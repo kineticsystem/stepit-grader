@@ -4,6 +4,7 @@
 #include "../testutils/TestImages.h"
 
 #include "core/StandardPipeline.h"
+#include "editor/Icons.h"
 #include "editor/Sections.h"
 #include "editor/WhiteBalancePicker.h"
 #include "editor/widgets/AdjustmentsPanel.h"
@@ -12,6 +13,7 @@
 #include "editor/widgets/ParameterSlider.h"
 #include "editor/widgets/RecentFilesMenu.h"
 
+#include <QApplication>
 #include <QDir>
 #include <QDoubleSpinBox>
 #include <QLabel>
@@ -325,4 +327,30 @@ TEST(RecentFilesMenuTest, ClearsAndRemoves)
     EXPECT_FALSE(menu.isEnabled());
     EXPECT_EQ(shown(menu).size(), 0);
     EXPECT_EQ(changed.count(), 2);
+}
+
+TEST(IconsTest, TheEyedropperIsBuiltInAndTakesTheThemesColour)
+{
+    const QPalette original = QApplication::palette();
+    for (const QColor text : {QColor{Qt::black}, QColor{Qt::white}}) {
+        QPalette palette = original;
+        palette.setColor(QPalette::ButtonText, text);
+        QApplication::setPalette(palette);
+        const QImage image = eyedropperIcon().pixmap(48).toImage();
+        int opaque = 0;
+        for (int y = 0; y < image.height(); ++y) {
+            for (int x = 0; x < image.width(); ++x) {
+                const QColor pixel = image.pixelColor(x, y);
+                if (pixel.alpha() > 200) {
+                    ++opaque;
+                    EXPECT_EQ(pixel.rgb(), text.rgb());
+                }
+            }
+        }
+        // The drawing covers part of the square: a shape, not nothing nor a block.
+        EXPECT_GT(opaque, 48 * 48 / 10);
+        EXPECT_LT(opaque, 48 * 48 / 2);
+        image.save(QString::fromStdString((testutils::outputFolder() / "eyedropper.png").string()));
+    }
+    QApplication::setPalette(original);
 }

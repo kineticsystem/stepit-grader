@@ -24,6 +24,11 @@ add_library(editor-lib STATIC
     src/widgets/RecentFilesMenu.cpp
     src/WhiteBalancePicker.cpp)
 target_include_directories(editor-lib PUBLIC include)
+# The icons, built into the library: nothing to install beside the program.
+qt_add_resources(editor-lib icons
+    PREFIX /
+    BASE resources
+    FILES resources/icons/eyedropper.svg)
 target_link_libraries(editor-lib
-    PUBLIC core-lib io-lib Qt6::Widgets Qt6::Concurrent)
+    PUBLIC core-lib io-lib Qt6::Widgets Qt6::Concurrent Qt6::Svg)
 stepit_grader_warnings(editor-lib)

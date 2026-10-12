@@ -17,7 +17,7 @@ if(EXISTS "${LENTIGRAM_LIB}")
     endforeach()
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Concurrent Test)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Concurrent Svg Test)
 find_package(TIFF REQUIRED)
 find_package(pugixml REQUIRED)
 find_package(PkgConfig REQUIRED)

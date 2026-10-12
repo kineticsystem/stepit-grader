@@ -5,5 +5,5 @@
 
 #include <QIcon>
 
-/// An eyedropper, from the desktop's theme when it has one, or drawn in the text's colour.
+/// An eyedropper, from Lentigram's icons, in the colour of the buttons' text.
 QIcon eyedropperIcon();
