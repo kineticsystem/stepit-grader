@@ -23,6 +23,7 @@
 #include <QSignalSpy>
 #include <QSlider>
 #include <QStyle>
+#include <QStyleOptionSlider>
 #include <QTest>
 #include <QToolButton>
 
@@ -58,6 +59,42 @@ TEST(ParameterSliderTest, DoubleClickResets)
     EXPECT_DOUBLE_EQ(slider.value(), 0);
     ASSERT_GE(spy.count(), 1);
     EXPECT_DOUBLE_EQ(spy.last().at(0).toDouble(), 0);
+}
+
+TEST(ParameterSliderTest, GrabsTheCircleAnywhereAndMovesOnTheLine)
+{
+    ParameterSlider slider{"Contrast", -100, 100, 0, 0};
+    slider.resize(300, slider.sizeHint().height());
+    static_cast<QWidget &>(slider).show(); // ParameterSlider::show() is its own, private
+    auto *line = slider.findChild<QSlider *>();
+    QStyleOptionSlider option;
+    option.initFrom(line);
+    option.orientation = Qt::Horizontal;
+    option.minimum = line->minimum();
+    option.maximum = line->maximum();
+    option.sliderPosition = line->sliderPosition();
+    const QRect circle
+        = line->style()->subControlRect(QStyle::CC_Slider, &option, QStyle::SC_SliderHandle, line);
+    // A circle large enough to grab at once, in the middle for the default of 0.
+    EXPECT_GE(circle.width(), 12);
+    EXPECT_EQ(circle.width(), circle.height());
+    EXPECT_NEAR(circle.center().x(), line->width() / 2, 2);
+    // A plain line: the same colour on both sides of the circle, not filled up to it as most
+    // styles fill a slider's groove; and the circle empty, in the window's colour.
+    const QImage drawn = line->grab().toImage();
+    const int y = circle.center().y();
+    EXPECT_EQ(drawn.pixelColor(line->width() / 4, y), drawn.pixelColor(line->width() * 3 / 4, y));
+    EXPECT_EQ(drawn.pixelColor(circle.center()), line->palette().color(QPalette::Window));
+
+    // Pressed near its edge, the circle is grabbed: the value stays until it is dragged.
+    QTest::mousePress(line, Qt::LeftButton, {}, circle.center() + QPoint{circle.width() / 2 - 2, 0});
+    EXPECT_TRUE(line->isSliderDown());
+    EXPECT_DOUBLE_EQ(slider.value(), 0);
+    QTest::mouseRelease(line, Qt::LeftButton, {}, circle.center());
+
+    // Pressed on the line, away from it, the value moves towards the press.
+    QTest::mouseClick(line, Qt::LeftButton, {}, QPoint{line->width() - 4, circle.center().y()});
+    EXPECT_GT(slider.value(), 0);
 }
 
 TEST(AdjustmentsPanelTest, SectionsFollowThePipeline)
