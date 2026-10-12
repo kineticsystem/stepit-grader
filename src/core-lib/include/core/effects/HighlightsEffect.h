@@ -17,7 +17,7 @@ class HighlightsEffect : public Effect
 public:
     static inline const Parameter HIGHLIGHTS{"Highlights2012", "Highlights", -100, 100, 0, 0};
 
-    std::string section() const override { return "Tone"; }
+    std::string section() const override { return "Light"; }
     std::vector<Parameter> parameters() const override { return {HIGHLIGHTS}; }
     void apply(Image &image, const Settings &settings, const RenderContext &context) const override;
 };

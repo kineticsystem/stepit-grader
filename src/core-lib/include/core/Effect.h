@@ -33,7 +33,7 @@ class Effect
 public:
     virtual ~Effect() = default;
 
-    /// The section of the tools panel it belongs to, e.g. "Tone".
+    /// The section of the tools panel it belongs to, e.g. "Light".
     virtual std::string section() const = 0;
 
     virtual std::vector<Parameter> parameters() const = 0;

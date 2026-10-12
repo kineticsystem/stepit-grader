@@ -3,7 +3,10 @@
 
 #include "widgets/Sections.h"
 
-std::vector<AdjustmentsPanel::Section> sectionsOf(const core::Pipeline &pipeline)
+#include <algorithm>
+
+std::vector<AdjustmentsPanel::Section> sectionsOf(
+    const core::Pipeline &pipeline, const std::vector<std::string> &order)
 {
     std::vector<AdjustmentsPanel::Section> sections;
     for (const auto &effect : pipeline.effects()) {
@@ -17,5 +20,11 @@ std::vector<AdjustmentsPanel::Section> sectionsOf(const core::Pipeline &pipeline
             it->parameters.push_back(parameter);
         }
     }
+    // Where a section stands in `order`; past its end for the sections it does not name, which
+    // keep the order of the pipeline, the sort being stable.
+    const auto rank = [&order](const AdjustmentsPanel::Section &section) {
+        return std::ranges::find(order, section.title.toStdString()) - order.begin();
+    };
+    std::ranges::stable_sort(sections, {}, rank);
     return sections;
 }

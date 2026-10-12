@@ -16,7 +16,7 @@ class VibranceEffect : public Effect
 public:
     static inline const Parameter VIBRANCE{"Vibrance", "Vibrance", -100, 100, 0, 0};
 
-    std::string section() const override { return "Presence"; }
+    std::string section() const override { return "Color"; }
     std::vector<Parameter> parameters() const override { return {VIBRANCE}; }
     void apply(Image &image, const Settings &settings, const RenderContext &context) const override;
 };

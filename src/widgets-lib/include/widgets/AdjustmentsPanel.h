@@ -18,7 +18,7 @@ class CollapsibleSection;
 class ParameterSlider;
 
 /**
- * The tools: one slider per parameter, in sections that fold away, e.g. "Tone" with the exposure
+ * The tools: one slider per parameter, in sections that fold away, e.g. "Light" with the exposure
  * and the contrast. It knows the parameters it is given, not the effects behind them, and tells
  * its client of every change with settingsChanged(), and of every section opened or closed with
  * sectionExpandedChanged(), so the client can remember them.

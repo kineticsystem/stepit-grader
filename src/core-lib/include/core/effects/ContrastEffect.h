@@ -16,7 +16,7 @@ class ContrastEffect : public Effect
 public:
     static inline const Parameter CONTRAST{"Contrast2012", "Contrast", -100, 100, 0, 0};
 
-    std::string section() const override { return "Tone"; }
+    std::string section() const override { return "Light"; }
     std::vector<Parameter> parameters() const override { return {CONTRAST}; }
     void apply(Image &image, const Settings &settings, const RenderContext &context) const override;
 };

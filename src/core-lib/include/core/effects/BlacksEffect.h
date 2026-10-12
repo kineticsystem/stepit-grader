@@ -16,7 +16,7 @@ class BlacksEffect : public Effect
 public:
     static inline const Parameter BLACKS{"Blacks2012", "Blacks", -100, 100, 0, 0};
 
-    std::string section() const override { return "Tone"; }
+    std::string section() const override { return "Light"; }
     std::vector<Parameter> parameters() const override { return {BLACKS}; }
     void apply(Image &image, const Settings &settings, const RenderContext &context) const override;
 };

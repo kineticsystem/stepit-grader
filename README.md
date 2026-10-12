@@ -178,7 +178,7 @@ Open a picture with **File > Open**, or drop it on the window. **File > Open Rec
 
 ### Edit It
 
-Move a slider on the right, or type its value. The sections start folded: a click on a section's title, e.g. **Tone**, opens it, and another folds it away. The picture follows at once, on a reduced preview, then, once the sliders stop for 0.3 seconds, in full, which is what to look at at 100%. A double click on a slider or its name puts it back to 0.
+Move a slider on the right, or type its value. The sections start folded: a click on a section's title, e.g. **Light**, opens it, and another folds it away. The picture follows at once, on a reduced preview, then, once the sliders stop for 0.3 seconds, in full, which is what to look at at 100%. A double click on a slider or its name puts it back to 0.
 
 To set the white balance from the picture, click the eyedropper next to **White Balance**, or press `W`, then click an area that should be white or grey, e.g. a grey card or a white wall. The cursor shows the circle averaged, about 10 screen pixels across, whatever the zoom; its clipped pixels are left out. The temperature and the tint are set so the area turns neutral, and the eyedropper goes back to dragging. `Esc` cancels.
 
@@ -254,22 +254,22 @@ The tools are applied in this order, from top to bottom. Each changes the whole 
 
 | Section | Tool | Range | What it does |
 |---|---|---|---|
-| White Balance | Temperature | `-100` to `100` | Warmer above 0, cooler below, from the picture's own white balance. |
+| Light | Exposure | `-5.00` to `5.00` | Stops of light: `+1.00` is twice as bright. |
+| | Contrast | `-100` to `100` | Spreads the tones away from middle grey, or toward it. |
+| | Highlights | `-100` to `100` | Darkens, or brightens, the bright areas only. |
+| | Shadows | `-100` to `100` | Brightens, or darkens, the dark areas only. |
+| | Blacks | `-100` to `100` | Crushes the darkest tones to black, or lifts black to a dark grey. |
+| Color | Temperature | `-100` to `100` | Warmer above 0, cooler below, from the picture's own white balance. |
 | | Tint | `-100` to `100` | More magenta above 0, more green below. |
+| | Vibrance | `-100` to `100` | Saturates the dull colours more than the vivid ones. |
+| | Saturation | `-100` to `100` | Saturates every colour; `-100` is black and white. |
+| Effects | Detail | `-100` to `100` | The contrast of the fine texture, a few pixels across, e.g. hairs. |
+| | Structure | `-100` to `100` | The contrast of the medium shapes, e.g. a leg against a body. |
 | Noise Reduction | Luminance | `0` to `100` | Smooths the grain of the luminance a high ISO makes, in the shadows and the highlights alike, and keeps the edges. |
 | | Luminance Detail | `0` to `100` | How much of the fine detail the luminance smoothing keeps; `50` by default. |
 | | Color | `0` to `100` | Removes the coloured blotches of a high ISO, mostly in the shadows, without colour bleeding across edges. The luminance, and so the detail, stays. |
 | Defringe | Purple Amount | `0` to `20` | Takes the colour out of purple fringes, the purple edges a lens draws along strong contrasts. Higher also searches a wider band beside the edges. |
 | | Purple Hue Low, Purple Hue High | `0` to `100` | The hues taken for fringes, from blue (`0`) through purple to magenta (`100`); `30` to `70` by default. A purple area away from edges keeps its colour. |
-| Tone | Exposure | `-5.00` to `5.00` | Stops of light: `+1.00` is twice as bright. |
-| | Contrast | `-100` to `100` | Spreads the tones away from middle grey, or toward it. |
-| | Highlights | `-100` to `100` | Darkens, or brightens, the bright areas only. |
-| | Shadows | `-100` to `100` | Brightens, or darkens, the dark areas only. |
-| | Blacks | `-100` to `100` | Crushes the darkest tones to black, or lifts black to a dark grey. |
-| Presence | Detail | `-100` to `100` | The contrast of the fine texture, a few pixels across, e.g. hairs. |
-| | Structure | `-100` to `100` | The contrast of the medium shapes, e.g. a leg against a body. |
-| | Vibrance | `-100` to `100` | Saturates the dull colours more than the vivid ones. |
-| | Saturation | `-100` to `100` | Saturates every colour; `-100` is black and white. |
 | HDR | HDR Compression | `0` to `100` | Fits the highlights brighter than white back into the picture, up to 4 stops above it, with a smooth roll-off instead of a clip. |
 | | Compression Point | `0` to `100` | Where the roll-off starts: from middle grey (`0`) to just below white (`100`). The tones below are untouched. |
 | | Local Contrast | `0` to `100` | At `100`, compresses the brightness of whole areas and keeps the texture within them, e.g. the clouds of a bright sky; at `0`, every pixel on its own. |
