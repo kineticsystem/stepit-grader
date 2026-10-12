@@ -13,6 +13,7 @@
 #include "widgets/ImageView.h"
 #include "widgets/ParameterSlider.h"
 #include "widgets/Sections.h"
+#include "widgets/SliderStyle.h"
 
 #include <QApplication>
 #include <QDir>
@@ -95,6 +96,15 @@ TEST(ParameterSliderTest, GrabsTheCircleAnywhereAndMovesOnTheLine)
     // Pressed on the line, away from it, the value moves towards the press.
     QTest::mouseClick(line, Qt::LeftButton, {}, QPoint{line->width() - 4, circle.center().y()});
     EXPECT_GT(slider.value(), 0);
+}
+
+TEST(SliderStyleTest, GivesAnySliderTheLook)
+{
+    // A slider of a program's own, not a ParameterSlider's: the same line and circle.
+    QSlider slider{Qt::Horizontal};
+    SliderStyle::apply(&slider);
+    EXPECT_EQ(slider.style(), SliderStyle::instance());
+    EXPECT_TRUE(slider.testAttribute(Qt::WA_Hover));
 }
 
 TEST(AdjustmentsPanelTest, SectionsFollowThePipeline)

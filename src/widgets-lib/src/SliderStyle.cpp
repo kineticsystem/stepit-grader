@@ -1,11 +1,12 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "SliderStyle.h"
+#include "widgets/SliderStyle.h"
 
 #include <QApplication>
 #include <QPainter>
 #include <QPointer>
+#include <QSlider>
 #include <QStyleOptionSlider>
 
 namespace {
@@ -45,6 +46,13 @@ SliderStyle *SliderStyle::instance()
         style->setParent(qApp);
     }
     return style;
+}
+
+void SliderStyle::apply(QSlider *slider)
+{
+    slider->setStyle(instance());
+    // The ring takes the highlight under the mouse, which needs hover events.
+    slider->setAttribute(Qt::WA_Hover);
 }
 
 int SliderStyle::pixelMetric(
