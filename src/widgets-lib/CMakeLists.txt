@@ -14,7 +14,9 @@ add_library(widgets-lib STATIC
     src/CollapsibleSection.cpp
     src/ImageView.cpp
     src/ParameterSlider.cpp
-    src/Sections.cpp)
+    src/Sections.cpp
+    src/SliderStyle.cpp
+    src/SliderStyle.h)
 add_library(stepit-grader::widgets ALIAS widgets-lib)
 target_include_directories(widgets-lib PUBLIC include)
 target_link_libraries(widgets-lib PUBLIC core-lib Qt6::Widgets)

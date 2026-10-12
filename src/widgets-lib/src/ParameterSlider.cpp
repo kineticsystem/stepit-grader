@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "widgets/ParameterSlider.h"
+#include "SliderStyle.h"
 
 #include <QDoubleSpinBox>
 #include <QEvent>
@@ -31,6 +32,10 @@ ParameterSlider::ParameterSlider(
     m_slider->setRange(toSteps(minimum), toSteps(maximum));
     m_slider->setValue(toSteps(defaultValue));
     m_slider->setPageStep(std::max(1, (toSteps(maximum) - toSteps(minimum)) / 20));
+    // A line with a circle to drag, whatever the application's style; the circle lights up under
+    // the mouse, which needs hover events.
+    m_slider->setStyle(SliderStyle::instance());
+    m_slider->setAttribute(Qt::WA_Hover);
     m_slider->setToolTip(tr("Double click to reset"));
     m_label->setToolTip(tr("Double click to reset"));
 
