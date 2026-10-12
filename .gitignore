@@ -6,3 +6,6 @@ deps/
 .vscode/
 .qtcreator/
 *.user
+
+# Notes kept out of the repository.
+tmp/
