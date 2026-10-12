@@ -13,7 +13,7 @@ enum class Theme {
     System,
     /// Qt's Fusion style, light.
     Light,
-    /// Qt's Fusion style, with Lentigram's dark colours.
+    /// Qt's Fusion style, dark grey.
     Dark,
 };
 

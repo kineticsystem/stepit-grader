@@ -25,8 +25,8 @@ add_library(editor-lib STATIC
     src/widgets/RecentFilesMenu.cpp
     src/WhiteBalancePicker.cpp)
 target_include_directories(editor-lib PUBLIC include)
-# The icons, from Lentigram's, a light and a dark drawing of each, built into
-# the library: nothing to install beside the program.
+# The icons, a light and a dark drawing of each, built into the library:
+# nothing to install beside the program.
 qt_add_resources(editor-lib icons
     PREFIX /
     BASE resources

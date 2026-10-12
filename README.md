@@ -48,10 +48,9 @@ The editor is built with CMake 3.22 or later and a C++23 compiler, e.g. GCC 13, 
 |---|---|---|
 | [Qt](https://www.qt.io/download-open-source) | 6.5 or later, 6.11 tested | The Qt online installer. |
 | [raw-converter](https://github.com/kineticsystem/raw-converter) | | A Git submodule, built with the editor. |
-| [LibRaw](https://www.libraw.org/) and [Little CMS](https://www.littlecms.com/) | 0.21 and 2.x | `./install-deps.sh`, or the system's packages. |
-| [libtiff](https://libtiff.gitlab.io/libtiff/), [pugixml](https://pugixml.org/) and [GoogleTest](https://github.com/google/googletest) | | Lentigram's `lib/`, made by [lentigram-deps](https://github.com/kineticsystem/lentigram-deps), or the system's packages. |
+| [LibRaw](https://www.libraw.org/), [Little CMS](https://www.littlecms.com/), [libtiff](https://libtiff.gitlab.io/libtiff/), [pugixml](https://pugixml.org/) and [GoogleTest](https://github.com/google/googletest) | 0.21.4, 2.17, 4.7.0, 1.15, 1.15.2 | `./install-deps.sh`, which builds them from their own source releases, or the system's packages. |
 
-When Lentigram is checked out next to this repository, in `../lentigram`, its `lib/` is used: nothing else to install for libtiff, pugixml and GoogleTest. Another folder is given with `-DLENTIGRAM_LIB=<path>`.
+`./install-deps.sh` needs a C and a C++ compiler, CMake, make, curl and zlib, which every system has.
 
 > [!NOTE]
 > The editor is built and tested on Ubuntu 24.04. The code is meant for macOS and Windows too, but has not been built there yet.
@@ -64,30 +63,34 @@ Install Qt 6 with the online installer, then tell CMake where it is, e.g.:
 export Qt6_DIR=~/Qt/6.11.0/gcc_64/lib/cmake/Qt6
 ```
 
-Without Lentigram's `lib/`, install the other libraries from Ubuntu:
+Install the build tools:
 
 ```bash
-sudo apt install build-essential cmake ninja-build pkg-config \
-    libtiff-dev libpugixml-dev libgtest-dev libraw-dev liblcms2-dev
+sudo apt install build-essential cmake ninja-build pkg-config curl zlib1g-dev
+```
+
+Instead of `./install-deps.sh`, the libraries can come from Ubuntu too:
+
+```bash
+sudo apt install libtiff-dev libpugixml-dev libgtest-dev libraw-dev liblcms2-dev
 ```
 
 ### macOS
 
-Install Xcode, Qt 6 with the online installer, and the libraries with [Homebrew](https://brew.sh):
+Install Xcode, Qt 6 with the online installer, and the build tools with [Homebrew](https://brew.sh):
 
 ```bash
-brew install cmake ninja pkg-config libtiff pugixml googletest libraw little-cms2
+brew install cmake ninja pkg-config
 export Qt6_DIR=~/Qt/6.11.0/macos/lib/cmake/Qt6
 ```
 
 ### Windows 11
 
-Install [MSYS2](https://www.msys2.org), and in its MINGW64 shell, Qt 6 and the libraries:
+Install [MSYS2](https://www.msys2.org), and in its MINGW64 shell, Qt 6 and the build tools:
 
 ```bash
 pacman -S --needed mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja \
-    mingw-w64-x86_64-qt6 mingw-w64-x86_64-libtiff mingw-w64-x86_64-pugixml \
-    mingw-w64-x86_64-gtest mingw-w64-x86_64-libraw mingw-w64-x86_64-lcms2 git
+    mingw-w64-x86_64-pkgconf mingw-w64-x86_64-zlib mingw-w64-x86_64-qt6 make curl git
 ```
 
 ## Install StepIt Grader
@@ -108,11 +111,13 @@ git submodule update --init
 
 ### Install the Libraries
 
-When the system has no LibRaw and Little CMS, e.g. on a computer without administrator rights, build them into `deps/`, which the build looks in first:
+Build the libraries once, in about half a minute. Each is downloaded from its own project, at a fixed version, and installed into a folder of its own in `deps/`, which the build looks in first.
 
 ```bash
 ./install-deps.sh
 ```
+
+There is one script per library in `scripts/`. A library already in `deps/` is skipped: delete its folder to build it again.
 
 ### Build the Project
 
@@ -161,7 +166,7 @@ The window's title shows `*` while the settings are not written yet: for the sec
 
 ### Choose the Theme
 
-**Settings > Theme** chooses the look: **System**, the desktop's own, the default; **Light**; or **Dark**, the dark grey of Lentigram, easier on the eyes when judging a picture. The change is at once, and kept for the next time. On macOS, the menus show no icons, as their bar stays light whatever the theme; the toolbar keeps them.
+**Settings > Theme** chooses the look: **System**, the desktop's own, the default; **Light**; or **Dark**, dark grey, easier on the eyes when judging a picture. The change is at once, and kept for the next time. On macOS, the menus show no icons, as their bar stays light whatever the theme; the toolbar keeps them.
 
 ### Keyboard Shortcuts
 
@@ -288,9 +293,7 @@ Without them, those two tests are skipped.
 
 **CMake says `Could not find a package configuration file provided by "Qt6"`.** It does not know where Qt is: set `Qt6_DIR`, see [Prerequisites](#prerequisites).
 
-**CMake says `Package 'libraw_r', required by 'virtual:world', not found`.** LibRaw is neither in the system nor in `deps/`: run `./install-deps.sh`, or install the system's package.
-
-**The link fails with `undefined reference to 'jpeg12_read_raw_data@LIBJPEG_6.2'`.** Lentigram's libtiff is linked with the system's libjpeg instead of Lentigram's libjpeg-turbo. Check that `${LENTIGRAM_LIB}/jpeg/lib` exists: the build adds it to the run path.
+**CMake says `Package 'libraw_r', required by 'virtual:world', not found`, or does not find TIFF or pugixml.** The libraries are neither in `deps/` nor in the system: run `./install-deps.sh`.
 
 **The sliders are slow.** The build is `Debug`: build in `Release`.
 
@@ -304,6 +307,7 @@ StepIt Grader is released under the MIT licence, see [`LICENSE`](LICENSE). The s
 | [raw-converter](https://github.com/kineticsystem/raw-converter) | MIT | Develops the raw files. |
 | [LibRaw](https://www.libraw.org/) | LGPL 2.1 or CDDL 1.0 | Decodes and demosaics the raw files, in raw-converter, linked dynamically. |
 | [Little CMS](https://www.littlecms.com/) | MIT | Converts the colours of a TIFF from its ICC profile. |
-| [libtiff](https://libtiff.gitlab.io/libtiff/) | libtiff licence, BSD-like | Reads the TIFF files. |
-| [pugixml](https://pugixml.org/) | MIT | Reads and writes the XMP sidecars. |
+| [libtiff](https://libtiff.gitlab.io/libtiff/) | libtiff licence, BSD-like | Reads and writes the TIFF files, linked statically. |
+| [pugixml](https://pugixml.org/) | MIT | Reads and writes the XMP sidecars, linked statically. |
+| [zlib](https://zlib.net/) | zlib licence | Deflate, for libtiff: the system's. |
 | [GoogleTest](https://github.com/google/googletest) | BSD 3-Clause | The tests. |

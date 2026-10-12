@@ -9,14 +9,14 @@ StepIt Grader is a C++23/Qt 6 desktop application that edits the tones and colou
 ## Build Commands
 
 ```bash
-./install-deps.sh                      # once: LibRaw and Little CMS into deps/
+./install-deps.sh                      # once: LibRaw, Little CMS, libtiff, pugixml, GoogleTest into deps/
 export Qt6_DIR=~/Qt/6.11.0/gcc_64/lib/cmake/Qt6
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build                 # or build/bin/stepit-grader-tests --gtest_filter='EffectsTest.*'
 ```
 
-libtiff, pugixml and GoogleTest come from Lentigram's `lib/` (`-DLENTIGRAM_LIB`, default `../lentigram/lib`), or the system. Build in Release: the effects are about ten times slower in Debug.
+LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/<library>`, built by `./install-deps.sh` (one script per library in `scripts/`) and found by the modules of `cmake/`; without `deps/`, from the system. Build in Release: the effects are about ten times slower in Debug.
 
 ## Architecture
 
@@ -39,7 +39,7 @@ libtiff, pugixml and GoogleTest come from Lentigram's `lib/` (`-DLENTIGRAM_LIB`,
 
 ## Code Style
 
-- C++23, clang-format with the `.clang-format` of the repo (Lentigram's), 100 columns.
+- C++23, clang-format with the `.clang-format` of the repo, 100 columns.
 - `m_` prefix for members, `Q_SIGNALS`/`Q_SLOTS`/`Q_EMIT`.
 - Each file starts with the MIT header: `// Copyright (c) 2026 Giovanni Remigi` and `// SPDX-License-Identifier: MIT`.
 - Comments say why; constants are named, at the top of their source, with what they mean.

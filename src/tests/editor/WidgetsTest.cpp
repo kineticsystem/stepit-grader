@@ -397,7 +397,7 @@ TEST(ThemeTest, DarkAndLightAndBackToTheSystemsStyle)
     };
     applyTheme(Theme::Dark);
     EXPECT_TRUE(fusion());
-    // Lentigram's dark grey.
+    // The dark theme's grey.
     EXPECT_EQ(QApplication::palette().color(QPalette::Window), QColor(53, 53, 53));
     EXPECT_TRUE(isDarkTheme());
     // A disabled icon is grey, not darkened out of sight.

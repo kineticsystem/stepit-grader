@@ -214,7 +214,7 @@ void MainWindow::createActions()
 
     createSettingsMenu();
 
-    // The actions used most, one click away, as in Lentigram: fixed, without a menu of its own.
+    // The actions used most, one click away: fixed, without a menu of its own.
     QToolBar *toolbar = addToolBar(tr("Tools"));
     toolbar->setObjectName("tools");
     toolbar->setMovable(false);

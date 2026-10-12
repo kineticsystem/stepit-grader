@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
     // The theme chosen in Settings > Theme, before the window and its icons are made.
     applyTheme(themeNamed(QSettings{}.value(THEME_SETTING).toString()).value_or(Theme::System));
 #ifdef Q_OS_MACOS
-    // As in Lentigram: macOS's menu bar stays light whatever the theme, where the icons of a dark
+    // macOS's menu bar stays light whatever the theme, where the icons of a dark
     // theme would hardly show. The menus go without icons; the toolbar keeps them.
     QApplication::setAttribute(Qt::AA_DontShowIconsInMenus);
 #endif

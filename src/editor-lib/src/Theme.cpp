@@ -12,7 +12,7 @@
 namespace {
 
 /**
- * Fusion, light or with Lentigram's dark colours. Fusion draws the same on every system, so the
+ * Fusion, light or dark grey. Fusion draws the same on every system, so the
  * dark colours look the same on Linux, Windows and macOS.
  */
 class FusionStyle : public QProxyStyle
@@ -28,7 +28,6 @@ public:
         if (!m_dark) {
             return QProxyStyle::standardPalette();
         }
-        // Lentigram's DarkStyle.
         QPalette palette;
         palette.setColor(QPalette::Window, QColor{53, 53, 53});
         palette.setColor(QPalette::WindowText, Qt::white);
@@ -61,8 +60,7 @@ public:
         if (!m_dark || mode != QIcon::Disabled) {
             return QProxyStyle::generatedIconPixmap(mode, pixmap, option);
         }
-        // Fusion darkens a disabled icon, which on a dark theme hides it: grey instead, as in
-        // Lentigram.
+        // Fusion darkens a disabled icon, which on a dark theme hides it: grey instead.
         QImage image = pixmap.toImage().convertToFormat(QImage::Format_ARGB32);
         for (int y = 0; y < image.height(); ++y) {
             auto *line = reinterpret_cast<QRgb *>(image.scanLine(y));

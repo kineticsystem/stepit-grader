@@ -1,4 +1,4 @@
-# One test program for every library, as Lentigram does: it links them all,
+# One test program for every library: it links them all,
 # so it also catches what only shows once they are together.
 find_package(GTest REQUIRED)
 set(CMAKE_AUTOMOC ON)
