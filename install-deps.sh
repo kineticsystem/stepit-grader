@@ -29,5 +29,6 @@ source "$ROOT/scripts/libraw/install-libraw.sh"
 source "$ROOT/scripts/tiff/install-tiff.sh"
 source "$ROOT/scripts/pugixml/install-pugixml.sh"
 source "$ROOT/scripts/gtest/install-gtest.sh"
+source "$ROOT/scripts/linuxdeploy/install-linuxdeploy.sh"
 
 echo "The libraries are in $DEPS_DIR"

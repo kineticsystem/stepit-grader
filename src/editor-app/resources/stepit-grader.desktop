@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=StepIt Grader
+GenericName=Photo Editor
+Comment=Edit the tones and colours of a picture
+Exec=stepit-grader %f
+Icon=stepit-grader
+Terminal=false
+Categories=Graphics;Photography;
+MimeType=image/tiff;image/x-adobe-dng;image/x-canon-cr2;image/x-canon-cr3;image/x-nikon-nef;image/x-sony-arw;image/x-fuji-raf;

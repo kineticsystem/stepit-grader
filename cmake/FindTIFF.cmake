@@ -3,7 +3,7 @@
 # Result variables:
 #   TIFF_FOUND, TIFF_VERSION, TIFF_INCLUDE_DIRS, TIFF_LIBRARIES
 # Imported target:
-#   TIFF::TIFF, with zlib, which the static libtiff of deps/ does not bring.
+#   TIFF::TIFF, with zlib, which a static libtiff does not bring.
 
 find_path(TIFF_INCLUDE_DIR
     NAMES tiffio.h

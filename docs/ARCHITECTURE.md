@@ -22,6 +22,7 @@
   - [The Main Window and main()](#the-main-window-and-main)
 - [A Slider Moves](#a-slider-moves)
 - [Threads](#threads)
+- [The Linux AppImage](#the-linux-appimage)
 - [Tests](#tests)
 - [How to Extend StepIt Grader](#how-to-extend-stepit-grader)
 - [Design Decisions and Trade-offs](#design-decisions-and-trade-offs)
@@ -404,6 +405,16 @@ A slider dragged sends a change for every step: each starts a preview if none is
 | Inside an effect, a reader or the screen conversion | `core::parallelFor`'s pool. | The caller waits for its chunks, helping with them. |
 | Saving a sidecar | The main thread: a few kB. | |
 
+## The Linux AppImage
+
+[`setup/linux/package-stepit-grader.sh`](../setup/linux/package-stepit-grader.sh) makes one AppImage with both programs, with the steps of [`common.sh`](../setup/linux/common.sh):
+
+1. Build the project into `build/linux-package`, without the tests, and install it into an `AppDir`.
+2. Bundle the programs, Qt and every library they need with linuxdeploy and its Qt plugin, which `install-deps.sh` downloads into `deps/linuxdeploy`. Qt's GTK3 theme is added, for the desktop's fonts and dialogs, and the offscreen display, to run headless.
+3. Replace linuxdeploy's `AppRun` with [`AppRun-stepit-grader.sh`](../setup/linux/AppRun-stepit-grader.sh), which starts the editor, or the command line with `--cli`, and make the AppImage.
+
+The application's icon and desktop file are in [`src/editor-app/resources`](../src/editor-app/resources), installed by CMake.
+
 ## Tests
 
 All the tests are in one program, [`src/tests`](../src/tests), with GoogleTest and Qt Test: it links every library, so it also catches what only shows once they are together. [`Main.cpp`](../src/tests/Main.cpp) makes one `QApplication`, offscreen. Run them with `ctest --test-dir build`, or `build/bin/stepit-grader-tests`.
@@ -459,7 +470,7 @@ What has no automated test, and how to check it by hand:
 
 **Our own thread pool.** An effect calls `parallelFor` about ten times, and two renders can run at once. The price: about 150 lines that must stay correct, which the sanitizers check.
 
-**The libraries built by the project.** `install-deps.sh` runs one script per library, `scripts/<library>/install-<library>.sh`, which downloads it, checks it and installs it into `deps/<library>`. A find module per library in `cmake/`, e.g. `FindTIFF.cmake`, looks in `deps/<library>` first, then in the system. libtiff, pugixml and GoogleTest are static, so nothing has to be shipped beside the programs; LibRaw stays shared, as its LGPL licence asks. The price: half a minute to build them once, and libtiff without JPEG.
+**The libraries built by the project.** `install-deps.sh` runs one script per library, `scripts/<library>/install-<library>.sh`, which downloads it, checks it and installs it into `deps/<library>`. A find module per library in `cmake/`, e.g. `FindTIFF.cmake`, looks in `deps/<library>` first, then in the system. pugixml and GoogleTest are static. LibRaw is shared, as its LGPL licence asks, and so is libtiff, as Qt's TIFF plugin needs it too, under the name `libtiff.so.5`, which the script links. The price: half a minute to build them once, and libtiff without JPEG.
 
 **A command line of its own, not the editor's window with options.** A program with a window is a GUI program on Windows: it cannot print to the console it was started from. A console program without Qt also runs on a server or in a container without a screen. The price: two programs to build and ship, sharing everything but `main()`.
 

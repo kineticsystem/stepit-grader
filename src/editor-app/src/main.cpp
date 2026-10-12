@@ -12,6 +12,7 @@
 #include "imageio/XmpSidecar.h"
 
 #include <QApplication>
+#include <QIcon>
 #include <QCommandLineParser>
 #include <QSettings>
 
@@ -33,6 +34,9 @@ int main(int argc, char *argv[])
     QApplication::setOrganizationName("kineticsystem");
     QApplication::setApplicationName("StepIt Grader");
     QApplication::setApplicationVersion(STEPIT_GRADER_VERSION);
+    QApplication::setWindowIcon(QIcon{":/stepit-grader.png"});
+    // The desktop file's name, so the desktop matches the window to its icon.
+    QApplication::setDesktopFileName("stepit-grader");
 
     QCommandLineParser parser;
     parser.setApplicationDescription(
