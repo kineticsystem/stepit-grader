@@ -18,6 +18,10 @@ ctest --test-dir build                 # or build/bin/stepit-grader-tests --gtes
 
 LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/<library>`, built by `./install-deps.sh` (one script per library in `scripts/`) and found by the modules of `cmake/`; without `deps/`, from the system. Build in Release: the effects are about ten times slower in Debug.
 
+## Packaging
+
+`setup/linux/package-stepit-grader.sh` makes the Linux AppImage, with both programs (`--cli` for the command line), into `build/linux-package/`. It needs `./install-deps.sh` first, which downloads linuxdeploy into `deps/linuxdeploy`.
+
 ## Architecture
 
 - `src/core-lib` (namespace `core`): the engine. Standard C++ only, no Qt, no files. `Image` is linear Rec. 2020 float. Each effect is one header in `include/core/effects` and one source in `src/effects`, implementing `Effect`; `makeStandardPipeline()` is the only place that lists them.

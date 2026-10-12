@@ -10,10 +10,10 @@
 set(STEPIT_GRADER_DEPS_DIR "${PROJECT_SOURCE_DIR}/deps")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
-# The libraries of deps/ that pkg-config finds: their lib/pkgconfig, through
-# CMAKE_PREFIX_PATH. They are shared, so their lib/ goes on the programs' run
-# path, and they start without LD_LIBRARY_PATH.
-set(STEPIT_GRADER_SHARED_DEPS libraw lcms2)
+# The shared libraries of deps/: their lib/ on the programs' run path, so they
+# start without LD_LIBRARY_PATH, and their lib/pkgconfig, through
+# CMAKE_PREFIX_PATH, for pkg-config.
+set(STEPIT_GRADER_SHARED_DEPS libraw lcms2 tiff)
 foreach(library ${STEPIT_GRADER_SHARED_DEPS})
     list(APPEND CMAKE_PREFIX_PATH "${STEPIT_GRADER_DEPS_DIR}/${library}")
     list(APPEND CMAKE_BUILD_RPATH "${STEPIT_GRADER_DEPS_DIR}/${library}/lib")

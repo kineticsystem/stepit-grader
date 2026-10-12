@@ -11,6 +11,7 @@
   - [Check out the Git Repository](#check-out-the-git-repository)
   - [Install the Libraries](#install-the-libraries)
   - [Build the Project](#build-the-project)
+  - [Package for Linux](#package-for-linux)
 - [Running the Application](#running-the-application)
   - [Open a Picture](#open-a-picture)
   - [Edit It](#edit-it)
@@ -57,41 +58,43 @@ The editor is built with CMake 3.22 or later and a C++23 compiler, e.g. GCC 13, 
 
 ### Ubuntu 24.04
 
-Install Qt 6 with the online installer, then tell CMake where it is, e.g.:
-
-```bash
-export Qt6_DIR=~/Qt/6.11.0/gcc_64/lib/cmake/Qt6
-```
-
 Install the build tools:
 
 ```bash
 sudo apt install build-essential cmake ninja-build pkg-config curl zlib1g-dev
 ```
 
-Instead of `./install-deps.sh`, the libraries can come from Ubuntu too:
+Install the latest Qt 6, with Qt Creator if you like, with the [Qt online installer](https://www.qt.io/download-open-source). Then tell CMake where Qt is, e.g.:
 
 ```bash
-sudo apt install libtiff-dev libpugixml-dev libgtest-dev libraw-dev liblcms2-dev
+export Qt6_DIR=~/Qt/6.11.0/gcc_64/lib/cmake/Qt6
 ```
 
 ### macOS
 
-Install Xcode, Qt 6 with the online installer, and the build tools with [Homebrew](https://brew.sh):
+1. Install Xcode, which brings the command line tools, from the [Apple Developer portal](https://developer.apple.com/download/): download the `.xip` file, double-click it, and drag Xcode into the Applications folder.
+2. Install CMake and Ninja, e.g. with [Homebrew](https://brew.sh): `brew install cmake ninja pkg-config`.
+3. Install the latest Qt 6 with the [Qt online installer](https://www.qt.io/download-open-source), and tell CMake where it is, e.g.:
 
-```bash
-brew install cmake ninja pkg-config
-export Qt6_DIR=~/Qt/6.11.0/macos/lib/cmake/Qt6
-```
+   ```bash
+   export Qt6_DIR=~/Qt/6.11.0/macos/lib/cmake/Qt6
+   ```
 
 ### Windows 11
 
-Install [MSYS2](https://www.msys2.org), and in its MINGW64 shell, Qt 6 and the build tools:
+1. Download [MSYS2](https://www.msys2.org) and install it.
+2. Open the MSYS2 **MINGW64** terminal, and update it, running this twice if it asks to restart the terminal:
 
-```bash
-pacman -S --needed mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja \
-    mingw-w64-x86_64-pkgconf mingw-w64-x86_64-zlib mingw-w64-x86_64-qt6 make curl git
-```
+   ```bash
+   pacman -Syu
+   ```
+
+3. Install the compiler, the build tools and Qt 6:
+
+   ```bash
+   pacman -S --needed mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja \
+       mingw-w64-x86_64-pkgconf mingw-w64-x86_64-zlib mingw-w64-x86_64-qt6 make curl git
+   ```
 
 ## Install StepIt Grader
 
@@ -129,6 +132,23 @@ cmake --build build
 ```
 
 The programs are in `build/bin`: `stepit-grader`, the editor, `stepit-grader-cli`, the command line, and `stepit-grader-tests`. Build in `Release`: the effects are about ten times slower in `Debug`.
+
+### Package for Linux
+
+Make an AppImage, a single file that runs on Linux without installing anything:
+
+```bash
+./setup/linux/package-stepit-grader.sh
+```
+
+It builds the project, bundles Qt and every library with [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy), which `./install-deps.sh` downloads, and writes `build/linux-package/stepit-grader-<version>-x86_64.AppImage`. It holds both programs:
+
+```bash
+./stepit-grader-0.1.0-x86_64.AppImage                  # the editor
+./stepit-grader-0.1.0-x86_64.AppImage --cli --help     # the command line
+```
+
+The AppImage runs on Linux systems at least as recent as the one it was made on.
 
 ## Running the Application
 
@@ -307,7 +327,8 @@ StepIt Grader is released under the MIT licence, see [`LICENSE`](LICENSE). The s
 | [raw-converter](https://github.com/kineticsystem/raw-converter) | MIT | Develops the raw files. |
 | [LibRaw](https://www.libraw.org/) | LGPL 2.1 or CDDL 1.0 | Decodes and demosaics the raw files, in raw-converter, linked dynamically. |
 | [Little CMS](https://www.littlecms.com/) | MIT | Converts the colours of a TIFF from its ICC profile. |
-| [libtiff](https://libtiff.gitlab.io/libtiff/) | libtiff licence, BSD-like | Reads and writes the TIFF files, linked statically. |
+| [libtiff](https://libtiff.gitlab.io/libtiff/) | libtiff licence, BSD-like | Reads and writes the TIFF files, linked dynamically. |
 | [pugixml](https://pugixml.org/) | MIT | Reads and writes the XMP sidecars, linked statically. |
 | [zlib](https://zlib.net/) | zlib licence | Deflate, for libtiff: the system's. |
 | [GoogleTest](https://github.com/google/googletest) | BSD 3-Clause | The tests. |
+| [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy) | MIT | Makes the Linux AppImage; not in the AppImage itself. |
