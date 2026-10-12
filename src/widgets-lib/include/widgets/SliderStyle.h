@@ -5,6 +5,8 @@
 
 #include <QProxyStyle>
 
+class QSlider;
+
 /**
  * Draws a horizontal slider as a thin line with a large empty circle to drag, as raw editors do,
  * in the colours of the slider's palette, so it follows the light and the dark themes. Whatever
@@ -12,6 +14,8 @@
  *
  * It also says where the circle is, so Qt grabs it anywhere inside, and the line runs the whole
  * width: the circle's centre reaches both ends.
+ *
+ * `ParameterSlider` uses it; `apply()` gives the same look to any other slider of a program.
  */
 class SliderStyle : public QProxyStyle
 {
@@ -20,6 +24,9 @@ class SliderStyle : public QProxyStyle
 public:
     /// One style for every slider, owned by the application.
     static SliderStyle *instance();
+
+    /// Draws the slider with this style, and lights its circle up under the mouse.
+    static void apply(QSlider *slider);
 
     int pixelMetric(
         PixelMetric metric, const QStyleOption *option, const QWidget *widget) const override;

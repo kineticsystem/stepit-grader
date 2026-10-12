@@ -13,11 +13,13 @@
 #include "widgets/ImageView.h"
 #include "widgets/ParameterSlider.h"
 #include "widgets/Sections.h"
+#include "widgets/SliderStyle.h"
 
+#include <QAbstractSpinBox>
 #include <QApplication>
 #include <QDir>
-#include <QDoubleSpinBox>
 #include <QLabel>
+#include <QLocale>
 #include <QProxyStyle>
 #include <QScrollBar>
 #include <QSignalSpy>
@@ -43,11 +45,37 @@ TEST(ParameterSliderTest, EmitsUserChangesOnly)
     slider.findChild<QSlider *>()->setValue(-125);
     ASSERT_EQ(spy.count(), 1);
     EXPECT_DOUBLE_EQ(spy.takeFirst().at(0).toDouble(), -1.25);
-    EXPECT_DOUBLE_EQ(slider.findChild<QDoubleSpinBox *>()->value(), -1.25);
+}
 
-    slider.findChild<QDoubleSpinBox *>()->setValue(2.0);
-    ASSERT_EQ(spy.count(), 1);
-    EXPECT_EQ(slider.findChild<QSlider *>()->value(), 200);
+/// The text the slider shows for its value: the label that is not its name.
+QString shownValue(const ParameterSlider &slider, const QString &name)
+{
+    for (const QLabel *label : slider.findChildren<QLabel *>()) {
+        if (label->text() != name) {
+            return label->text();
+        }
+    }
+    return {};
+}
+
+TEST(ParameterSliderTest, ShowsTheValueAsTextNotToEdit)
+{
+    ParameterSlider slider{"Exposure", -5, 5, 0, 2};
+    // No box to type in: the slider is the one way to change the value.
+    EXPECT_EQ(slider.findChild<QAbstractSpinBox *>(), nullptr);
+    EXPECT_EQ(shownValue(slider, "Exposure"), QLocale{}.toString(0.0, 'f', 2));
+
+    slider.setValue(1.2);
+    EXPECT_EQ(shownValue(slider, "Exposure"), QLocale{}.toString(1.2, 'f', 2));
+    slider.findChild<QSlider *>()->setValue(-125);
+    EXPECT_EQ(shownValue(slider, "Exposure"), QLocale{}.toString(-1.25, 'f', 2));
+    // A value a hair below 0 shows as 0, as the slider's step, not as -0.00.
+    slider.setValue(-0.001);
+    EXPECT_EQ(shownValue(slider, "Exposure"), QLocale{}.toString(0.0, 'f', 2));
+
+    ParameterSlider whole{"Contrast", -100, 100, 0, 0};
+    whole.setValue(-35);
+    EXPECT_EQ(shownValue(whole, "Contrast"), "-35");
 }
 
 TEST(ParameterSliderTest, DoubleClickResets)
@@ -95,6 +123,15 @@ TEST(ParameterSliderTest, GrabsTheCircleAnywhereAndMovesOnTheLine)
     // Pressed on the line, away from it, the value moves towards the press.
     QTest::mouseClick(line, Qt::LeftButton, {}, QPoint{line->width() - 4, circle.center().y()});
     EXPECT_GT(slider.value(), 0);
+}
+
+TEST(SliderStyleTest, GivesAnySliderTheLook)
+{
+    // A slider of a program's own, not a ParameterSlider's: the same line and circle.
+    QSlider slider{Qt::Horizontal};
+    SliderStyle::apply(&slider);
+    EXPECT_EQ(slider.style(), SliderStyle::instance());
+    EXPECT_TRUE(slider.testAttribute(Qt::WA_Hover));
 }
 
 TEST(AdjustmentsPanelTest, SectionsFollowThePipeline)
