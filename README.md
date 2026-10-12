@@ -132,7 +132,7 @@ build/bin/stepit-grader ~/Pictures/IMG_0001.CR2
 
 ### Open a Picture
 
-Open a picture with **File > Open**, or drop it on the window. A raw file takes a few seconds to develop: about 2.5 seconds for the 21 megapixels of a Canon 5D Mark II. A picture that has a sidecar opens with its settings.
+Open a picture with **File > Open**, or drop it on the window. **File > Open Recent** lists the last 10 pictures opened, the latest first; hover over one for its full path. **Clear**, at the bottom, empties the list, and a picture moved or deleted since goes from it when chosen. A raw file takes a few seconds to develop: about 2.5 seconds for the 21 megapixels of a Canon 5D Mark II. A picture that has a sidecar opens with its settings.
 
 ### Edit It
 

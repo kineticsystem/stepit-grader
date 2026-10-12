@@ -10,6 +10,7 @@ add_library(editor-lib STATIC
     include/editor/widgets/CollapsibleSection.h
     include/editor/widgets/ImageView.h
     include/editor/widgets/ParameterSlider.h
+    include/editor/widgets/RecentFilesMenu.h
     src/Document.cpp
     src/Icons.cpp
     src/ImageConversion.cpp
@@ -20,6 +21,7 @@ add_library(editor-lib STATIC
     src/widgets/CollapsibleSection.cpp
     src/widgets/ImageView.cpp
     src/widgets/ParameterSlider.cpp
+    src/widgets/RecentFilesMenu.cpp
     src/WhiteBalancePicker.cpp)
 target_include_directories(editor-lib PUBLIC include)
 target_link_libraries(editor-lib

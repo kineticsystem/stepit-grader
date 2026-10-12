@@ -11,6 +11,7 @@ class Document;
 class ImageView;
 class PreviewRenderer;
 class QLabel;
+class RecentFilesMenu;
 
 /**
  * The editor's window: the picture in the middle, the tools on the right, and the menus. It
@@ -53,4 +54,5 @@ private:
     QLabel *m_zoomLabel;
     QLabel *m_renderLabel;
     QAction *m_pickWhite = nullptr;
+    RecentFilesMenu *m_recentFiles = nullptr;
 };

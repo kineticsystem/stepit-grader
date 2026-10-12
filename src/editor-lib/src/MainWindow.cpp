@@ -7,6 +7,7 @@
 #include "editor/PreviewRenderer.h"
 #include "editor/WhiteBalancePicker.h"
 #include "editor/widgets/ImageView.h"
+#include "editor/widgets/RecentFilesMenu.h"
 
 #include <QApplication>
 #include <QCloseEvent>
@@ -25,6 +26,9 @@
 namespace {
 
 constexpr const char *LAST_FOLDER_KEY = "lastFolder";
+constexpr const char *RECENT_FILES_KEY = "recentPictures";
+/// The pictures listed in File > Open Recent.
+constexpr int RECENT_FILES = 10;
 constexpr int PANEL_WIDTH = 300;
 
 } // namespace
@@ -113,6 +117,14 @@ void MainWindow::createActions()
 {
     QMenu *file = menuBar()->addMenu(tr("&File"));
     file->addAction(tr("&Open…"), QKeySequence::Open, this, &MainWindow::chooseFile);
+
+    m_recentFiles = new RecentFilesMenu{tr("Open &Recent"), RECENT_FILES, this};
+    m_recentFiles->setFiles(QSettings{}.value(RECENT_FILES_KEY).toStringList());
+    connect(m_recentFiles, &RecentFilesMenu::fileSelected, this, &MainWindow::openFile);
+    connect(m_recentFiles, &RecentFilesMenu::filesChanged, this, [](const QStringList &files) {
+        QSettings{}.setValue(RECENT_FILES_KEY, files);
+    });
+    file->addMenu(m_recentFiles);
     QAction *save
         = file->addAction(tr("&Save Settings"), QKeySequence::Save, m_document, &Document::save);
     file->addSeparator();
@@ -155,6 +167,13 @@ void MainWindow::chooseFile()
 
 void MainWindow::openFile(const QString &path)
 {
+    if (!QFileInfo::exists(path)) {
+        // E.g. a recent picture since moved or deleted: it goes from the list.
+        m_recentFiles->removeFile(path);
+        QMessageBox::warning(
+            this, tr("Cannot Open"), tr("%1 no longer exists.").arg(QDir::toNativeSeparators(path)));
+        return;
+    }
     if (!m_document->canOpen(path)) {
         QMessageBox::warning(
             this,
@@ -173,6 +192,7 @@ void MainWindow::openFile(const QString &path)
 void MainWindow::onOpened()
 {
     QApplication::restoreOverrideCursor();
+    m_recentFiles->addFile(m_document->path());
     const auto image = m_document->image();
     m_renderer->setSource(image);
     m_panel->setControlsEnabled(true);

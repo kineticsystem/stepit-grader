@@ -10,7 +10,9 @@
 #include "editor/widgets/CollapsibleSection.h"
 #include "editor/widgets/ImageView.h"
 #include "editor/widgets/ParameterSlider.h"
+#include "editor/widgets/RecentFilesMenu.h"
 
+#include <QDir>
 #include <QDoubleSpinBox>
 #include <QLabel>
 #include <QScrollBar>
@@ -244,4 +246,83 @@ TEST(AdjustmentsPanelTest, SectionsFoldAndScrollWithTheSlidersDisabled)
     ASSERT_NE(vertical, bars.end());
     EXPECT_TRUE((*vertical)->isEnabled());
     EXPECT_GT((*vertical)->maximum(), 0);
+}
+
+namespace {
+
+/// The file entries shown, as their tooltips, the full paths.
+QStringList shown(const RecentFilesMenu &menu)
+{
+    QStringList paths;
+    for (QAction *action : menu.actions()) {
+        if (action->isVisible() && !action->data().toString().isEmpty()) {
+            paths << action->toolTip();
+        }
+    }
+    return paths;
+}
+
+} // namespace
+
+TEST(RecentFilesMenuTest, KeepsTheLatestFirstWithoutDuplicates)
+{
+    RecentFilesMenu menu{"Open Recent", 3};
+    QSignalSpy changed{&menu, &RecentFilesMenu::filesChanged};
+    EXPECT_FALSE(menu.isEnabled());
+
+    menu.addFile("/p/a.tif");
+    menu.addFile("/p/b.CR2");
+    menu.addFile("/p/a.tif");
+    EXPECT_EQ(menu.files(), (QStringList{"/p/a.tif", "/p/b.CR2"}));
+    EXPECT_TRUE(menu.isEnabled());
+
+    // Past the maximum, the oldest goes.
+    menu.addFile("/p/c.dng");
+    menu.addFile("/p/d.dng");
+    EXPECT_EQ(menu.files(), (QStringList{"/p/d.dng", "/p/c.dng", "/p/a.tif"}));
+    EXPECT_EQ(shown(menu).size(), 3);
+    EXPECT_EQ(changed.count(), 5);
+    EXPECT_EQ(changed.last().at(0).toStringList(), menu.files());
+}
+
+TEST(RecentFilesMenuTest, ShowsNamesNumberedAndPathsAsTooltips)
+{
+    RecentFilesMenu menu{"Open Recent", 3};
+    menu.setFiles({"/p/one/IMG_1.CR2", "/p/two/IMG_1.CR2"});
+    const auto actions = menu.actions();
+    EXPECT_EQ(actions[0]->text(), "&1 IMG_1.CR2");
+    EXPECT_EQ(actions[1]->text(), "&2 IMG_1.CR2");
+    EXPECT_EQ(actions[1]->toolTip(), QDir::toNativeSeparators("/p/two/IMG_1.CR2"));
+    EXPECT_FALSE(actions[2]->isVisible());
+}
+
+TEST(RecentFilesMenuTest, ReportsTheFileChosenWithItsFullPath)
+{
+    RecentFilesMenu menu{"Open Recent", 3};
+    menu.setFiles({"/p/a.tif", "/p/b.CR2"});
+    QSignalSpy selected{&menu, &RecentFilesMenu::fileSelected};
+    menu.actions()[1]->trigger();
+    ASSERT_EQ(selected.count(), 1);
+    EXPECT_EQ(selected.first().at(0).toString(), "/p/b.CR2");
+}
+
+TEST(RecentFilesMenuTest, ClearsAndRemoves)
+{
+    RecentFilesMenu menu{"Open Recent", 3};
+    // Given by the client: shown, not reported back.
+    QSignalSpy changed{&menu, &RecentFilesMenu::filesChanged};
+    menu.setFiles({"/p/a.tif", "/p/b.CR2", "/p/c.dng"});
+    EXPECT_EQ(changed.count(), 0);
+
+    menu.removeFile("/p/b.CR2");
+    EXPECT_EQ(menu.files(), (QStringList{"/p/a.tif", "/p/c.dng"}));
+    menu.removeFile("/p/unknown.tif");
+    EXPECT_EQ(changed.count(), 1);
+
+    // The last action is Clear.
+    menu.actions().last()->trigger();
+    EXPECT_TRUE(menu.files().isEmpty());
+    EXPECT_FALSE(menu.isEnabled());
+    EXPECT_EQ(shown(menu).size(), 0);
+    EXPECT_EQ(changed.count(), 2);
 }
