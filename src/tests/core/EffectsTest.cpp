@@ -7,11 +7,13 @@
 #include "core/Sampling.h"
 #include "core/StandardPipeline.h"
 #include "core/effects/BlacksEffect.h"
+#include "core/effects/ColorNoiseEffect.h"
 #include "core/effects/ContrastEffect.h"
 #include "core/effects/DefringeEffect.h"
 #include "core/effects/DetailEffect.h"
 #include "core/effects/ExposureEffect.h"
 #include "core/effects/HighlightsEffect.h"
+#include "core/effects/LuminanceNoiseEffect.h"
 #include "core/effects/SaturationEffect.h"
 #include "core/effects/ShadowsEffect.h"
 #include "core/effects/SharpnessEffect.h"
@@ -23,6 +25,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <random>
 #include <set>
 
 using namespace core;
@@ -75,7 +78,7 @@ TEST(EffectsTest, ParametersHaveUniqueIdsAndDefaultsInRange)
         EXPECT_LE(parameter.minimum, parameter.defaultValue);
         EXPECT_GE(parameter.maximum, parameter.defaultValue);
     }
-    EXPECT_EQ(ids.size(), 18u);
+    EXPECT_EQ(ids.size(), 21u);
 }
 
 TEST(EffectsTest, ExposureOfOneStopDoublesTheLight)
@@ -404,4 +407,114 @@ TEST(EffectsTest, ToneCompressionWithLocalContrastKeepsTheTextureOfBrightAreas)
         return testutils::luminanceSpread(image, 50, 50, 350, 350);
     };
     EXPECT_GT(spread(100), 1.5 * spread(0));
+}
+
+namespace {
+
+/**
+ * Grey, 0.18, with a step to 0.5 at the middle, and grain as a sensor makes it, growing with the
+ * square root of the light: the same for the three channels (luminance noise) or each its own
+ * (colour noise).
+ */
+Image grainy(int width, int height, float noise, bool coloured)
+{
+    std::mt19937 random{42};
+    std::normal_distribution<float> gauss{0.0f, noise};
+    Image image{width, height};
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            const float base = x < width / 2 ? 0.18f : 0.5f;
+            const float common = gauss(random);
+            float *p = image.pixel(x, y);
+            for (int c = 0; c < 3; ++c) {
+                p[c] = base + std::sqrt(base) * (coloured ? gauss(random) : common);
+            }
+        }
+    }
+    return image;
+}
+
+double chromaSpread(const Image &image, int x0, int y0, int x1, int y1)
+{
+    double sum = 0;
+    for (int y = y0; y < y1; ++y) {
+        for (int x = x0; x < x1; ++x) {
+            float lab[3];
+            color::rec2020ToOklab(image.pixel(x, y), lab);
+            sum += std::hypot(lab[1], lab[2]);
+        }
+    }
+    return sum / ((x1 - x0) * (y1 - y0));
+}
+
+} // namespace
+
+TEST(EffectsTest, LuminanceNoiseSmoothsTheGrainAndKeepsTheEdge)
+{
+    const Image image = grainy(200, 100, 0.03f, false);
+    const Image clean = applied(LuminanceNoiseEffect{}, image, LuminanceNoiseEffect::AMOUNT.id, 100);
+    // The grain of each side, a third of what it was or less.
+    EXPECT_LT(
+        testutils::luminanceSpread(clean, 10, 10, 90, 90),
+        0.4 * testutils::luminanceSpread(image, 10, 10, 90, 90));
+    EXPECT_LT(
+        testutils::luminanceSpread(clean, 110, 10, 190, 90),
+        0.4 * testutils::luminanceSpread(image, 110, 10, 190, 90));
+    // The edge stays where it was, as steep: the two pixels beside it keep their sides' levels.
+    EXPECT_NEAR(testutils::mean(clean, 1, 98, 10, 99, 90), 0.18, 0.02);
+    EXPECT_NEAR(testutils::mean(clean, 1, 101, 10, 102, 90), 0.5, 0.04);
+}
+
+TEST(EffectsTest, LuminanceNoiseDetailPutsBackPartOfTheGrain)
+{
+    const Image image = grainy(100, 100, 0.03f, false);
+    Settings settings;
+    settings.setValue(LuminanceNoiseEffect::AMOUNT.id, 100);
+    auto spread = [&](double detail) {
+        settings.setValue(LuminanceNoiseEffect::DETAIL.id, detail);
+        Image out = image;
+        LuminanceNoiseEffect{}.apply(out, settings, RenderContext{});
+        return testutils::luminanceSpread(out, 10, 10, 40, 90);
+    };
+    EXPECT_LT(spread(0), spread(100));
+    // The colour of a grey stays grey.
+    Image out = image;
+    LuminanceNoiseEffect{}.apply(out, settings, RenderContext{});
+    EXPECT_NEAR(out.pixel(20, 20)[0], out.pixel(20, 20)[2], 1e-5f);
+}
+
+TEST(EffectsTest, ColorNoiseRemovesTheBlotchesAndKeepsTheLuminance)
+{
+    const Image image = grainy(200, 100, 0.04f, true);
+    const Image clean = applied(ColorNoiseEffect{}, image, ColorNoiseEffect::AMOUNT.id, 100);
+    EXPECT_LT(chromaSpread(clean, 10, 10, 90, 90), 0.3 * chromaSpread(image, 10, 10, 90, 90));
+    // Oklab's lightness, so the luminance and its detail, as they were.
+    float before[3], after[3];
+    color::rec2020ToOklab(image.pixel(50, 50), before);
+    color::rec2020ToOklab(clean.pixel(50, 50), after);
+    EXPECT_NEAR(after[0], before[0], 1e-4f);
+}
+
+TEST(EffectsTest, ColorNoiseKeepsColoursToTheirSideOfAnEdge)
+{
+    // Red beside blue, of different lightness, as a red object on a blue sky.
+    Image image{100, 40};
+    for (int y = 0; y < 40; ++y) {
+        for (int x = 0; x < 100; ++x) {
+            float *p = image.pixel(x, y);
+            p[0] = x < 50 ? 0.4f : 0.02f;
+            p[1] = x < 50 ? 0.05f : 0.05f;
+            p[2] = x < 50 ? 0.02f : 0.3f;
+        }
+    }
+    const Image clean = applied(ColorNoiseEffect{}, image, ColorNoiseEffect::AMOUNT.id, 100);
+    // Next to the edge, each side keeps its colour.
+    float red[3], blue[3];
+    color::rec2020ToOklab(clean.pixel(48, 20), red);
+    color::rec2020ToOklab(clean.pixel(51, 20), blue);
+    float redBefore[3], blueBefore[3];
+    color::rec2020ToOklab(image.pixel(48, 20), redBefore);
+    color::rec2020ToOklab(image.pixel(51, 20), blueBefore);
+    EXPECT_NEAR(red[1], redBefore[1], 0.02f);
+    EXPECT_NEAR(blue[2], blueBefore[2], 0.02f);
 }

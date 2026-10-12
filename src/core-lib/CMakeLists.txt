@@ -13,11 +13,13 @@ add_library(core-lib STATIC
     src/Settings.cpp
     src/StandardPipeline.cpp
     src/effects/BlacksEffect.cpp
+    src/effects/ColorNoiseEffect.cpp
     src/effects/ContrastEffect.cpp
     src/effects/DefringeEffect.cpp
     src/effects/DetailEffect.cpp
     src/effects/ExposureEffect.cpp
     src/effects/HighlightsEffect.cpp
+    src/effects/LuminanceNoiseEffect.cpp
     src/effects/SaturationEffect.cpp
     src/effects/ShadowsEffect.cpp
     src/effects/SharpnessEffect.cpp

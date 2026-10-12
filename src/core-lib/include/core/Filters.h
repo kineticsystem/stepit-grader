@@ -20,4 +20,12 @@ Plane gaussianBlur(const Plane &plane, double sigma);
  */
 Plane guidedFilter(const Plane &plane, int radius, float epsilon);
 
+/**
+ * The input smoothed by the guided filter, guided by another plane of the same size (He et al.,
+ * 2010): the input follows the guide's edges, where the guide varies more than sqrt(epsilon) over
+ * `radius`, and is smoothed elsewhere. E.g. the colour of a picture, guided by its luminance,
+ * keeps to the edges the luminance shows.
+ */
+Plane guidedFilter(const Plane &guide, const Plane &input, int radius, float epsilon);
+
 } // namespace core::filters

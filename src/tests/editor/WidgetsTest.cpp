@@ -60,13 +60,15 @@ TEST(ParameterSliderTest, DoubleClickResets)
 TEST(AdjustmentsPanelTest, SectionsFollowThePipeline)
 {
     const auto sections = sectionsOf(*core::makeStandardPipeline());
-    ASSERT_EQ(sections.size(), 6u);
+    ASSERT_EQ(sections.size(), 7u);
     EXPECT_EQ(sections[0].title, "White Balance");
-    EXPECT_EQ(sections[1].title, "Defringe");
-    EXPECT_EQ(sections[2].title, "Tone");
-    EXPECT_EQ(sections[2].parameters.front().id, "Exposure2012");
-    EXPECT_EQ(sections[4].title, "HDR");
-    EXPECT_EQ(sections[5].title, "Sharpening");
+    EXPECT_EQ(sections[1].title, "Noise Reduction");
+    EXPECT_EQ(sections[1].parameters.size(), 3u);
+    EXPECT_EQ(sections[2].title, "Defringe");
+    EXPECT_EQ(sections[3].title, "Tone");
+    EXPECT_EQ(sections[3].parameters.front().id, "Exposure2012");
+    EXPECT_EQ(sections[5].title, "HDR");
+    EXPECT_EQ(sections[6].title, "Sharpening");
 }
 
 TEST(AdjustmentsPanelTest, EmitsTheSettingsWhenASliderMoves)
@@ -142,7 +144,7 @@ TEST(AdjustmentsPanelTest, SectionsFoldAndReportIt)
     AdjustmentsPanel panel{sectionsOf(*core::makeStandardPipeline())};
     panel.show();
     QSignalSpy spy{&panel, &AdjustmentsPanel::sectionExpandedChanged};
-    EXPECT_EQ(panel.sectionTitles().size(), 6);
+    EXPECT_EQ(panel.sectionTitles().size(), 7);
     EXPECT_TRUE(panel.isSectionExpanded("Defringe"));
 
     panel.setSectionExpanded("Defringe", false);

@@ -103,3 +103,22 @@ TEST(PipelineTest, CancelledRenderReturnsNothing)
     ASSERT_TRUE(image);
     EXPECT_FLOAT_EQ(image->pixel(0, 0)[0], 0.2f);
 }
+
+TEST(FiltersTest, GuidedFilterByAnotherPlaneFollowsItsEdges)
+{
+    // The input is noise; the guide a step: the result is smooth on each side of the guide's step,
+    // and steps where it does.
+    Plane guide{100, 10};
+    Plane input{100, 10};
+    for (int y = 0; y < 10; ++y) {
+        for (int x = 0; x < 100; ++x) {
+            guide.at(x, y) = x < 50 ? 0.2f : 0.8f;
+            input.at(x, y) = (x < 50 ? -1.0f : 1.0f) + ((x * 7 + y * 3) % 5 - 2) * 0.1f;
+        }
+    }
+    const Plane out = filters::guidedFilter(guide, input, 8, 1e-4f);
+    EXPECT_NEAR(out.at(20, 5), -1.0f, 0.05f);
+    EXPECT_NEAR(out.at(80, 5), 1.0f, 0.05f);
+    EXPECT_LT(out.at(48, 5), -0.8f);
+    EXPECT_GT(out.at(51, 5), 0.8f);
+}

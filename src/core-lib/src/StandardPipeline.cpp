@@ -3,11 +3,13 @@
 
 #include "core/StandardPipeline.h"
 #include "core/effects/BlacksEffect.h"
+#include "core/effects/ColorNoiseEffect.h"
 #include "core/effects/ContrastEffect.h"
 #include "core/effects/DefringeEffect.h"
 #include "core/effects/DetailEffect.h"
 #include "core/effects/ExposureEffect.h"
 #include "core/effects/HighlightsEffect.h"
+#include "core/effects/LuminanceNoiseEffect.h"
 #include "core/effects/SaturationEffect.h"
 #include "core/effects/ShadowsEffect.h"
 #include "core/effects/SharpnessEffect.h"
@@ -22,6 +24,8 @@ std::shared_ptr<const Pipeline> makeStandardPipeline()
 {
     return std::make_shared<const Pipeline>(std::vector<std::shared_ptr<const Effect>>{
         std::make_shared<WhiteBalanceEffect>(),
+        std::make_shared<LuminanceNoiseEffect>(),
+        std::make_shared<ColorNoiseEffect>(),
         std::make_shared<DefringeEffect>(),
         std::make_shared<ExposureEffect>(),
         std::make_shared<ContrastEffect>(),

@@ -30,7 +30,7 @@ StepIt Grader is a desktop application, in C++ and Qt 6, for the tones and colou
 With StepIt Grader we can:
 
 - open a TIFF, 8 or 16 bits or float, with its ICC profile, a DNG, or a camera raw file, e.g. a Canon CR2;
-- set the white balance, by hand or by picking an area that should be white or grey, remove purple fringing, set the exposure, the contrast, the highlights, the shadows, the blacks, the detail, the structure, the vibrance, the saturation, an HDR compression of the highlights and the sharpness, and see the result as the slider moves;
+- set the white balance, by hand or by picking an area that should be white or grey, reduce the luminance and the colour noise of a high ISO, remove purple fringing, set the exposure, the contrast, the highlights, the shadows, the blacks, the detail, the structure, the vibrance, the saturation, an HDR compression of the highlights and the sharpness, and see the result as the slider moves;
 - zoom from the whole picture to 800%, and drag it around;
 - save the settings by itself in an XMP sidecar that Lightroom and Camera Raw can read, and open them again with the picture;
 - grade any number of pictures from the command line with those settings, into 16-bit TIFFs in sRGB, Adobe RGB, ProPhoto RGB or linear Rec. 2020.
@@ -209,6 +209,9 @@ The tools are applied in this order, from top to bottom. Each changes the whole 
 |---|---|---|---|
 | White Balance | Temperature | `-100` to `100` | Warmer above 0, cooler below, from the picture's own white balance. |
 | | Tint | `-100` to `100` | More magenta above 0, more green below. |
+| Noise Reduction | Luminance | `0` to `100` | Smooths the grain of the luminance a high ISO makes, in the shadows and the highlights alike, and keeps the edges. |
+| | Luminance Detail | `0` to `100` | How much of the fine detail the luminance smoothing keeps; `50` by default. |
+| | Color | `0` to `100` | Removes the coloured blotches of a high ISO, mostly in the shadows, without colour bleeding across edges. The luminance, and so the detail, stays. |
 | Defringe | Purple Amount | `0` to `20` | Takes the colour out of purple fringes, the purple edges a lens draws along strong contrasts. Higher also searches a wider band beside the edges. |
 | | Purple Hue Low, Purple Hue High | `0` to `100` | The hues taken for fringes, from blue (`0`) through purple to magenta (`100`); `30` to `70` by default. A purple area away from edges keeps its colour. |
 | Tone | Exposure | `-5.00` to `5.00` | Stops of light: `+1.00` is twice as bright. |

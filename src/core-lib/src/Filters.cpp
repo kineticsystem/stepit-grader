@@ -135,4 +135,40 @@ Plane guidedFilter(const Plane &plane, int radius, float epsilon)
     return out;
 }
 
+Plane guidedFilter(const Plane &guide, const Plane &input, int radius, float epsilon)
+{
+    if (radius <= 0 || input.data.empty()) {
+        return input;
+    }
+    const std::size_t n = input.data.size();
+    Plane guideSquares{guide.width, guide.height};
+    Plane products{guide.width, guide.height};
+    parallelForEach(n, [&](std::size_t i) {
+        guideSquares.data[i] = guide.data[i] * guide.data[i];
+        products.data[i] = guide.data[i] * input.data[i];
+    });
+    const Plane meanGuide = boxBlur(guide, radius);
+    const Plane meanInput = boxBlur(input, radius);
+    const Plane meanGuideSquares = boxBlur(guideSquares, radius);
+    const Plane meanProducts = boxBlur(products, radius);
+
+    Plane a{input.width, input.height};
+    Plane b{input.width, input.height};
+    parallelForEach(n, [&](std::size_t i) {
+        const float variance
+            = std::max(0.0f, meanGuideSquares.data[i] - meanGuide.data[i] * meanGuide.data[i]);
+        const float covariance = meanProducts.data[i] - meanGuide.data[i] * meanInput.data[i];
+        a.data[i] = covariance / (variance + epsilon);
+        b.data[i] = meanInput.data[i] - a.data[i] * meanGuide.data[i];
+    });
+    const Plane meanA = boxBlur(a, radius);
+    const Plane meanB = boxBlur(b, radius);
+
+    Plane out{input.width, input.height};
+    parallelForEach(n, [&](std::size_t i) {
+        out.data[i] = meanA.data[i] * guide.data[i] + meanB.data[i];
+    });
+    return out;
+}
+
 } // namespace core::filters
