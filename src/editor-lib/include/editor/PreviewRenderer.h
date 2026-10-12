@@ -16,6 +16,8 @@
 #include <atomic>
 #include <memory>
 #include <optional>
+#include <utility>
+#include <vector>
 
 /**
  * Renders the image with the settings, off the user interface's thread, in two passes:
@@ -26,6 +28,9 @@
  *
  * Each pass ends with rendered(). A change of the settings drops the passes the new settings make
  * useless: only the latest settings are rendered.
+ *
+ * The last two pictures rendered in full are kept: settings rendered already, e.g. switching
+ * between the picture before and after its edit, are shown at once, in full, without a pass.
  */
 class PreviewRenderer : public QObject
 {
@@ -52,6 +57,8 @@ Q_SIGNALS:
 private:
     void startPreview();
     void startFull();
+    /// Keeps a full picture, forgetting the oldest beyond the number kept.
+    void remember(const core::Settings &settings, const QImage &image);
 
     std::shared_ptr<const core::Pipeline> m_pipeline;
     int m_previewSide;
@@ -66,6 +73,9 @@ private:
     std::shared_ptr<std::atomic<int>> m_generation = std::make_shared<std::atomic<int>>(0);
     bool m_previewRunning = false;
     bool m_previewPending = false;
+    /// The last pictures rendered in full, the latest last, with their settings.
+    std::vector<std::pair<core::Settings, QImage>> m_rendered;
+
     QFuture<void> m_previewJob;
     /// The full passes still running, the stale ones included: waited for on destruction.
     QList<QFuture<void>> m_fullJobs;

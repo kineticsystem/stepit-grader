@@ -142,6 +142,10 @@ Move a slider on the right, or type its value. The sections start folded: a clic
 
 To set the white balance from the picture, click the eyedropper next to **White Balance**, or press `W`, then click an area that should be white or grey, e.g. a grey card or a white wall. The cursor shows the circle averaged, about 10 screen pixels across, whatever the zoom; its clipped pixels are left out. The temperature and the tint are set so the area turns neutral, and the eyedropper goes back to dragging. `Esc` cancels.
 
+To compare with the picture before the edit, click the before and after button of the toolbar, the picture split in two, or press `\`. **Before** shows in the status bar while the picture is the one before the edit; the same button, or `\` again, goes back to the edit, at once. Moving a slider goes back to the edit too.
+
+The toolbar, above the picture, holds the actions used most: open, save, before and after, the white balance's eyedropper, and the zoom. Each is also in a menu, with its key.
+
 Zoom with the wheel, around the cursor, or with the **View** menu; drag the picture with the mouse. A double click on the picture switches between the whole picture and 100% where clicked.
 
 ### Save the Settings
@@ -160,6 +164,7 @@ The window's title shows `*` while the settings are not written yet: for the sec
 | `Ctrl+S` | Save the settings now, rather than 1 second after the last change. |
 | `Ctrl+Shift+R` | Reset all the sliders. |
 | `W` | Pick the white balance from an area; `Esc` cancels. |
+| `\` | Show the picture before the edit, or after. |
 | `Ctrl++`, `Ctrl+-` | Zoom in, zoom out. |
 | `Ctrl+0` | Fit the picture to the window. |
 | `Ctrl+1` | Show it at 100%. |

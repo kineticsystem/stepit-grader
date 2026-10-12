@@ -38,6 +38,8 @@ protected:
 
 private:
     void createActions();
+    /// Shows the picture before its edit, or after.
+    void showBefore(bool before);
     void chooseFile();
     /**
      * Saves the settings that wait to be; when that fails, asks whether to go on without them.
@@ -57,5 +59,7 @@ private:
     QLabel *m_zoomLabel;
     QLabel *m_renderLabel;
     QAction *m_pickWhite = nullptr;
+    QAction *m_showBefore = nullptr;
+    QLabel *m_beforeLabel;
     RecentFilesMenu *m_recentFiles = nullptr;
 };

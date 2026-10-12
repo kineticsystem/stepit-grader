@@ -275,3 +275,41 @@ TEST_F(PreviewRendererTest, RendersOnlyTheLatestSettingsInFull)
     EXPECT_EQ(fullPasses, 1);
     EXPECT_LE(rendered.count(), 6);
 }
+
+TEST_F(PreviewRendererTest, ShowsSettingsRenderedAlreadyAtOnce)
+{
+    openAndWait("/pictures/a.tif");
+    PreviewRenderer renderer{pipeline, 100, std::chrono::milliseconds{10}};
+    QSignalSpy rendered{&renderer, &PreviewRenderer::rendered};
+    renderer.setSource(document.image());
+    const auto waitForFull = [&] {
+        return QTest::qWaitFor(
+            [&] { return !rendered.isEmpty() && rendered.last().at(2).toBool(); }, 5000);
+    };
+
+    // After, then before: both rendered in full.
+    core::Settings after;
+    after.setValue("Exposure2012", 1.0);
+    renderer.render(after);
+    ASSERT_TRUE(waitForFull());
+    const QImage afterImage = rendered.last().at(0).value<QImage>();
+    rendered.clear();
+    renderer.render(core::Settings{});
+    ASSERT_TRUE(waitForFull());
+    rendered.clear();
+
+    // Back to after: shown in full at once, from the cache, with no pass.
+    renderer.render(after);
+    ASSERT_EQ(rendered.count(), 1);
+    EXPECT_TRUE(rendered.first().at(2).toBool());
+    EXPECT_EQ(rendered.first().at(0).value<QImage>(), afterImage);
+    QTest::qWait(100);
+    EXPECT_EQ(rendered.count(), 1);
+
+    // A new picture forgets the pictures kept.
+    renderer.setSource(document.image());
+    rendered.clear();
+    renderer.render(after);
+    EXPECT_EQ(rendered.count(), 0);
+    ASSERT_TRUE(waitForFull());
+}

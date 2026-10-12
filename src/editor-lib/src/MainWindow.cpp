@@ -18,7 +18,9 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QSettings>
+#include <QSignalBlocker>
 #include <QStatusBar>
+#include <QToolBar>
 #include <QToolButton>
 
 #include "core/effects/WhiteBalanceEffect.h"
@@ -50,6 +52,7 @@ MainWindow::MainWindow(
     , m_fileLabel{new QLabel{this}}
     , m_zoomLabel{new QLabel{this}}
     , m_renderLabel{new QLabel{this}}
+    , m_beforeLabel{new QLabel{tr("Before"), this}}
 {
     setCentralWidget(m_view);
 
@@ -63,7 +66,12 @@ MainWindow::MainWindow(
     addDockWidget(Qt::RightDockWidgetArea, dock);
 
     statusBar()->addWidget(m_fileLabel, 1);
+    statusBar()->addPermanentWidget(m_beforeLabel);
     statusBar()->addPermanentWidget(m_renderLabel);
+    QFont bold = m_beforeLabel->font();
+    bold.setBold(true);
+    m_beforeLabel->setFont(bold);
+    m_beforeLabel->hide();
     statusBar()->addPermanentWidget(m_zoomLabel);
 
     createActions();
@@ -76,6 +84,12 @@ MainWindow::MainWindow(
     connect(m_panel, &AdjustmentsPanel::settingsChanged, m_document, &Document::setSettings);
     connect(m_document, &Document::settingsChanged, this, [this](const core::Settings &settings) {
         m_panel->setSettings(settings);
+        // A change is seen on the edited picture: the picture before the edit gives way to it.
+        if (m_showBefore->isChecked()) {
+            const QSignalBlocker blocker{m_showBefore};
+            m_showBefore->setChecked(false);
+            m_beforeLabel->hide();
+        }
         m_renderLabel->setText(tr("Rendering…"));
         m_renderer->render(settings);
     });
@@ -133,8 +147,11 @@ void MainWindow::createActions()
         QSettings{}.setValue(RECENT_FILES_KEY, files);
     });
     file->addMenu(m_recentFiles);
+    QAction *open = file->actions().constFirst();
+    open->setIcon(themedIcon("document-open"));
     QAction *save
         = file->addAction(tr("&Save Settings"), QKeySequence::Save, m_document, &Document::save);
+    save->setIcon(themedIcon("document-save"));
     file->addSeparator();
     file->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
 
@@ -143,19 +160,53 @@ void MainWindow::createActions()
     QAction *reset = edit->addAction(
         tr("Reset &All"), QKeySequence{tr("Ctrl+Shift+R")}, m_document, &Document::resetSettings);
     edit->addSeparator();
-    m_pickWhite = edit->addAction(eyedropperIcon(), tr("Pick &White Balance"));
+    m_pickWhite = edit->addAction(themedIcon("color-picker"), tr("Pick &White Balance"));
     m_pickWhite->setShortcut(QKeySequence{tr("W")});
     m_pickWhite->setCheckable(true);
     m_pickWhite->setToolTip(tr("Click an area that should be white or grey (W)"));
     connect(m_pickWhite, &QAction::toggled, m_view, &ImageView::setPickMode);
 
     QMenu *view = menuBar()->addMenu(tr("&View"));
-    view->addAction(tr("Zoom &In"), QKeySequence::ZoomIn, m_view, &ImageView::zoomIn);
-    view->addAction(tr("Zoom &Out"), QKeySequence::ZoomOut, m_view, &ImageView::zoomOut);
-    view->addAction(tr("&Fit to Window"), QKeySequence{tr("Ctrl+0")}, m_view, &ImageView::fitToWindow);
-    view->addAction(tr("&Actual Size"), QKeySequence{tr("Ctrl+1")}, m_view, &ImageView::actualSize);
+    // Lightroom's key for it.
+    m_showBefore = view->addAction(themedIcon("image-v-split"), tr("&Before and After"));
+    m_showBefore->setShortcut(QKeySequence{Qt::Key_Backslash});
+    m_showBefore->setCheckable(true);
+    m_showBefore->setToolTip(tr("Show the picture before the edit, or after (\\)"));
+    connect(m_showBefore, &QAction::toggled, this, &MainWindow::showBefore);
+    view->addSeparator();
+    QAction *zoomIn = view->addAction(
+        themedIcon("zoom-in"), tr("Zoom &In"), QKeySequence::ZoomIn, m_view, &ImageView::zoomIn);
+    QAction *zoomOut = view->addAction(
+        themedIcon("zoom-out"), tr("Zoom &Out"), QKeySequence::ZoomOut, m_view, &ImageView::zoomOut);
+    QAction *fit = view->addAction(
+        themedIcon("zoom-fit-best"),
+        tr("&Fit to Window"),
+        QKeySequence{tr("Ctrl+0")},
+        m_view,
+        &ImageView::fitToWindow);
+    QAction *actual = view->addAction(
+        themedIcon("zoom-original"),
+        tr("&Actual Size"),
+        QKeySequence{tr("Ctrl+1")},
+        m_view,
+        &ImageView::actualSize);
 
-    for (QAction *action : {save, revert, reset, m_pickWhite}) {
+    // The actions used most, one click away, as in Lentigram: fixed, without a menu of its own.
+    QToolBar *toolbar = addToolBar(tr("Tools"));
+    toolbar->setObjectName("tools");
+    toolbar->setMovable(false);
+    toolbar->setContextMenuPolicy(Qt::PreventContextMenu);
+    toolbar->addAction(open);
+    toolbar->addAction(save);
+    toolbar->addSeparator();
+    toolbar->addAction(m_showBefore);
+    toolbar->addAction(m_pickWhite);
+    toolbar->addSeparator();
+    for (QAction *action : {zoomIn, zoomOut, fit, actual}) {
+        toolbar->addAction(action);
+    }
+
+    for (QAction *action : {save, revert, reset, m_pickWhite, m_showBefore}) {
         action->setEnabled(false);
         connect(m_document, &Document::opened, action, [action] { action->setEnabled(true); });
     }
@@ -269,4 +320,13 @@ void MainWindow::pickWhiteBalanceAt(QPointF point, double radius)
 void MainWindow::updateZoom(double zoom)
 {
     m_zoomLabel->setText(QString{"%1%"}.arg(qRound(zoom * 100)));
+}
+
+void MainWindow::showBefore(bool before)
+{
+    m_beforeLabel->setVisible(before);
+    // The picture before the edit is the picture with no settings: the renderer shows it from its
+    // cache once rendered, so switching back and forth is at once.
+    m_renderLabel->setText(tr("Rendering…"));
+    m_renderer->render(before ? core::Settings{} : m_document->settings());
 }

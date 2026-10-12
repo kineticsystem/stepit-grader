@@ -32,10 +32,18 @@ PreviewRenderer::~PreviewRenderer()
     }
 }
 
+namespace {
+
+/// The full pictures kept: the picture before its edit, and after.
+constexpr std::size_t KEPT_RENDERS = 2;
+
+} // namespace
+
 void PreviewRenderer::setSource(std::shared_ptr<const core::Image> image)
 {
     ++*m_generation;
     m_fullTimer.stop();
+    m_rendered.clear();
     m_full = std::move(image);
     if (m_full) {
         auto preview = std::make_shared<core::Image>(
@@ -55,6 +63,16 @@ void PreviewRenderer::render(const core::Settings &settings)
     m_settings = settings;
     ++*m_generation;
     m_fullTimer.stop();
+    const auto parameters = m_pipeline->parameters();
+    for (const auto &[kept, image] : m_rendered) {
+        if (kept.sameAs(settings, parameters)) {
+            // Rendered already: shown in full at once. A preview still running is now stale,
+            // and is dropped when it ends.
+            m_previewPending = false;
+            Q_EMIT rendered(image, image.size(), true);
+            return;
+        }
+    }
     if (m_previewRunning) {
         m_previewPending = true;
     } else {
@@ -86,9 +104,9 @@ void PreviewRenderer::startPreview()
                     return;
                 }
                 self->m_previewRunning = false;
-                // A preview of older settings is still shown: better than nothing while
-                // the newer one is made.
-                if (!shown.isNull()) {
+                // A preview of older settings is still shown while a newer one is made: better
+                // than nothing. One whose settings were shown in full meanwhile is not.
+                if (!shown.isNull() && (*counter == generation || self->m_previewPending)) {
                     Q_EMIT self->rendered(shown, fullSize, false);
                 }
                 if (self->m_previewPending) {
@@ -125,11 +143,20 @@ void PreviewRenderer::startFull()
         QImage shown = toQImage(*image);
         QMetaObject::invokeMethod(
             qApp,
-            [self, shown = std::move(shown), counter, generation] {
+            [self, settings, shown = std::move(shown), counter, generation] {
                 if (self && *counter == generation) {
+                    self->remember(settings, shown);
                     Q_EMIT self->rendered(shown, shown.size(), true);
                 }
             },
             Qt::QueuedConnection);
     });
+}
+
+void PreviewRenderer::remember(const core::Settings &settings, const QImage &image)
+{
+    m_rendered.emplace_back(settings, image);
+    if (m_rendered.size() > KEPT_RENDERS) {
+        m_rendered.erase(m_rendered.begin());
+    }
 }

@@ -11,34 +11,33 @@
 
 namespace {
 
-/// The sizes drawn, so the icon is sharp in a menu, a tool button and on high-density screens.
+/// The sizes drawn, so the icon is sharp in a menu, a toolbar and on high-density screens.
 constexpr int SIZES[] = {16, 22, 24, 32, 48, 64};
 
-/**
- * An SVG of one colour, drawn in `colour` at each size: the drawing's shape, the theme's
- * colour, so one file suits a light and a dark theme.
- */
-QIcon tintedIcon(const QString &resource, const QColor &colour)
+} // namespace
+
+bool isDarkTheme()
 {
-    QSvgRenderer renderer{resource};
+    return QApplication::palette().color(QPalette::Window).lightness() < 128;
+}
+
+QIcon themedIcon(const QString &name)
+{
+    // Drawn by Qt's SVG module, rather than an icon plugin that would have to be shipped beside
+    // the program.
+    QSvgRenderer renderer{QString{":/icons/%1/%2.svg"}.arg(isDarkTheme() ? "dark" : "light", name)};
     QIcon icon;
+    if (!renderer.isValid()) {
+        return icon;
+    }
     for (int size : SIZES) {
         QPixmap pixmap{size, size};
         pixmap.fill(Qt::transparent);
         QPainter painter{&pixmap};
         painter.setRenderHint(QPainter::Antialiasing);
         renderer.render(&painter);
-        painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
-        painter.fillRect(pixmap.rect(), colour);
         painter.end();
         icon.addPixmap(pixmap);
     }
     return icon;
-}
-
-} // namespace
-
-QIcon eyedropperIcon()
-{
-    return tintedIcon(":/icons/eyedropper.svg", QApplication::palette().color(QPalette::ButtonText));
 }

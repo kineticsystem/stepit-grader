@@ -25,6 +25,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
+
 TEST(ParameterSliderTest, EmitsUserChangesOnly)
 {
     ParameterSlider slider{"Exposure", -5, 5, 0, 2};
@@ -329,28 +331,51 @@ TEST(RecentFilesMenuTest, ClearsAndRemoves)
     EXPECT_EQ(changed.count(), 2);
 }
 
-TEST(IconsTest, TheEyedropperIsBuiltInAndTakesTheThemesColour)
+TEST(IconsTest, EveryIconIsBuiltInWithADrawingForEachTheme)
 {
     const QPalette original = QApplication::palette();
-    for (const QColor text : {QColor{Qt::black}, QColor{Qt::white}}) {
+    const QStringList names{
+        "color-picker",
+        "image-v-split",
+        "document-open",
+        "document-save",
+        "zoom-in",
+        "zoom-out",
+        "zoom-fit-best",
+        "zoom-original"};
+    // The mean lightness of an icon's drawing, in a light or a dark theme.
+    const auto lightness = [&](const QString &name, bool dark) {
         QPalette palette = original;
-        palette.setColor(QPalette::ButtonText, text);
+        palette.setColor(QPalette::Window, dark ? QColor{40, 40, 40} : QColor{240, 240, 240});
         QApplication::setPalette(palette);
-        const QImage image = eyedropperIcon().pixmap(48).toImage();
+        EXPECT_EQ(isDarkTheme(), dark);
+        const QImage image = themedIcon(name).pixmap(48).toImage();
         int opaque = 0;
+        double sum = 0;
         for (int y = 0; y < image.height(); ++y) {
             for (int x = 0; x < image.width(); ++x) {
                 const QColor pixel = image.pixelColor(x, y);
                 if (pixel.alpha() > 200) {
                     ++opaque;
-                    EXPECT_EQ(pixel.rgb(), text.rgb());
+                    sum += pixel.lightness();
                 }
             }
         }
-        // The drawing covers part of the square: a shape, not nothing nor a block.
-        EXPECT_GT(opaque, 48 * 48 / 10);
-        EXPECT_LT(opaque, 48 * 48 / 2);
-        image.save(QString::fromStdString((testutils::outputFolder() / "eyedropper.png").string()));
+        // A drawing, not nothing.
+        EXPECT_GT(opaque, 48 * 48 / 20) << name.toStdString();
+        return opaque > 0 ? sum / opaque : 0.0;
+    };
+    for (const QString &name : names) {
+        // Each theme has its own drawing: lighter for the dark theme, or, for an icon of two
+        // tones whose tones swap, e.g. the before and after, just another one.
+        const double light = lightness(name, false);
+        const double dark = lightness(name, true);
+        if (name == "image-v-split") {
+            EXPECT_GT(std::abs(dark - light), 10) << name.toStdString();
+        } else {
+            EXPECT_GT(dark, light + 50) << name.toStdString();
+        }
     }
+    EXPECT_TRUE(themedIcon("no-such-icon").isNull());
     QApplication::setPalette(original);
 }
