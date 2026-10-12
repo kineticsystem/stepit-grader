@@ -3,7 +3,6 @@
 
 #include "widgets/CollapsibleSection.h"
 
-#include <QFrame>
 #include <QHBoxLayout>
 #include <QSignalBlocker>
 #include <QToolButton>
@@ -27,10 +26,6 @@ CollapsibleSection::CollapsibleSection(const QString &title, QWidget *parent)
     font.setBold(true);
     m_header->setFont(font);
 
-    auto *line = new QFrame{this};
-    line->setFrameShape(QFrame::HLine);
-    line->setFrameShadow(QFrame::Sunken);
-
     m_contentLayout->setContentsMargins(0, 0, 0, 0);
     m_contentLayout->setSpacing(0);
 
@@ -41,7 +36,6 @@ CollapsibleSection::CollapsibleSection(const QString &title, QWidget *parent)
     m_headerLayout->setSpacing(2);
     m_headerLayout->addWidget(m_header);
     layout->addLayout(m_headerLayout);
-    layout->addWidget(line);
     layout->addWidget(m_content);
 
     connect(m_header, &QToolButton::toggled, this, [this](bool expanded) {
