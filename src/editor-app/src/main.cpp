@@ -5,6 +5,7 @@
 #include "editor/MainWindow.h"
 #include "editor/PreviewRenderer.h"
 #include "editor/Sections.h"
+#include "editor/Theme.h"
 
 #include "core/StandardPipeline.h"
 #include "imageio/ImageLoader.h"
@@ -12,6 +13,7 @@
 
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QSettings>
 
 #ifdef __GLIBC__
 #include <malloc.h>
@@ -40,6 +42,14 @@ int main(int argc, char *argv[])
     parser.addPositionalArgument(
         "image", QApplication::translate("main", "The TIFF, DNG or raw file to open."), "[image]");
     parser.process(app);
+
+    // The theme chosen in Settings > Theme, before the window and its icons are made.
+    applyTheme(themeNamed(QSettings{}.value(THEME_SETTING).toString()).value_or(Theme::System));
+#ifdef Q_OS_MACOS
+    // As in Lentigram: macOS's menu bar stays light whatever the theme, where the icons of a dark
+    // theme would hardly show. The menus go without icons; the toolbar keeps them.
+    QApplication::setAttribute(Qt::AA_DontShowIconsInMenus);
+#endif
 
     const auto pipeline = core::makeStandardPipeline();
     Document document{

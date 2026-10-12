@@ -6,6 +6,7 @@
 #include "core/StandardPipeline.h"
 #include "editor/Icons.h"
 #include "editor/Sections.h"
+#include "editor/Theme.h"
 #include "editor/WhiteBalancePicker.h"
 #include "editor/widgets/AdjustmentsPanel.h"
 #include "editor/widgets/CollapsibleSection.h"
@@ -17,9 +18,11 @@
 #include <QDir>
 #include <QDoubleSpinBox>
 #include <QLabel>
+#include <QProxyStyle>
 #include <QScrollBar>
 #include <QSignalSpy>
 #include <QSlider>
+#include <QStyle>
 #include <QTest>
 #include <QToolButton>
 
@@ -380,4 +383,48 @@ TEST(IconsTest, EveryIconIsBuiltInWithADrawingForEachTheme)
     }
     EXPECT_TRUE(themedIcon("no-such-icon").isNull());
     QApplication::setPalette(original);
+}
+
+TEST(ThemeTest, DarkAndLightAndBackToTheSystemsStyle)
+{
+    const QString system = QApplication::style()->name();
+    const QPalette original = QApplication::palette();
+
+    // Fusion, inside the proxy that gives it the theme's colours.
+    const auto fusion = [] {
+        const auto *proxy = qobject_cast<QProxyStyle *>(QApplication::style());
+        return proxy != nullptr && proxy->baseStyle()->name() == "fusion";
+    };
+    applyTheme(Theme::Dark);
+    EXPECT_TRUE(fusion());
+    // Lentigram's dark grey.
+    EXPECT_EQ(QApplication::palette().color(QPalette::Window), QColor(53, 53, 53));
+    EXPECT_TRUE(isDarkTheme());
+    // A disabled icon is grey, not darkened out of sight.
+    const QPixmap disabled = themedIcon("zoom-in").pixmap(24, QIcon::Disabled);
+    const QImage image = disabled.toImage();
+    bool grey = false;
+    for (int y = 0; y < image.height() && !grey; ++y) {
+        for (int x = 0; x < image.width() && !grey; ++x) {
+            grey = image.pixelColor(x, y).alpha() > 200
+                   && image.pixelColor(x, y) == QColor(128, 128, 128);
+        }
+    }
+    EXPECT_TRUE(grey);
+
+    applyTheme(Theme::Light);
+    EXPECT_TRUE(fusion());
+    EXPECT_FALSE(isDarkTheme());
+
+    applyTheme(Theme::System);
+    EXPECT_EQ(QApplication::style()->name(), system);
+    QApplication::setPalette(original);
+}
+
+TEST(ThemeTest, NamesRoundTrip)
+{
+    for (Theme theme : {Theme::System, Theme::Light, Theme::Dark}) {
+        EXPECT_EQ(themeNamed(nameOf(theme)), theme);
+    }
+    EXPECT_FALSE(themeNamed("purple"));
 }

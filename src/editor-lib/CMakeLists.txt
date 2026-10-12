@@ -17,6 +17,7 @@ add_library(editor-lib STATIC
     src/MainWindow.cpp
     src/PreviewRenderer.cpp
     src/Sections.cpp
+    src/Theme.cpp
     src/widgets/AdjustmentsPanel.cpp
     src/widgets/CollapsibleSection.cpp
     src/widgets/ImageView.cpp

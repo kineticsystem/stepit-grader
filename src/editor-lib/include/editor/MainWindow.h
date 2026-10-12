@@ -7,6 +7,9 @@
 
 #include <QMainWindow>
 
+#include <utility>
+#include <vector>
+
 class Document;
 class ImageView;
 class PreviewRenderer;
@@ -38,6 +41,11 @@ protected:
 
 private:
     void createActions();
+    /// The menu of the application's own settings: the theme.
+    void createSettingsMenu();
+    /// Gives the action the icon `name` of the theme, and again when the theme changes.
+    void setThemedIcon(QAction *action, const QString &name);
+    void refreshIcons();
     /// Shows the picture before its edit, or after.
     void showBefore(bool before);
     void chooseFile();
@@ -60,6 +68,8 @@ private:
     QLabel *m_renderLabel;
     QAction *m_pickWhite = nullptr;
     QAction *m_showBefore = nullptr;
+    /// The actions with an icon, and the icon's name, drawn again for a new theme.
+    std::vector<std::pair<QAction *, QString>> m_themedIcons;
     QLabel *m_beforeLabel;
     RecentFilesMenu *m_recentFiles = nullptr;
 };

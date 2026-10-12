@@ -5,10 +5,12 @@
 #include "editor/Document.h"
 #include "editor/Icons.h"
 #include "editor/PreviewRenderer.h"
+#include "editor/Theme.h"
 #include "editor/WhiteBalancePicker.h"
 #include "editor/widgets/ImageView.h"
 #include "editor/widgets/RecentFilesMenu.h"
 
+#include <QActionGroup>
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDockWidget>
@@ -148,10 +150,10 @@ void MainWindow::createActions()
     });
     file->addMenu(m_recentFiles);
     QAction *open = file->actions().constFirst();
-    open->setIcon(themedIcon("document-open"));
+    setThemedIcon(open, "document-open");
     QAction *save
         = file->addAction(tr("&Save Settings"), QKeySequence::Save, m_document, &Document::save);
-    save->setIcon(themedIcon("document-save"));
+    setThemedIcon(save, "document-save");
     file->addSeparator();
     file->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
 
@@ -160,7 +162,8 @@ void MainWindow::createActions()
     QAction *reset = edit->addAction(
         tr("Reset &All"), QKeySequence{tr("Ctrl+Shift+R")}, m_document, &Document::resetSettings);
     edit->addSeparator();
-    m_pickWhite = edit->addAction(themedIcon("color-picker"), tr("Pick &White Balance"));
+    m_pickWhite = edit->addAction(tr("Pick &White Balance"));
+    setThemedIcon(m_pickWhite, "color-picker");
     m_pickWhite->setShortcut(QKeySequence{tr("W")});
     m_pickWhite->setCheckable(true);
     m_pickWhite->setToolTip(tr("Click an area that should be white or grey (W)"));
@@ -168,7 +171,8 @@ void MainWindow::createActions()
 
     QMenu *view = menuBar()->addMenu(tr("&View"));
     // Lightroom's key for it.
-    m_showBefore = view->addAction(themedIcon("image-v-split"), tr("&Before and After"));
+    m_showBefore = view->addAction(tr("&Before and After"));
+    setThemedIcon(m_showBefore, "image-v-split");
     m_showBefore->setShortcut(QKeySequence{Qt::Key_Backslash});
     m_showBefore->setCheckable(true);
     m_showBefore->setToolTip(tr("Show the picture before the edit, or after (\\)"));
@@ -190,6 +194,13 @@ void MainWindow::createActions()
         QKeySequence{tr("Ctrl+1")},
         m_view,
         &ImageView::actualSize);
+
+    setThemedIcon(zoomIn, "zoom-in");
+    setThemedIcon(zoomOut, "zoom-out");
+    setThemedIcon(fit, "zoom-fit-best");
+    setThemedIcon(actual, "zoom-original");
+
+    createSettingsMenu();
 
     // The actions used most, one click away, as in Lentigram: fixed, without a menu of its own.
     QToolBar *toolbar = addToolBar(tr("Tools"));
@@ -329,4 +340,40 @@ void MainWindow::showBefore(bool before)
     // cache once rendered, so switching back and forth is at once.
     m_renderLabel->setText(tr("Rendering…"));
     m_renderer->render(before ? core::Settings{} : m_document->settings());
+}
+
+void MainWindow::createSettingsMenu()
+{
+    QMenu *settings = menuBar()->addMenu(tr("&Settings"));
+    QMenu *themes = settings->addMenu(tr("&Theme"));
+    auto *group = new QActionGroup{themes};
+    const Theme current = themeNamed(QSettings{}.value(THEME_SETTING).toString())
+                              .value_or(Theme::System);
+    const std::pair<Theme, QString> choices[]
+        = {{Theme::System, tr("&System")}, {Theme::Light, tr("&Light")}, {Theme::Dark, tr("&Dark")}};
+    for (const auto &[theme, label] : choices) {
+        QAction *action = themes->addAction(label);
+        action->setCheckable(true);
+        action->setChecked(theme == current);
+        group->addAction(action);
+        connect(action, &QAction::triggered, this, [this, theme] {
+            applyTheme(theme);
+            QSettings{}.setValue(THEME_SETTING, nameOf(theme));
+            refreshIcons();
+        });
+    }
+}
+
+void MainWindow::setThemedIcon(QAction *action, const QString &name)
+{
+    action->setIcon(themedIcon(name));
+    m_themedIcons.emplace_back(action, name);
+}
+
+void MainWindow::refreshIcons()
+{
+    // An icon keeps the drawing of the theme it was made in: each is made again for the new one.
+    for (const auto &[action, name] : m_themedIcons) {
+        action->setIcon(themedIcon(name));
+    }
 }

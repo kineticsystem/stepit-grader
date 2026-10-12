@@ -15,6 +15,7 @@
   - [Open a Picture](#open-a-picture)
   - [Edit It](#edit-it)
   - [Save the Settings](#save-the-settings)
+  - [Choose the Theme](#choose-the-theme)
   - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Grade from the Command Line](#grade-from-the-command-line)
 - [The Tools](#the-tools)
@@ -155,6 +156,10 @@ The editor saves the settings by itself, next to the picture, e.g. `IMG_0001.xmp
 The window's title shows `*` while the settings are not written yet: for the second after a change, or until the next change after a save that failed. A failed save is shown in the status bar and tried again at the next change; only when the edit would be lost, on closing the window or opening another picture, does the editor ask whether to go on without it. **File > Save Settings** saves at once.
 
 **Edit > Revert to Opened** goes back to the settings the picture had when it was opened, from its sidecar or none, and **Edit > Reset All** to a picture with no edit. Both are changes like any other, saved in turn.
+
+### Choose the Theme
+
+**Settings > Theme** chooses the look: **System**, the desktop's own, the default; **Light**; or **Dark**, the dark grey of Lentigram, easier on the eyes when judging a picture. The change is at once, and kept for the next time. On macOS, the menus show no icons, as their bar stays light whatever the theme; the toolbar keeps them.
 
 ### Keyboard Shortcuts
 
