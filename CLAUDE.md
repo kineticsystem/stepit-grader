@@ -26,8 +26,8 @@ LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/<library>`, 
 
 - `src/core-lib` (namespace `core`): the engine. Standard C++ only, no Qt, no files. `Image` is linear Rec. 2020 float. Each effect is one header in `include/core/effects` and one source in `src/effects`, implementing `Effect`; `makeStandardPipeline()` is the only place that lists them.
 - `src/io-lib` (namespace `imageio`): `ImageReader` (TIFF with ICC via libtiff and Little CMS, raw and DNG via the raw-converter submodule) and `SettingsStore` (`XmpSidecar`, pugixml). No Qt.
-- `src/widgets-lib`: Qt Widgets and `core-lib` only. The reusable widgets, included as `widgets/...` (`ImageView`, `ParameterSlider`, `CollapsibleSection`, `AdjustmentsPanel`, `RecentFilesMenu`, `sectionsOf()`), that know nothing of their clients and report with signals.
-- `src/editor-lib`: Qt. `Document`, which reads and writes every file in turn on a one-thread pool and saves the settings by itself after a delay it is given; `PreviewRenderer`; `MainWindow`, which only connects the parts.
+- `src/widgets-lib`: Qt Widgets and `core-lib` only. The reusable widgets, included as `widgets/...` (`ImageView`, `ParameterSlider`, `CollapsibleSection`, `AdjustmentsPanel`, `sectionsOf()`), that know nothing of their clients and report with signals. Only what another program needs to grade: a widget of the editor's own, e.g. `RecentFilesMenu`, is in `editor-lib`.
+- `src/editor-lib`: Qt. `Document`, which reads and writes every file in turn on a one-thread pool and saves the settings by itself after a delay it is given; `PreviewRenderer`; `RecentFilesMenu`; `MainWindow`, which only connects the parts.
 - `src/editor-app`: `main()`, the composition root.
 - `src/cli-lib` (namespace `cli`): `parseOptions()` and `Grader`, which grades pictures with saved settings into 16-bit TIFFs (`imageio::TiffWriter`). No Qt.
 - `src/cli-app`: `stepit-grader-cli`'s `main()`.

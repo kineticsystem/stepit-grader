@@ -76,6 +76,22 @@ struct Fixture : ::testing::Test
                && !loaded.isEmpty();
     }
 
+    /// The saves the store has written, read under its lock: the file thread writes it.
+    int storeSaves() const
+    {
+        const std::lock_guard lock{store->mutex};
+        return store->saves;
+    }
+
+    /**
+     * Waits until the store has written `count` saves and the document has heard of each: the
+     * store counts a save on the file thread, and the document hears of it after, on this one.
+     */
+    bool waitForSaves(int count)
+    {
+        return QTest::qWaitFor([&] { return storeSaves() >= count && !document.isSaving(); }, 5000);
+    }
+
     double savedContrast(const std::filesystem::path &image) const
     {
         return store->files.at(image).values().at("Contrast2012");
@@ -194,7 +210,7 @@ TEST_F(DocumentTest, SavesAChangeAfterTheDelay)
     EXPECT_EQ(store->saves, 0);
     EXPECT_TRUE(document.isModified());
 
-    ASSERT_TRUE(QTest::qWaitFor([&] { return store->saves > 0; }, 5000));
+    ASSERT_TRUE(waitForSaves(1));
     EXPECT_EQ(store->saves, 1);
     EXPECT_DOUBLE_EQ(savedContrast("/pictures/a.tif"), 20);
     EXPECT_FALSE(document.isModified());
@@ -276,7 +292,7 @@ TEST_F(DocumentTest, KeepsAChangeMadeWhileSaving)
     QSignalSpy saved{&document, &Document::saved};
     ASSERT_TRUE(QTest::qWaitFor([&] { return !saved.isEmpty(); }, 5000));
     EXPECT_TRUE(document.isModified());
-    ASSERT_TRUE(QTest::qWaitFor([&] { return store->saves == 2; }, 5000));
+    ASSERT_TRUE(waitForSaves(2));
     EXPECT_DOUBLE_EQ(savedContrast("/pictures/a.tif"), 30);
     ASSERT_TRUE(QTest::qWaitFor([&] { return !document.isModified(); }, 5000));
 }
@@ -313,7 +329,7 @@ TEST_F(DocumentTest, RevertsToTheSettingsItWasOpenedWith)
     document.revertSettings();
     EXPECT_TRUE(document.settings().sameAs(opened, pipeline->parameters()));
     EXPECT_TRUE(document.isModified());
-    ASSERT_TRUE(QTest::qWaitFor([&] { return store->saves == 2; }, 5000));
+    ASSERT_TRUE(waitForSaves(2));
     EXPECT_TRUE(store->files.at("/pictures/a.tif").sameAs(opened, pipeline->parameters()));
     EXPECT_FALSE(document.isModified());
 }
@@ -345,7 +361,7 @@ TEST_F(DocumentTest, RetriesAFailedSaveAtTheNextChange)
 
     store->failSaving = false;
     document.setSettings(contrast(30));
-    ASSERT_TRUE(QTest::qWaitFor([&] { return store->saves > 0; }, 5000));
+    ASSERT_TRUE(waitForSaves(1));
     EXPECT_DOUBLE_EQ(savedContrast("/pictures/a.tif"), 30);
     EXPECT_FALSE(document.isModified());
 }

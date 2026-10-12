@@ -1,16 +1,19 @@
-# The editor's user interface, in Qt: the document, the renderer and the main
-# window, which uses the widgets of widgets-lib.
+# The editor's user interface, in Qt: the document, the renderer, the main
+# window and its menu of recent files. The window uses the widgets of
+# widgets-lib.
 set(CMAKE_AUTOMOC ON)
 
 add_library(editor-lib STATIC
     include/editor/Document.h
     include/editor/MainWindow.h
     include/editor/PreviewRenderer.h
+    include/editor/RecentFilesMenu.h
     src/Document.cpp
     src/Icons.cpp
     src/ImageConversion.cpp
     src/MainWindow.cpp
     src/PreviewRenderer.cpp
+    src/RecentFilesMenu.cpp
     src/Theme.cpp
     src/WhiteBalancePicker.cpp)
 target_include_directories(editor-lib PUBLIC include)

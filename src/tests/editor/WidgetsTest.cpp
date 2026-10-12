@@ -5,13 +5,13 @@
 
 #include "core/StandardPipeline.h"
 #include "editor/Icons.h"
+#include "editor/RecentFilesMenu.h"
 #include "editor/Theme.h"
 #include "editor/WhiteBalancePicker.h"
 #include "widgets/AdjustmentsPanel.h"
 #include "widgets/CollapsibleSection.h"
 #include "widgets/ImageView.h"
 #include "widgets/ParameterSlider.h"
-#include "widgets/RecentFilesMenu.h"
 #include "widgets/Sections.h"
 
 #include <QApplication>
