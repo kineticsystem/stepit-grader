@@ -43,7 +43,7 @@ public:
     /// The light the picture is taken to have been shot under, for these two values.
     static Chromaticity sourceWhite(double temperature, double tint);
 
-    std::string section() const override { return "White Balance"; }
+    std::string section() const override { return "Color"; }
     std::vector<Parameter> parameters() const override { return {TEMPERATURE, TINT}; }
     void apply(Image &image, const Settings &settings, const RenderContext &context) const override;
 };

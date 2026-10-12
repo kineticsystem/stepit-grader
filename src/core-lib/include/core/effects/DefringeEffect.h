@@ -21,7 +21,7 @@ public:
     static inline const Parameter HUE_LOW{"DefringePurpleHueLo", "Purple Hue Low", 0, 100, 30, 0};
     static inline const Parameter HUE_HIGH{"DefringePurpleHueHi", "Purple Hue High", 0, 100, 70, 0};
 
-    std::string section() const override { return "Defringe"; }
+    std::string section() const override { return "Chromatic Aberration"; }
     std::vector<Parameter> parameters() const override { return {AMOUNT, HUE_LOW, HUE_HIGH}; }
     /// Nothing to do without an amount, whatever the hue range.
     bool isIdentity(const Settings &settings) const override;

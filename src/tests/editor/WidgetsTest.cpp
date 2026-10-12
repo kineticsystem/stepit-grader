@@ -99,16 +99,49 @@ TEST(ParameterSliderTest, GrabsTheCircleAnywhereAndMovesOnTheLine)
 
 TEST(AdjustmentsPanelTest, SectionsFollowThePipeline)
 {
+    // Without an order, the sections come as the effects run, each with its parameters in order.
     const auto sections = sectionsOf(*core::makeStandardPipeline());
-    ASSERT_EQ(sections.size(), 7u);
-    EXPECT_EQ(sections[0].title, "White Balance");
+    ASSERT_EQ(sections.size(), 6u);
+    EXPECT_EQ(sections[0].title, "Color");
     EXPECT_EQ(sections[1].title, "Noise Reduction");
     EXPECT_EQ(sections[1].parameters.size(), 3u);
-    EXPECT_EQ(sections[2].title, "Defringe");
-    EXPECT_EQ(sections[3].title, "Tone");
+    EXPECT_EQ(sections[2].title, "Chromatic Aberration");
+    EXPECT_EQ(sections[3].title, "Light");
     EXPECT_EQ(sections[3].parameters.front().id, "Exposure2012");
+    EXPECT_EQ(sections[4].title, "Effects");
     EXPECT_EQ(sections[5].title, "HDR");
-    EXPECT_EQ(sections[6].title, "Sharpening");
+}
+
+TEST(AdjustmentsPanelTest, SectionsFollowTheOrderGiven)
+{
+    const auto sections = sectionsOf(*core::makeStandardPipeline(), core::standardSectionOrder());
+    QStringList titles;
+    for (const auto &section : sections) {
+        titles << section.title;
+    }
+    EXPECT_EQ(
+        titles,
+        (QStringList{"Light", "Color", "Effects", "Noise Reduction", "Chromatic Aberration", "HDR"}));
+    // The colour gathers the white balance, which runs first, and the colours, which run later.
+    QStringList color;
+    for (const auto &parameter : sections[1].parameters) {
+        color << QString::fromStdString(parameter.id);
+    }
+    EXPECT_EQ(
+        color, (QStringList{"IncrementalTemperature", "IncrementalTint", "Vibrance", "Saturation"}));
+    // The effects gather the texture, the clarity and the sharpening, which runs last.
+    QStringList effects;
+    for (const auto &parameter : sections[2].parameters) {
+        effects << QString::fromStdString(parameter.id);
+    }
+    EXPECT_EQ(effects, (QStringList{"Texture", "Clarity2012", "Sharpness"}));
+
+    // A section the order does not name follows those it names, in the order of the pipeline.
+    const auto partial = sectionsOf(*core::makeStandardPipeline(), {"HDR", "Light"});
+    EXPECT_EQ(partial[0].title, "HDR");
+    EXPECT_EQ(partial[1].title, "Light");
+    EXPECT_EQ(partial[2].title, "Color");
+    EXPECT_EQ(partial[3].title, "Noise Reduction");
 }
 
 TEST(AdjustmentsPanelTest, EmitsTheSettingsWhenASliderMoves)
@@ -159,7 +192,7 @@ TEST(ImageViewTest, FitsThenZoomsRelativeToTheFullSize)
 
 TEST(CollapsibleSectionTest, ClickingTheTitleFoldsTheContent)
 {
-    CollapsibleSection section{"Tone"};
+    CollapsibleSection section{"Light"};
     auto *content = new QLabel{"inside"};
     section.addWidget(content);
     section.show();
@@ -184,22 +217,22 @@ TEST(AdjustmentsPanelTest, SectionsFoldAndReportIt)
     AdjustmentsPanel panel{sectionsOf(*core::makeStandardPipeline())};
     panel.show();
     QSignalSpy spy{&panel, &AdjustmentsPanel::sectionExpandedChanged};
-    EXPECT_EQ(panel.sectionTitles().size(), 7);
-    EXPECT_TRUE(panel.isSectionExpanded("Defringe"));
+    EXPECT_EQ(panel.sectionTitles().size(), 6);
+    EXPECT_TRUE(panel.isSectionExpanded("Chromatic Aberration"));
 
-    panel.setSectionExpanded("Defringe", false);
-    EXPECT_FALSE(panel.isSectionExpanded("Defringe"));
+    panel.setSectionExpanded("Chromatic Aberration", false);
+    EXPECT_FALSE(panel.isSectionExpanded("Chromatic Aberration"));
     EXPECT_FALSE(panel.slider("DefringePurpleAmount")->isVisible());
     EXPECT_EQ(spy.count(), 0);
 
     const auto headers = panel.findChildren<QToolButton *>();
-    const auto tone = std::ranges::find_if(headers, [](QToolButton *b) {
-        return b->text() == "Tone";
+    const auto light = std::ranges::find_if(headers, [](QToolButton *b) {
+        return b->text() == "Light";
     });
-    ASSERT_NE(tone, headers.end());
-    QTest::mouseClick(*tone, Qt::LeftButton);
+    ASSERT_NE(light, headers.end());
+    QTest::mouseClick(*light, Qt::LeftButton);
     ASSERT_EQ(spy.count(), 1);
-    EXPECT_EQ(spy.first().at(0).toString(), "Tone");
+    EXPECT_EQ(spy.first().at(0).toString(), "Light");
     EXPECT_FALSE(spy.first().at(1).toBool());
 }
 
@@ -276,13 +309,13 @@ TEST(AdjustmentsPanelTest, SectionsFoldAndScrollWithTheSlidersDisabled)
 
     // A real click, through the window, on the title: it must still fold the section.
     const auto headers = panel.findChildren<QToolButton *>();
-    const auto tone = std::ranges::find_if(headers, [](QToolButton *b) {
-        return b->text() == "Tone";
+    const auto light = std::ranges::find_if(headers, [](QToolButton *b) {
+        return b->text() == "Light";
     });
-    ASSERT_NE(tone, headers.end());
-    EXPECT_TRUE((*tone)->isEnabled());
-    QTest::mouseClick(*tone, Qt::LeftButton);
-    EXPECT_FALSE(panel.isSectionExpanded("Tone"));
+    ASSERT_NE(light, headers.end());
+    EXPECT_TRUE((*light)->isEnabled());
+    QTest::mouseClick(*light, Qt::LeftButton);
+    EXPECT_FALSE(panel.isSectionExpanded("Light"));
 
     // The panel, too small for its sections, scrolls.
     const auto bars = panel.findChildren<QScrollBar *>();

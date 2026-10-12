@@ -13,7 +13,7 @@ class SaturationEffect : public Effect
 public:
     static inline const Parameter SATURATION{"Saturation", "Saturation", -100, 100, 0, 0};
 
-    std::string section() const override { return "Presence"; }
+    std::string section() const override { return "Color"; }
     std::vector<Parameter> parameters() const override { return {SATURATION}; }
     void apply(Image &image, const Settings &settings, const RenderContext &context) const override;
 };

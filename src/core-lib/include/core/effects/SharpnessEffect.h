@@ -17,7 +17,7 @@ class SharpnessEffect : public Effect
 public:
     static inline const Parameter SHARPNESS{"Sharpness", "Sharpness", 0, 150, 0, 0};
 
-    std::string section() const override { return "Sharpening"; }
+    std::string section() const override { return "Effects"; }
     std::vector<Parameter> parameters() const override { return {SHARPNESS}; }
     void apply(Image &image, const Settings &settings, const RenderContext &context) const override;
 };
