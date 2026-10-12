@@ -4,7 +4,7 @@
 #pragma once
 
 #include "core/Pipeline.h"
-#include "editor/widgets/AdjustmentsPanel.h"
+#include "widgets/AdjustmentsPanel.h"
 
 #include <vector>
 

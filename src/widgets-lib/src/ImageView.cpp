@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/widgets/ImageView.h"
+#include "widgets/ImageView.h"
 
 #include <QDragEnterEvent>
 #include <QDropEvent>

@@ -45,14 +45,8 @@ void PreviewRenderer::setSource(std::shared_ptr<const core::Image> image)
     m_fullTimer.stop();
     m_rendered.clear();
     m_full = std::move(image);
-    if (m_full) {
-        auto preview = std::make_shared<core::Image>(
-            core::geometry::downscale(*m_full, m_previewSide));
-        m_previewScale = static_cast<double>(preview->width) / m_full->width;
-        m_preview = std::move(preview);
-    } else {
-        m_preview.reset();
-    }
+    // Reducing a picture of tens of megapixels takes a while: the first pass does it.
+    m_preview.reset();
 }
 
 void PreviewRenderer::render(const core::Settings &settings)
@@ -90,20 +84,28 @@ void PreviewRenderer::startPreview()
                                       pipeline = m_pipeline,
                                       source = m_preview,
                                       full = m_full,
+                                      side = m_previewSide,
                                       settings = m_settings,
-                                      scale = m_previewScale,
                                       counter = m_generation,
                                       generation] {
-        const auto image = pipeline->render(*source, settings, core::RenderContext{scale});
+        const auto preview = source ? source
+                                    : std::make_shared<const core::Image>(
+                                          core::geometry::downscale(*full, side));
+        const double scale = static_cast<double>(preview->width) / full->width;
+        const auto image = pipeline->render(*preview, settings, core::RenderContext{scale});
         QImage shown = image ? toQImage(*image) : QImage{};
         const QSize fullSize{full->width, full->height};
         QMetaObject::invokeMethod(
             qApp,
-            [self, shown = std::move(shown), fullSize, counter, generation] {
+            [self, preview, full, shown = std::move(shown), fullSize, counter, generation] {
                 if (!self) {
                     return;
                 }
                 self->m_previewRunning = false;
+                // Kept for the next passes, unless another picture came meanwhile.
+                if (self->m_full == full && !self->m_preview) {
+                    self->m_preview = preview;
+                }
                 // A preview of older settings is still shown while a newer one is made: better
                 // than nothing. One whose settings were shown in full meanwhile is not.
                 if (!shown.isNull() && (*counter == generation || self->m_previewPending)) {

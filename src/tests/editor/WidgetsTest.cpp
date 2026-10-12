@@ -5,14 +5,14 @@
 
 #include "core/StandardPipeline.h"
 #include "editor/Icons.h"
-#include "editor/Sections.h"
 #include "editor/Theme.h"
 #include "editor/WhiteBalancePicker.h"
-#include "editor/widgets/AdjustmentsPanel.h"
-#include "editor/widgets/CollapsibleSection.h"
-#include "editor/widgets/ImageView.h"
-#include "editor/widgets/ParameterSlider.h"
-#include "editor/widgets/RecentFilesMenu.h"
+#include "widgets/AdjustmentsPanel.h"
+#include "widgets/CollapsibleSection.h"
+#include "widgets/ImageView.h"
+#include "widgets/ParameterSlider.h"
+#include "widgets/RecentFilesMenu.h"
+#include "widgets/Sections.h"
 
 #include <QApplication>
 #include <QDir>
