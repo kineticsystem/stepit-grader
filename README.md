@@ -265,15 +265,15 @@ The tools are applied in this order, from top to bottom. Each changes the whole 
 | | Saturation | `-100` to `100` | Saturates every colour; `-100` is black and white. |
 | Effects | Detail | `-100` to `100` | The contrast of the fine texture, a few pixels across, e.g. hairs. |
 | | Structure | `-100` to `100` | The contrast of the medium shapes, e.g. a leg against a body. |
+| | Sharpness | `0` to `150` | Sharpens the finest edges. Look at it at 100%. |
 | Noise Reduction | Luminance | `0` to `100` | Smooths the grain of the luminance a high ISO makes, in the shadows and the highlights alike, and keeps the edges. |
 | | Luminance Detail | `0` to `100` | How much of the fine detail the luminance smoothing keeps; `50` by default. |
 | | Color | `0` to `100` | Removes the coloured blotches of a high ISO, mostly in the shadows, without colour bleeding across edges. The luminance, and so the detail, stays. |
-| Defringe | Purple Amount | `0` to `20` | Takes the colour out of purple fringes, the purple edges a lens draws along strong contrasts. Higher also searches a wider band beside the edges. |
+| Chromatic Aberration | Purple Amount | `0` to `20` | Takes the colour out of purple fringes, the purple edges a lens draws along strong contrasts. Higher also searches a wider band beside the edges. |
 | | Purple Hue Low, Purple Hue High | `0` to `100` | The hues taken for fringes, from blue (`0`) through purple to magenta (`100`); `30` to `70` by default. A purple area away from edges keeps its colour. |
 | HDR | HDR Compression | `0` to `100` | Fits the highlights brighter than white back into the picture, up to 4 stops above it, with a smooth roll-off instead of a clip. |
 | | Compression Point | `0` to `100` | Where the roll-off starts: from middle grey (`0`) to just below white (`100`). The tones below are untouched. |
 | | Local Contrast | `0` to `100` | At `100`, compresses the brightness of whole areas and keeps the texture within them, e.g. the clouds of a bright sky; at `0`, every pixel on its own. |
-| Sharpening | Sharpness | `0` to `150` | Sharpens the finest edges. Look at it at 100%. |
 
 The picture is edited in linear Rec. 2020 with 32-bit floats: no colour is clipped and no tone is lost between the tools, only on the screen.
 

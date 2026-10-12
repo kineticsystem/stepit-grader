@@ -101,16 +101,15 @@ TEST(AdjustmentsPanelTest, SectionsFollowThePipeline)
 {
     // Without an order, the sections come as the effects run, each with its parameters in order.
     const auto sections = sectionsOf(*core::makeStandardPipeline());
-    ASSERT_EQ(sections.size(), 7u);
+    ASSERT_EQ(sections.size(), 6u);
     EXPECT_EQ(sections[0].title, "Color");
     EXPECT_EQ(sections[1].title, "Noise Reduction");
     EXPECT_EQ(sections[1].parameters.size(), 3u);
-    EXPECT_EQ(sections[2].title, "Defringe");
+    EXPECT_EQ(sections[2].title, "Chromatic Aberration");
     EXPECT_EQ(sections[3].title, "Light");
     EXPECT_EQ(sections[3].parameters.front().id, "Exposure2012");
     EXPECT_EQ(sections[4].title, "Effects");
     EXPECT_EQ(sections[5].title, "HDR");
-    EXPECT_EQ(sections[6].title, "Sharpening");
 }
 
 TEST(AdjustmentsPanelTest, SectionsFollowTheOrderGiven)
@@ -122,8 +121,7 @@ TEST(AdjustmentsPanelTest, SectionsFollowTheOrderGiven)
     }
     EXPECT_EQ(
         titles,
-        (QStringList{
-            "Light", "Color", "Effects", "Noise Reduction", "Defringe", "HDR", "Sharpening"}));
+        (QStringList{"Light", "Color", "Effects", "Noise Reduction", "Chromatic Aberration", "HDR"}));
     // The colour gathers the white balance, which runs first, and the colours, which run later.
     QStringList color;
     for (const auto &parameter : sections[1].parameters) {
@@ -131,6 +129,12 @@ TEST(AdjustmentsPanelTest, SectionsFollowTheOrderGiven)
     }
     EXPECT_EQ(
         color, (QStringList{"IncrementalTemperature", "IncrementalTint", "Vibrance", "Saturation"}));
+    // The effects gather the texture, the clarity and the sharpening, which runs last.
+    QStringList effects;
+    for (const auto &parameter : sections[2].parameters) {
+        effects << QString::fromStdString(parameter.id);
+    }
+    EXPECT_EQ(effects, (QStringList{"Texture", "Clarity2012", "Sharpness"}));
 
     // A section the order does not name follows those it names, in the order of the pipeline.
     const auto partial = sectionsOf(*core::makeStandardPipeline(), {"HDR", "Light"});
@@ -213,11 +217,11 @@ TEST(AdjustmentsPanelTest, SectionsFoldAndReportIt)
     AdjustmentsPanel panel{sectionsOf(*core::makeStandardPipeline())};
     panel.show();
     QSignalSpy spy{&panel, &AdjustmentsPanel::sectionExpandedChanged};
-    EXPECT_EQ(panel.sectionTitles().size(), 7);
-    EXPECT_TRUE(panel.isSectionExpanded("Defringe"));
+    EXPECT_EQ(panel.sectionTitles().size(), 6);
+    EXPECT_TRUE(panel.isSectionExpanded("Chromatic Aberration"));
 
-    panel.setSectionExpanded("Defringe", false);
-    EXPECT_FALSE(panel.isSectionExpanded("Defringe"));
+    panel.setSectionExpanded("Chromatic Aberration", false);
+    EXPECT_FALSE(panel.isSectionExpanded("Chromatic Aberration"));
     EXPECT_FALSE(panel.slider("DefringePurpleAmount")->isVisible());
     EXPECT_EQ(spy.count(), 0);
 

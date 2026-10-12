@@ -43,7 +43,7 @@ std::shared_ptr<const Pipeline> makeStandardPipeline()
 
 std::vector<std::string> standardSectionOrder()
 {
-    return {"Light", "Color", "Effects", "Noise Reduction", "Defringe", "HDR", "Sharpening"};
+    return {"Light", "Color", "Effects", "Noise Reduction", "Chromatic Aberration", "HDR"};
 }
 
 } // namespace core
