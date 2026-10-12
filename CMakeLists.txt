@@ -24,12 +24,31 @@ else()
 endif()
 option(STEPIT_GRADER_BUILD_EDITOR "Build the editor, which needs Qt 6" ${STEPIT_GRADER_TOP_LEVEL})
 option(STEPIT_GRADER_BUILD_TESTS "Build the tests, which need Qt 6 and GoogleTest" ${STEPIT_GRADER_TOP_LEVEL})
+# The engine alone, for a bigger project that grades its own pictures:
+# stepit-grader::core and, with Qt 6 Widgets, the panel of sliders,
+# stepit-grader::widgets. No readers, no programs, nothing of deps/.
+option(STEPIT_GRADER_ENGINE_ONLY "Build only the engine and its widgets" OFF)
+option(STEPIT_GRADER_BUILD_WIDGETS "Build the widgets, which need Qt 6 Widgets" ${STEPIT_GRADER_TOP_LEVEL})
+if(STEPIT_GRADER_ENGINE_ONLY)
+    set(STEPIT_GRADER_BUILD_EDITOR OFF)
+    set(STEPIT_GRADER_BUILD_TESTS OFF)
+elseif(STEPIT_GRADER_BUILD_EDITOR OR STEPIT_GRADER_BUILD_TESTS)
+    set(STEPIT_GRADER_BUILD_WIDGETS ON)
+endif()
 
 if(STEPIT_GRADER_TOP_LEVEL)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 endif()
 
 include(cmake/Dependencies.cmake)
+
+add_subdirectory(src/core-lib)
+if(STEPIT_GRADER_BUILD_WIDGETS)
+    add_subdirectory(src/widgets-lib)
+endif()
+if(STEPIT_GRADER_ENGINE_ONLY)
+    return()
+endif()
 
 # raw-converter decodes and renders the raw files. Only its library: its
 # command line tool and tests are off when it is a subproject. A bigger project
@@ -38,7 +57,6 @@ if(NOT TARGET rawconv)
     add_subdirectory(modules/raw-converter EXCLUDE_FROM_ALL)
 endif()
 
-add_subdirectory(src/core-lib)
 add_subdirectory(src/io-lib)
 add_subdirectory(src/cli-lib)
 add_subdirectory(src/cli-app)

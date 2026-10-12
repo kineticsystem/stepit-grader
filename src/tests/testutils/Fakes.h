@@ -13,6 +13,7 @@
 
 #include <map>
 #include <mutex>
+#include <thread>
 
 namespace testutils {
 
@@ -53,6 +54,7 @@ public:
         const std::filesystem::path &file, const std::vector<core::Parameter> &) const override
     {
         const std::lock_guard lock{mutex};
+        lastThread = std::this_thread::get_id();
         const auto found = files.find(file);
         if (found == files.end()) {
             throw imageio::Error{"Cannot read " + file.string() + ": no such file"};
@@ -66,6 +68,7 @@ public:
         const std::vector<core::Parameter> &) const override
     {
         const std::lock_guard lock{mutex};
+        lastThread = std::this_thread::get_id();
         if (failSaving) {
             throw imageio::Error{"disk full"};
         }
@@ -77,6 +80,8 @@ public:
     mutable std::optional<core::Settings> stored;
     mutable std::map<std::filesystem::path, core::Settings> files;
     mutable int saves = 0;
+    /// The thread of the last save or loadFile(), to check it is not the caller's.
+    mutable std::thread::id lastThread;
     bool failSaving = false;
 };
 

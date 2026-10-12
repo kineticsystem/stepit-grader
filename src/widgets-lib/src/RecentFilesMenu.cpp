@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/widgets/RecentFilesMenu.h"
+#include "widgets/RecentFilesMenu.h"
 
 #include <QDir>
 #include <QFileInfo>

@@ -20,6 +20,7 @@
   - [The Document](#the-document)
   - [The Preview Renderer](#the-preview-renderer)
   - [The Main Window and main()](#the-main-window-and-main)
+- [The Engine in Another Program](#the-engine-in-another-program)
 - [A Slider Moves](#a-slider-moves)
 - [Threads](#threads)
 - [The Linux AppImage](#the-linux-appimage)
@@ -35,7 +36,7 @@ It follows one idea: **an edit is a set of named values, never pixels**. The sli
 
 ## The Big Picture
 
-The code is five static libraries and two programs, the editor and the command line, which share the engine and the files. Each library depends only on those below it, and only the editor's knows Qt.
+The code is six static libraries and two programs, the editor and the command line, which share the engine and the files. Each library depends only on those below it, and only the widgets' and the editor's know Qt.
 
 ```mermaid
 ---
@@ -95,7 +96,8 @@ config:
 flowchart TB
     App["stepit-grader<br/>the editor's main()"]
     Cli["stepit-grader-cli<br/>the command line's main()"]
-    Editor["editor-lib<br/>widgets, Document, PreviewRenderer, MainWindow"]
+    Editor["editor-lib<br/>Document, PreviewRenderer, MainWindow"]
+    Widgets["widgets-lib<br/>AdjustmentsPanel, sliders, ImageView"]
     CliLib["cli-lib<br/>Options, Grader"]
     IO["io-lib<br/>readers, TIFF writer, XMP sidecar"]
     Core["core-lib<br/>Image, Effect, Pipeline, the effects"]
@@ -107,9 +109,11 @@ flowchart TB
     Cli --> CliLib
     CliLib --> IO
     CliLib --> Core
+    Editor --> Widgets
     Editor --> IO
-    Editor --> Core
     Editor --> Qt
+    Widgets --> Core
+    Widgets --> Qt
     IO --> Core
     IO --> Raw
     IO --> Libs
@@ -130,12 +134,15 @@ flowchart TB
 |---|---|---|---|
 | [`core-lib`](../src/core-lib) | The image in the working space, the `Effect` interface, the `Pipeline`, the fifteen effects, the area sampling, the filters, the colour maths, the threads, the conversion for the screen. | Threads only. | Include Qt, read or write a file, know which effects exist outside `StandardPipeline.cpp`. |
 | [`io-lib`](../src/io-lib) | Reading images into the working space, writing them as TIFFs out of it, and the settings in XMP sidecars. | `core-lib`; privately raw-converter, libtiff, Little CMS, pugixml. | Include Qt, change pixels beyond bringing them into the working space, expose a third-party type in a header. |
-| [`editor-lib`](../src/editor-lib) | The widgets, the document, the background rendering, the main window and its icons. | `core-lib`, `io-lib`, Qt Widgets, Concurrent and Svg. | Change pixels itself: it asks the engine. Create its own reader, store or pipeline: it is given them. |
+| [`widgets-lib`](../src/widgets-lib) | The reusable widgets: the panel of sliders and its sections, the image view, the menu of recent files, and `sectionsOf()`. | `core-lib`, Qt Widgets. | Know the editor, a file or a document: each is given what it shows and reports with signals. |
+| [`editor-lib`](../src/editor-lib) | The document, the background rendering, the white balance picker, the main window, its themes and icons. | `core-lib`, `widgets-lib`, `io-lib`, Qt Widgets, Concurrent and Svg. | Change pixels itself: it asks the engine. Create its own reader, store or pipeline: it is given them. Read or write a file, or render, on the main thread. |
 | [`editor-app`](../src/editor-app) | `main()`. | `editor-lib`. | Hold any logic beyond choosing the parts. |
 | [`cli-lib`](../src/cli-lib) | The command line's options and the grading of many pictures. | `core-lib`, `io-lib`. | Include Qt, print: it reports results, `main()` prints them. |
 | [`cli-app`](../src/cli-app) | `main()`. | `cli-lib`. | Hold any logic beyond choosing the parts and printing. |
 
-`core-lib` is about 2,500 lines, `io-lib` 1,150, `editor-lib` 2,000, `cli-lib` 300 and the tests 1,750.
+`core-lib` is about 2,700 lines, `io-lib` 1,150, `widgets-lib` 1,050, `editor-lib` 1,500, `cli-lib` 300 and the tests 2,300.
+
+`core-lib` is built with `-O2` in a Debug build too, except with MSVC: its loops over every pixel are about ten times slower without the optimiser, too slow to follow a slider while the rest of a program is debugged.
 
 ## The Engine
 
@@ -250,41 +257,41 @@ The editor and the command line make the same picture of the same settings: one 
 
 ## The Editor
 
-## The Editor
-
 ### The Widgets
 
-Each widget is reusable: it is given what it shows, knows nothing of who uses it, and reports what the user did with signals.
+The widgets are a library of their own, [`widgets-lib`](../src/widgets-lib), included as `widgets/...`. Each is reusable: it is given what it shows, knows nothing of who uses it, and reports what the user did with signals.
 
 | Widget | What it does | Signals |
 |---|---|---|
-| [`ImageView`](../src/editor-lib/include/editor/widgets/ImageView.h) | Shows a `QImage`, centred, fitted or zoomed to 800%, dragged with the mouse, zoomed by the wheel around the cursor. It paints only the visible part, and reduces the image once per zoom with area averaging. The image may stand for a larger one: `setImage(preview, fullSize)` keeps the zoom relative to the full size, so the full picture replacing the preview does not move the view. In pick mode, `setPickMode(true)`, a click reports a point instead of dragging, with a circle of `PICK_RADIUS`, 5 screen pixels, under the cursor; `Esc` leaves it. It does not know what the point is for. | `zoomChanged`, `fileDropped`, `pointPicked`, in pixels of the full image with the radius in the same pixels, `pickCancelled` |
-| [`ParameterSlider`](../src/editor-lib/include/editor/widgets/ParameterSlider.h) | A name, a slider and a box for one value; a double click puts the default back. | `valueChanged`, only for the user's changes, never for `setValue()`. |
-| [`CollapsibleSection`](../src/editor-lib/include/editor/widgets/CollapsibleSection.h) | A bold title with an arrow above widgets that fold away when it is clicked; `addHeaderWidget()` puts a widget, e.g. a tool's button, on the right of the title. | `expandedChanged`, only for the user's clicks, never for `setExpanded()`. |
-| [`RecentFilesMenu`](../src/editor-lib/include/editor/widgets/RecentFilesMenu.h) | The files opened last, the latest first, numbered `&1` to `&9` with their full path as a tooltip, then Clear; disabled while empty. It keeps the list but does not store it: `setFiles()` gives it, `filesChanged` reports it. The menu is given its list rather than storing it, so it needs no settings file in its tests. | `fileSelected`, with the full path; `filesChanged`, for `addFile()`, `removeFile()` and `clearFiles()`, never for `setFiles()`. |
-| [`AdjustmentsPanel`](../src/editor-lib/include/editor/widgets/AdjustmentsPanel.h) | One `CollapsibleSection` per section it is given, with a `ParameterSlider` per parameter, in a scroll area. It knows parameters, not effects, and opens and closes sections when asked, without remembering them. `setControlsEnabled()` enables or disables the sliders only: disabling the whole panel would disable its titles and its scroll bar too. | `settingsChanged`, with every value; `sectionExpandedChanged`, with the section's title. |
+| [`ImageView`](../src/widgets-lib/include/widgets/ImageView.h) | Shows a `QImage`, centred, fitted or zoomed to 800%, dragged with the mouse, zoomed by the wheel around the cursor. It paints only the visible part, and reduces the image once per zoom with area averaging. The image may stand for a larger one: `setImage(preview, fullSize)` keeps the zoom relative to the full size, so the full picture replacing the preview does not move the view. In pick mode, `setPickMode(true)`, a click reports a point instead of dragging, with a circle of `PICK_RADIUS`, 5 screen pixels, under the cursor; `Esc` leaves it. It does not know what the point is for. | `zoomChanged`, `fileDropped`, `pointPicked`, in pixels of the full image with the radius in the same pixels, `pickCancelled` |
+| [`ParameterSlider`](../src/widgets-lib/include/widgets/ParameterSlider.h) | A name, a slider and a box for one value; a double click puts the default back. | `valueChanged`, only for the user's changes, never for `setValue()`. |
+| [`CollapsibleSection`](../src/widgets-lib/include/widgets/CollapsibleSection.h) | A bold title with an arrow above widgets that fold away when it is clicked; `addHeaderWidget()` puts a widget, e.g. a tool's button, on the right of the title. | `expandedChanged`, only for the user's clicks, never for `setExpanded()`. |
+| [`RecentFilesMenu`](../src/widgets-lib/include/widgets/RecentFilesMenu.h) | The files opened last, the latest first, numbered `&1` to `&9` with their full path as a tooltip, then Clear; disabled while empty. It keeps the list but does not store it: `setFiles()` gives it, `filesChanged` reports it. The menu is given its list rather than storing it, so it needs no settings file in its tests. | `fileSelected`, with the full path; `filesChanged`, for `addFile()`, `removeFile()` and `clearFiles()`, never for `setFiles()`. |
+| [`AdjustmentsPanel`](../src/widgets-lib/include/widgets/AdjustmentsPanel.h) | One `CollapsibleSection` per section it is given, with a `ParameterSlider` per parameter, in a scroll area. It knows parameters, not effects, and opens and closes sections when asked, without remembering them. `setControlsEnabled()` enables or disables the sliders only: disabling the whole panel would disable its titles and its scroll bar too. | `settingsChanged`, with every value; `sectionExpandedChanged`, with the section's title. |
 
 [`pickWhiteBalance()`](../src/editor-lib/include/editor/WhiteBalancePicker.h) turns a point picked into settings: it samples the document's image, the picture before any edit, which is what the white balance, first in the pipeline, sees; asks `WhiteBalanceEffect::neutralFor()`; and returns the settings with the two values changed, or a message for the user when the area is clipped, black or outside the picture. A function, so the tests need no window. [`themedIcon()`](../src/editor-lib/include/editor/Icons.h) gives an icon of the editor's, e.g. `zoom-in`, from [`resources/icons`](../src/editor-lib/resources/icons), built into the library as a Qt resource: each has a drawing for a light theme, dark grey, and one for a dark theme, light grey, chosen by the lightness of the window's colour. Two drawings, not one painted in the theme's colour, as some icons have two tones, e.g. the before and after's two halves. Qt's SVG module draws them, not an icon plugin, which would have to be shipped beside the program on Windows and macOS.
 
 [`applyTheme()`](../src/editor-lib/include/editor/Theme.h) gives the application a `Theme`: **System**, the desktop's style as the application started with it; **Light**, Qt's Fusion; or **Dark**, Fusion with a dark grey palette, and disabled icons grey rather than darkened out of sight. Fusion draws the same on every system, so the dark colours do too. The style is a `QProxyStyle` around Fusion, which gives its `standardPalette()`. An icon keeps the drawing of the theme it was made in, so the main window remembers each action's icon name and makes the icons again after a change.
 
-`sectionsOf()`, in [`Sections.h`](../src/editor-lib/include/editor/Sections.h), groups the parameters of a pipeline by section, so the panel needs no pipeline.
+`sectionsOf()`, in [`Sections.h`](../src/widgets-lib/include/widgets/Sections.h), groups the parameters of a pipeline by section, so the panel needs no pipeline.
 
 ### The Document
 
 [`Document`](../src/editor-lib/include/editor/Document.h) is the picture being edited: its path, its pixels, and three sets of settings: those it was opened with, those its sidecar holds, and the current ones. It is given its `ImageReader`, its `SettingsStore`, the parameters and the delay before it saves, 1 second by default, so the tests give it fakes and 200 ms.
 
-- `open()` first saves what waits to be saved, then reads the image and its sidecar on a worker thread, and ends with `opened()` then `settingsChanged()`, or `openFailed()` with the reader's message. The sliders stay live while it reads, so `finishOpening()` saves once more before it takes the new picture: a change made meanwhile belongs to the old one.
+Every read and write of a file runs on `m_files`, a `QThreadPool` of one thread, so they never block the window and keep the order they were asked in: a save of a picture is written before the same picture is read again, and the settings asked from a file before another picture opens are read before it. The destructor waits for them, as they report to the document.
+
+- `open()` first asks for a save of what waits to be saved, then reads the image and its sidecar, and ends with `opened()` then `settingsChanged()`, or `openFailed()` with the reader's message. The sliders stay live while it reads, so `finishOpening()` asks for a save once more before it takes the new picture: a change made meanwhile belongs to the old one.
 - `setSettings()`, `resetSettings()` and `revertSettings()` emit `settingsChanged()` only when a value changes, and `modifiedChanged()` when the settings start or stop differing from what the sidecar holds, or from the defaults without a sidecar. `revertSettings()` goes back to the settings the picture was opened with.
 - Each change that leaves the settings different from the sidecar restarts a single-shot `QTimer`; when it fires, `save()` runs. A slider dragged restarts it at every step, so the file is written once, a second after it stops. A change back to what the sidecar holds stops the timer: nothing is written, and a picture opened and closed without a change gets no sidecar.
-- `save()` writes through the store, if the settings differ from the sidecar, and emits `saved()` or `saveFailed()`. It returns false only when the store failed. After a failure the settings stay modified and the timer is not restarted: the next change tries again, rather than a loop writing to a full disk every second.
-- `loadSettings()` applies the settings of another file, through the store's `loadFile()`: every value of it, the others at their defaults, as a change, so saved and reverted like one. It ends with `settingsLoaded()`, or `settingsLoadFailed()` with the store's message and the settings as they were.
+- `save()` asks for a write through the store, if the settings differ from the sidecar, of the path and the settings as they are, and returns; `finishSaving()` ends it with `saved()` or `saveFailed()`. `isSaving()` is true until the last one asked has ended, and a save of the settings a save already writes is not asked twice. The settings stay modified until it ends, and after, if they changed meanwhile: those changes wait for the next save. After a failure the settings stay modified and the timer is not restarted: the next change tries again, rather than a loop writing to a full disk every second.
+- `loadSettings()` applies the settings of another file, read through the store's `loadFile()` in the background: every value of it, the others at their defaults, as a change, so saved and reverted like one. It ends with `settingsLoaded()`, or `settingsLoadFailed()` with the store's message and the settings as they were; with nothing when another picture opened meanwhile, as the settings were not for it. It returns false, at once, without a picture.
 
 ### The Preview Renderer
 
 [`PreviewRenderer`](../src/editor-lib/include/editor/PreviewRenderer.h) renders the settings off the user interface's thread, in two passes, each ending with `rendered(image, fullSize, full)`:
 
-1. **The preview**, at once: the picture reduced to at most 2,048 pixels on its longer side, made once per picture. While one runs, newer settings wait, and only the latest is rendered next.
+1. **The preview**, at once: the picture reduced to at most 2,048 pixels on its longer side, made once per picture, by the first preview pass, so `setSource()` returns at once. While one runs, newer settings wait, and only the latest is rendered next.
 2. **The full picture**, once the settings have not changed for 0.3 seconds.
 
 The last two pictures rendered in full are kept, with their settings. Settings rendered already are shown in full at once, without a pass: switching between the picture before its edit, rendered with no settings, and after takes no time once both are made. A new picture empties them.
@@ -305,7 +312,7 @@ A counter, shared with the passes, goes up with every change. A full pass compar
 | `Document` | `modifiedChanged` | the window's `*`: settings not written yet, waiting or after a failure |
 | `Document` | `saved` | the status bar, for 3 seconds |
 | `Document` | `saveFailed` | the status bar, for 15 seconds, without a dialog |
-| **File > Save Settings**, `Ctrl+S` | `triggered` | `Document::save`, at once |
+| **File > Save Settings**, `Ctrl+S` | `triggered` | `Document::save`, at once, in the background |
 | **Edit > Revert to Opened** | `triggered` | `Document::revertSettings` |
 | `PreviewRenderer` | `rendered` | `ImageView::setImage` |
 | `ImageView` | `fileDropped` | `MainWindow::openFile` |
@@ -313,14 +320,27 @@ A counter, shared with the passes, goes up with every change. A full pass compar
 | `RecentFilesMenu` | `filesChanged` | `QSettings`, under `recentPictures`, given back with `setFiles()` when the window opens |
 | `Document` | `opened` | `RecentFilesMenu::addFile`: only a picture that opened is listed |
 | **Pick White Balance**, `W`, and its button in the White Balance title | `toggled` | `ImageView::setPickMode` |
-| `ImageView` | `pointPicked` | `pickWhiteBalance()`, then `Document::setSettings`; the action unchecked: one pick, then back to dragging |
+| `ImageView` | `pointPicked` | `pickWhiteBalance()`, by `QtConcurrent::run`, then `Document::setSettings` with the temperature and the tint picked and the other values as they are by then, unless another picture opened meanwhile; the action unchecked: one pick, then back to dragging |
 | `ImageView` | `pickCancelled` | the action unchecked |
 | **Before and After**, `\\`, and its button in the toolbar | `toggled` | `PreviewRenderer::render`, with no settings for before and the document's for after; **Before** in the status bar |
 | `Document` | `settingsChanged`, while before | the action unchecked, without a signal: a change is seen on the edit |
 
-Before another picture is opened, or the window closed, `settingsSaved()` calls `Document::save()` so nothing waits. It asks only when that save fails, whether to go on without the edit: there, and only there, the edit would be lost.
+Before another picture is opened, or the window closed, `whenSaved()` asks for `Document::save()` and keeps what to do next; `continueWhenSaved()`, called at once and on `saved` and `saveFailed`, does it once no save is running and nothing waits to be written. A change made while the save ran is written in turn. It asks only when the last save failed, whether to go on without the edit: there, and only there, the edit would be lost. A close waits the same way: `closeEvent()` ignores the event while settings wait to be written, and closes the window again, from the event loop, once they are.
 
 [`main()`](../src/editor-app/src/main.cpp) is the composition root: it makes the standard pipeline, the standard reader, the XMP sidecar, the document, the renderer and the window, and gives each its parts.
+
+## The Engine in Another Program
+
+A program that grades pictures of its own takes the engine and the panel of sliders without the rest: with `STEPIT_GRADER_ENGINE_ONLY` on, the project, added with `add_subdirectory()`, builds only `core-lib` and, with `STEPIT_GRADER_BUILD_WIDGETS` and Qt 6 Widgets, `widgets-lib`, and looks for nothing of `deps/`: no readers, no raw-converter, no programs, no tests.
+
+```cmake
+set(STEPIT_GRADER_ENGINE_ONLY ON)
+set(STEPIT_GRADER_BUILD_WIDGETS ON)
+add_subdirectory(modules/stepit-grader)
+target_link_libraries(my-program PRIVATE stepit-grader::core stepit-grader::widgets)
+```
+
+The program brings its pictures to the working space, linear Rec. 2020 in float, renders them with `makeStandardPipeline()`, and shows the sliders with `AdjustmentsPanel{sectionsOf(*pipeline)}`, whose `settingsChanged` gives the values to keep. As the editor does, it renders off its main thread, and passes a `cancelled` callback to `Pipeline::render()` so a render made old by a newer change stops at its next effect.
 
 ## A Slider Moves
 
@@ -400,10 +420,12 @@ A slider dragged sends a change for every step: each starts a preview if none is
 | What | Where it runs | How its result comes back |
 |---|---|---|
 | The window, the widgets, the document's state | The main thread. | |
-| Reading a picture and its sidecar | `QtConcurrent::run`, from `Document::open()`. | `QFutureWatcher::finished`, on the main thread. |
+| Reading a picture and its sidecar | `QtConcurrent::run` on the document's one-thread pool, from `Document::open()`. | `QFutureWatcher::finished`, on the main thread. |
+| Saving a sidecar, loading another file's settings | `QtConcurrent::run` on the same pool, after the reads and writes asked before, from `Document::save()` and `loadSettings()`. | `QMetaObject::invokeMethod` on the document, queued; the destructor waits for the pool. |
+| Measuring the white balance picked | `QtConcurrent::run`, from `MainWindow::pickWhiteBalanceAt()`. | `QFutureWatcher::finished`, on the main thread. |
+| Reducing the picture for the preview | The first preview pass, from `PreviewRenderer`. | With the pass's result, kept unless another picture came meanwhile. |
 | A preview or a full pass | `QtConcurrent::run`, from `PreviewRenderer`. | `QMetaObject::invokeMethod` on the main thread, guarded by a `QPointer` to the renderer. |
 | Inside an effect, a reader or the screen conversion | `core::parallelFor`'s pool. | The caller waits for its chunks, helping with them. |
-| Saving a sidecar | The main thread: a few kB. | |
 
 ## The Linux AppImage
 
@@ -423,17 +445,17 @@ All the tests are in one program, [`src/tests`](../src/tests), with GoogleTest a
 |---|---|---|
 | [`core`](../src/tests/core) | 37 | Every effect at its defaults changes nothing; the luminance noise smooths sensor grain to under 40% on both sides of an edge that stays as steep, its detail puts grain back, and a grey stays grey; the colour noise removes the blotches without changing the lightness, and keeps red and blue to their sides of an edge; the guided filter by another plane follows the guide's edges; parameter ids unique, defaults in range; each effect moves the picture the right way, e.g. the highlights change the bright side of a step and leave the dark one; the defringe greys a purple fringe beside an edge, keeps a purple patch away from edges and a green fringe, and finds the same fringe in a preview a third of the size; a warm and a cool grey turned neutral by the white balance found for them, a grey needing none, black giving none, a cast beyond the sliders clamped; the HDR curve untouched below its knee, smooth at it, rising to white, the highlights brought below white with their hue, and local contrast keeping the texture of bright areas; the area sampling's disc and clipped pixels; the box blur, the guided filter's edge without overshoot; Oklab round trip; D65 adapted to D65; middle grey as sRGB 118; downscale and orientation; a cancelled render. |
 | [`io`](../src/tests/io) | 19 | A 16-bit linear Rec. 2020 TIFF read unchanged; an untagged 8-bit TIFF taken for sRGB; orientation; a broken file reported; readers chosen by extension; a Canon CR2 and a DNG, when the samples are there; the sidecar's formatting, another raw editor's sidecar read, elements with another prefix, an update that keeps everything else, a round trip on disk, a sidecar that is not XML, a sidecar of any name loaded; the TIFF writer in each of the four colour spaces read back through its embedded profile, white clipped, a file replaced whole without a temporary file left, a folder that does not exist; the colour spaces' names. |
-| [`editor`](../src/tests/editor) | 35 | The slider emits the user's changes only, and resets on a double click; a section folds on a click on its title, and reports the user's clicks only; the panel's sections fold and report it, and still fold and scroll with the sliders disabled; the recent files menu keeps the latest first, without duplicates and up to its maximum, shows numbered names with the paths as tooltips, reports the file chosen with its path, removes and clears; every icon is built in, with a drawing for each theme; the dark theme is Fusion in dark grey, greys disabled icons, and System gives the desktop's style back; the themes' names; the renderer shows settings rendered already at once, from the pictures it keeps, and forgets them for a new picture; the view in pick mode reports the click in pixels of the full image and leaves pick mode with `Esc`; the picker sets the white balance of a warm card and keeps the other values, and explains a clipped or black area; the sections follow the pipeline; the panel emits every value; the view fits, zooms, and keeps the zoom when the full picture replaces the preview; the document, with a fake reader and store, loads another file's settings as a change, saved and reverted, reports a file it cannot load with the settings unchanged, loads nothing without a picture, opens with the saved settings, reports what it cannot read, tracks the changes not written yet; saves a change after the delay and not before, many quick changes once, nothing without a change, at once on request and before another picture opens; reverts to the settings it was opened with and saves that; reports a failed save and tries again at the next change; the renderer sends a preview then the full picture, and only one full pass for many quick changes. |
+| [`editor`](../src/tests/editor) | 39 | The slider emits the user's changes only, and resets on a double click; a section folds on a click on its title, and reports the user's clicks only; the panel's sections fold and report it, and still fold and scroll with the sliders disabled; the recent files menu keeps the latest first, without duplicates and up to its maximum, shows numbered names with the paths as tooltips, reports the file chosen with its path, removes and clears; every icon is built in, with a drawing for each theme; the dark theme is Fusion in dark grey, greys disabled icons, and System gives the desktop's style back; the themes' names; the renderer shows settings rendered already at once, from the pictures it keeps, and forgets them for a new picture; the view in pick mode reports the click in pixels of the full image and leaves pick mode with `Esc`; the picker sets the white balance of a warm card and keeps the other values, and explains a clipped or black area; the sections follow the pipeline; the panel emits every value; the view fits, zooms, and keeps the zoom when the full picture replaces the preview; the document, with a fake reader and store, loads another file's settings as a change, saved and reverted, reports a file it cannot load with the settings unchanged, loads nothing without a picture, opens with the saved settings, reports what it cannot read, tracks the changes not written yet; saves a change after the delay and not before, many quick changes once, nothing without a change, at once on request and before another picture opens; reverts to the settings it was opened with and saves that; reports a failed save and tries again at the next change; saves and loads off the caller's thread, writes the same settings once when asked twice, keeps a change made while saving modified and writes it next, and drops settings asked for a picture left while another opened; the renderer reduces the preview in its first pass, not in `setSource()`, sends a preview then the full picture, and only one full pass for many quick changes. |
 | [`cli`](../src/tests/cli) | 7 | Every option read, the defaults, what is wrong reported with a message, `--` before a name with a dash; the grader, with a fake reader and store, applies the settings given to every picture, or each picture's own sidecar, or none; never writes over the picture, nor over a TIFF without `--overwrite`; reports a picture that fails and grades the others, and refuses a second picture of the same name. |
 
-The 101 tests take about 10 seconds, most of it reading the two raw samples and waiting for the document's saves, which [`fetch-samples.sh`](https://github.com/kineticsystem/raw-converter/blob/main/bin/fetch-samples.sh) of raw-converter downloads; without them, those two are skipped.
+The 105 tests take about 10 seconds, most of it reading the two raw samples and waiting for the document's saves, which [`fetch-samples.sh`](https://github.com/kineticsystem/raw-converter/blob/main/bin/fetch-samples.sh) of raw-converter downloads; without them, those two are skipped.
 
 What has no automated test, and how to check it by hand:
 
 | Part | How to check it |
 |---|---|
 | The look of the effects | Open a raw file, move each slider to both ends, and look for halos along strong edges, banding in skies, and colour shifts in greys. |
-| The menus and the dialogs | Open, change, wait a second: the sidecar is there and the `*` gone; change and close at once: the sidecar has the change; make the folder read-only and change: the status bar says it cannot save and the `*` stays, and closing asks whether to leave the edit unsaved; drop a JPEG: it says it cannot open it. |
+| The menus and the dialogs | Open, change, wait a second: the sidecar is there and the `*` gone; change and close at once: the sidecar has the change, and the window closes once it is written; change and open another picture at once: the first one's sidecar has the change; make the folder read-only and change: the status bar says it cannot save and the `*` stays, and closing asks whether to leave the edit unsaved; drop a JPEG: it says it cannot open it. |
 
 ## How to Extend StepIt Grader
 
@@ -447,6 +469,8 @@ What has no automated test, and how to check it by hand:
 | Add an output colour space, e.g. Display P3 | A value of `ColourSpace`, its name in `ColourProfiles.cpp`, and its profile in `profiles::of()`. |
 | Change the preview's size or delay | The arguments of `PreviewRenderer` in `main()`. |
 | Change the delay before a save | The `saveDelay` argument of `Document` in `main()`. |
+| Add a reusable widget | A header in `include/widgets` and a source in `src` of `widgets-lib`, both in its `CMakeLists.txt`, knowing nothing of the editor; a test in `WidgetsTest.cpp`. |
+| Add a menu action that does work | The work in `QtConcurrent::run`, or in the document's pool when it touches a file, and its result back with a `QFutureWatcher` or a queued call; the window only connects it. |
 
 ## Design Decisions and Trade-offs
 
@@ -477,5 +501,9 @@ What has no automated test, and how to check it by hand:
 **sRGB by default, wide gamut on request.** sRGB is what every viewer assumes, so a TIFF in it looks right everywhere. Prints reach colours sRGB clips: Adobe RGB and ProPhoto RGB keep them, and their profile says so to any program that reads the file. The price: a ProPhoto TIFF looks dull in a program that ignores the profile.
 
 **Saved by itself, a second after the last change.** An edit is a few values, and the sidecar a few kB: writing it costs nothing, while an edit lost to a forgotten save, or to a "Save the settings?" answered wrong, costs the work. So the document saves without asking, and a picture always reopens as it was left. The delay lets a slider dragged write once, when it stops, not at each of its steps. The window's `*` keeps its usual meaning, "not written yet", which with auto-save is the second after a change, and after a failure, the one sign that stays once the status bar's message is gone. The price: there is no "close without saving"; trying a change is keeping it, and **Edit > Revert to Opened** is the way back to the picture as it was opened. An edit made in another program on the same sidecar while the picture is open is overwritten at the next change.
+
+**Every file read and written in turn, off the main thread.** A sidecar is a few kB, but on a network folder or a sleeping disk a write can take seconds, and the window would freeze for them. One thread keeps the order without locks: a save of a picture is on disk before the same picture is read again. The price: an action that leaves the picture, opening another or closing, waits for the save through signals rather than a call that returns, and a save waits behind the read of a large raw file.
+
+**The engine as a package of its own.** `core-lib` and `widgets-lib` need nothing but the standard library, threads and Qt Widgets, so another program can grade its pictures with the same engine and sliders, with `STEPIT_GRADER_ENGINE_ONLY`, instead of a copy that drifts. The price: the widgets' names are the editor's, without a namespace of their own, and the engine's `core` namespace is a generic name in a bigger program.
 
 **No undo yet.** Revert and Reset cover the common cases: the settings are values, and an undo would be a list of `Settings`, in the `Document`.

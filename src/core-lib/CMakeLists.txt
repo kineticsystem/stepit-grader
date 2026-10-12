@@ -27,6 +27,14 @@ add_library(core-lib STATIC
     src/effects/ToneCompressionEffect.cpp
     src/effects/VibranceEffect.cpp
     src/effects/WhiteBalanceEffect.cpp)
+add_library(stepit-grader::core ALIAS core-lib)
 target_include_directories(core-lib PUBLIC include)
 target_link_libraries(core-lib PUBLIC Threads::Threads)
 stepit_grader_warnings(core-lib)
+
+# The effects loop over every pixel, about ten times slower without the
+# optimiser: optimised in a debug build too, so a program debugged with the
+# engine still follows its sliders.
+if(NOT MSVC)
+    target_compile_options(core-lib PRIVATE $<$<CONFIG:Debug>:-O2>)
+endif()

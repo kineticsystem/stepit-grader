@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/widgets/CollapsibleSection.h"
+#include "widgets/CollapsibleSection.h"
 
 #include <QFrame>
 #include <QHBoxLayout>

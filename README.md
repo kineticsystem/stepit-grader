@@ -12,6 +12,7 @@
   - [Install the Libraries](#install-the-libraries)
   - [Build the Project](#build-the-project)
   - [Package for Linux](#package-for-linux)
+  - [Use the Engine in Another Program](#use-the-engine-in-another-program)
 - [Running the Application](#running-the-application)
   - [Open a Picture](#open-a-picture)
   - [Edit It](#edit-it)
@@ -131,7 +132,7 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-The programs are in `build/bin`: `stepit-grader`, the editor, `stepit-grader-cli`, the command line, and `stepit-grader-tests`. Build in `Release`: the effects are about ten times slower in `Debug`.
+The programs are in `build/bin`: `stepit-grader`, the editor, `stepit-grader-cli`, the command line, and `stepit-grader-tests`. Build in `Release`: the engine is optimised in `Debug` too, but the rest of the program is not.
 
 ### Package for Linux
 
@@ -149,6 +150,19 @@ It builds the project, bundles Qt and every library with [linuxdeploy](https://g
 ```
 
 The AppImage runs on Linux systems at least as recent as the one it was made on.
+
+### Use the Engine in Another Program
+
+The engine and the panel of sliders build on their own, with nothing of `deps/`, for a program that grades its own pictures. Add the repository, e.g. as a submodule, and in its `CMakeLists.txt`:
+
+```cmake
+set(STEPIT_GRADER_ENGINE_ONLY ON)
+set(STEPIT_GRADER_BUILD_WIDGETS ON)   # the sliders, with Qt 6 Widgets; OFF for the engine alone
+add_subdirectory(modules/stepit-grader)
+target_link_libraries(my-program PRIVATE stepit-grader::core stepit-grader::widgets)
+```
+
+[The Engine in Another Program](docs/ARCHITECTURE.md#the-engine-in-another-program) says how to use them.
 
 ## Running the Application
 
@@ -315,7 +329,7 @@ Without them, those two tests are skipped.
 
 **CMake says `Package 'libraw_r', required by 'virtual:world', not found`, or does not find TIFF or pugixml.** The libraries are neither in `deps/` nor in the system: run `./install-deps.sh`.
 
-**The sliders are slow.** The build is `Debug`: build in `Release`.
+**The sliders are slow.** Build in `Release`.
 
 ## Licences
 

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/widgets/ParameterSlider.h"
+#include "widgets/ParameterSlider.h"
 
 #include <QDoubleSpinBox>
 #include <QEvent>

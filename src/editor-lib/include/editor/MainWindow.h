@@ -3,13 +3,15 @@
 
 #pragma once
 
-#include "editor/widgets/AdjustmentsPanel.h"
+#include "widgets/AdjustmentsPanel.h"
 
 #include <QMainWindow>
 
+#include <functional>
 #include <utility>
 #include <vector>
 
+struct WhiteBalancePick;
 class Document;
 class ImageView;
 class PreviewRenderer;
@@ -20,6 +22,10 @@ class RecentFilesMenu;
  * The editor's window: the picture in the middle, the tools on the right, and the menus. It
  * connects the parts it is given, which know nothing of each other: the document, the renderer,
  * the image view and the tools panel.
+ *
+ * Its actions do no work of their own on the user interface's thread: the files are read and
+ * written by the document, the pictures rendered by the renderer, and the white balance measured
+ * in the background.
  */
 class MainWindow : public QMainWindow
 {
@@ -52,14 +58,18 @@ private:
     /// Asks for a file of settings, and applies it to the picture open.
     void chooseSettings();
     /**
-     * Saves the settings that wait to be; when that fails, asks whether to go on without them.
-     * Returns false when the user stays.
+     * Runs `then` once the settings that wait to be saved are written, in the background; when
+     * they cannot be, asks whether to go on without them, and forgets `then` if the user stays.
      */
-    bool settingsSaved();
+    void whenSaved(std::function<void()> then);
+    /// Goes on with the action waiting for a save, if the save asked has ended.
+    void continueWhenSaved(bool failed);
     void onOpened();
     void updateTitle();
     void updateZoom(double zoom);
+    /// Measures the white balance in the background, and sets it once measured.
     void pickWhiteBalanceAt(QPointF point, double radius);
+    void showWhiteBalancePicked(const WhiteBalancePick &pick);
 
     Document *m_document;
     PreviewRenderer *m_renderer;
@@ -74,4 +84,8 @@ private:
     std::vector<std::pair<QAction *, QString>> m_themedIcons;
     QLabel *m_beforeLabel;
     RecentFilesMenu *m_recentFiles = nullptr;
+    /// The action waiting for the settings to be written, e.g. opening another picture.
+    std::function<void()> m_whenSaved;
+    /// The window closes: its settings are written, or the user chose to leave them.
+    bool m_closing = false;
 };

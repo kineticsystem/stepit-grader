@@ -4,16 +4,16 @@
 #include "editor/Document.h"
 #include "editor/MainWindow.h"
 #include "editor/PreviewRenderer.h"
-#include "editor/Sections.h"
 #include "editor/Theme.h"
+#include "widgets/Sections.h"
 
 #include "core/StandardPipeline.h"
 #include "imageio/ImageLoader.h"
 #include "imageio/XmpSidecar.h"
 
 #include <QApplication>
-#include <QIcon>
 #include <QCommandLineParser>
+#include <QIcon>
 #include <QSettings>
 
 #ifdef __GLIBC__

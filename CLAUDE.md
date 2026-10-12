@@ -16,7 +16,7 @@ cmake --build build
 ctest --test-dir build                 # or build/bin/stepit-grader-tests --gtest_filter='EffectsTest.*'
 ```
 
-LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/<library>`, built by `./install-deps.sh` (one script per library in `scripts/`) and found by the modules of `cmake/`; without `deps/`, from the system. Build in Release: the effects are about ten times slower in Debug.
+LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/<library>`, built by `./install-deps.sh` (one script per library in `scripts/`) and found by the modules of `cmake/`; without `deps/`, from the system. Build in Release; `core-lib` is optimised in Debug too, its effects being about ten times slower without the optimiser. With `-DSTEPIT_GRADER_ENGINE_ONLY=ON` (and `STEPIT_GRADER_BUILD_WIDGETS`) the project builds only `core-lib` and `widgets-lib`, without `deps/`, for another program that adds it with `add_subdirectory()` and links `stepit-grader::core` and `stepit-grader::widgets`.
 
 ## Packaging
 
@@ -26,11 +26,12 @@ LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/<library>`, 
 
 - `src/core-lib` (namespace `core`): the engine. Standard C++ only, no Qt, no files. `Image` is linear Rec. 2020 float. Each effect is one header in `include/core/effects` and one source in `src/effects`, implementing `Effect`; `makeStandardPipeline()` is the only place that lists them.
 - `src/io-lib` (namespace `imageio`): `ImageReader` (TIFF with ICC via libtiff and Little CMS, raw and DNG via the raw-converter submodule) and `SettingsStore` (`XmpSidecar`, pugixml). No Qt.
-- `src/editor-lib`: Qt. Reusable widgets in `widgets/` (`ImageView`, `ParameterSlider`, `CollapsibleSection`, `AdjustmentsPanel`) that know nothing of their clients and report with signals; `Document`, which also saves the settings by itself after a delay it is given; `PreviewRenderer`; `MainWindow`, which only connects the parts.
+- `src/widgets-lib`: Qt Widgets and `core-lib` only. The reusable widgets, included as `widgets/...` (`ImageView`, `ParameterSlider`, `CollapsibleSection`, `AdjustmentsPanel`, `RecentFilesMenu`, `sectionsOf()`), that know nothing of their clients and report with signals.
+- `src/editor-lib`: Qt. `Document`, which reads and writes every file in turn on a one-thread pool and saves the settings by itself after a delay it is given; `PreviewRenderer`; `MainWindow`, which only connects the parts.
 - `src/editor-app`: `main()`, the composition root.
 - `src/cli-lib` (namespace `cli`): `parseOptions()` and `Grader`, which grades pictures with saved settings into 16-bit TIFFs (`imageio::TiffWriter`). No Qt.
 - `src/cli-app`: `stepit-grader-cli`'s `main()`.
-- Dependencies go downward only: editor-app → editor-lib → io-lib → core-lib, and cli-app → cli-lib → io-lib → core-lib.
+- Dependencies go downward only: editor-app → editor-lib → widgets-lib, io-lib → core-lib, and cli-app → cli-lib → io-lib → core-lib.
 - StepIt Grader is independent software: never mention the projects that use it in its code or docs.
 
 ## Rules
@@ -39,7 +40,7 @@ LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/<library>`, 
 - Every effect at its defaults leaves the image unchanged, and has a test that says so and one that it moves the picture the right way.
 - Inject dependencies (reader, store, pipeline) through constructors; no singletons besides the thread pool in `Parallel.cpp`.
 - A widget emits signals for the user's changes only, never for a `setValue()` from its client.
-- Long work runs off the main thread (`QtConcurrent`, `core::parallelFor`) and comes back with a queued call.
+- Long work runs off the main thread (`QtConcurrent`, `core::parallelFor`) and comes back with a queued call. So does every menu action's work, a sidecar's read and write included: the window waits for a result through signals, never by blocking.
 
 ## Code Style
 

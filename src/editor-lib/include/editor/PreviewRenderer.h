@@ -44,7 +44,7 @@ public:
         QObject *parent = nullptr);
     ~PreviewRenderer() override;
 
-    /// The image to render, in full; the preview is made from it.
+    /// The image to render, in full; the preview is reduced from it by the first pass, off the thread.
     void setSource(std::shared_ptr<const core::Image> image);
 
 public Q_SLOTS:
@@ -65,8 +65,8 @@ private:
     QTimer m_fullTimer;
 
     std::shared_ptr<const core::Image> m_full;
+    /// Null until the first preview pass of the source has made it.
     std::shared_ptr<const core::Image> m_preview;
-    double m_previewScale = 1.0;
 
     core::Settings m_settings;
     /// Counts the changes; a pass whose number is no longer the latest stops.

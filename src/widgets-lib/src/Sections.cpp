@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/Sections.h"
+#include "widgets/Sections.h"
 
 std::vector<AdjustmentsPanel::Section> sectionsOf(const core::Pipeline &pipeline)
 {

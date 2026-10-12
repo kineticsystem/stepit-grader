@@ -10,6 +10,7 @@
 #include <QFutureWatcher>
 #include <QObject>
 #include <QString>
+#include <QThreadPool>
 #include <QTimer>
 
 #include <chrono>
@@ -29,6 +30,9 @@ class SettingsStore;
  *
  * It saves by itself: `saveDelay` after the last change of the settings, so a slider dragged writes
  * the sidecar once, when it stops. A save that fails is reported, and tried again at the next change.
+ *
+ * Every read and write of a file runs off the user interface's thread, one after the other in the
+ * order asked, so a save of a picture is written before the same picture is read again.
  */
 class Document : public QObject
 {
@@ -41,6 +45,8 @@ public:
         std::vector<core::Parameter> parameters,
         std::chrono::milliseconds saveDelay = std::chrono::seconds{1},
         QObject *parent = nullptr);
+    /// Waits for the reads and writes still running.
+    ~Document() override;
 
     /**
      * Saves the settings of the picture open, if they wait to be, then reads the image and its
@@ -57,9 +63,11 @@ public:
     const core::Settings &settings() const { return m_settings; }
     /**
      * Whether the settings are not written yet: they differ from those the sidecar holds, or, with
-     * no sidecar, from the defaults. True while a save waits, and after one failed.
+     * no sidecar, from the defaults. True while a save waits or runs, and after one failed.
      */
     bool isModified() const;
+    /// Whether a save runs or waits for its turn.
+    bool isSaving() const { return m_saving > 0; }
 
     /// The file names of settings it loads, for an open dialog, e.g. "*.xmp".
     QString settingsNameFilter() const;
@@ -77,14 +85,16 @@ public Q_SLOTS:
     /**
      * Applies the settings of a file of the store's kind, e.g. a sidecar saved for another
      * picture, to this one: every value, those the file lacks at their defaults. A change like any
-     * other, so saved and reverted like one. Ends with settingsLoaded() or settingsLoadFailed().
+     * other, so saved and reverted like one. Read in the background; ends with settingsLoaded() or
+     * settingsLoadFailed(), or with nothing when another picture was opened meanwhile. Returns
+     * false, at once, when no picture is open.
      */
     bool loadSettings(const QString &file);
     /**
-     * Saves the settings now, if they are not written yet; ends with saved() or saveFailed().
-     * Returns false only when they could not be written.
+     * Saves the settings now, in the background, if they are not written yet; ends with saved() or
+     * saveFailed().
      */
-    bool save();
+    void save();
 
 Q_SIGNALS:
     void opened();
@@ -104,13 +114,23 @@ private:
         QString error;
     };
 
+    struct Written
+    {
+        QString path;
+        core::Settings settings;
+        QString error;
+    };
+
     void finishOpening();
+    void finishSaving(const Written &written);
     void changeSettings(const core::Settings &settings);
 
     std::shared_ptr<const imageio::ImageReader> m_reader;
     std::shared_ptr<const imageio::SettingsStore> m_store;
     std::vector<core::Parameter> m_parameters;
 
+    /// One thread, so the reads and writes of the files keep their order.
+    QThreadPool m_files;
     QFutureWatcher<Loaded> m_opening;
     QString m_openingPath;
 
@@ -122,5 +142,9 @@ private:
     /// The settings the picture was opened with, for revertSettings().
     core::Settings m_opened;
     bool m_modified = false;
+    /// The saves asked and not ended yet.
+    int m_saving = 0;
+    /// The settings of the latest save asked, not to write the same twice.
+    std::optional<core::Settings> m_lastSave;
     QTimer m_saveTimer;
 };

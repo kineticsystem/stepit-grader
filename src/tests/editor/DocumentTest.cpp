@@ -16,6 +16,7 @@
 
 #include <chrono>
 #include <filesystem>
+#include <thread>
 
 namespace {
 
@@ -46,6 +47,31 @@ struct Fixture : ::testing::Test
         QSignalSpy failed{&document, &Document::openFailed};
         document.open(path);
         ASSERT_TRUE(QTest::qWaitFor([&] { return opened.count() + failed.count() > 0; }, 5000));
+    }
+
+    /// Asks for a save and waits for it to end; whether it succeeded.
+    bool saveAndWait()
+    {
+        QSignalSpy saved{&document, &Document::saved};
+        QSignalSpy failed{&document, &Document::saveFailed};
+        document.save();
+        if (!document.isSaving()) {
+            return !document.isModified();
+        }
+        return QTest::qWaitFor([&] { return !document.isSaving(); }, 5000) && failed.isEmpty()
+               && !saved.isEmpty();
+    }
+
+    /// Asks for the settings of `file` and waits for them, or for their failure.
+    bool loadSettingsAndWait(const QString &file)
+    {
+        QSignalSpy loaded{&document, &Document::settingsLoaded};
+        QSignalSpy failed{&document, &Document::settingsLoadFailed};
+        if (!document.loadSettings(file)) {
+            return false;
+        }
+        return QTest::qWaitFor([&] { return loaded.count() + failed.count() > 0; }, 5000)
+               && !loaded.isEmpty();
     }
 
     double savedContrast(const std::filesystem::path &image) const
@@ -99,7 +125,7 @@ TEST_F(DocumentTest, TracksChangesNotWrittenYet)
     EXPECT_EQ(modified.count(), 2);
 
     document.setSettings(contrast(20));
-    ASSERT_TRUE(document.save());
+    ASSERT_TRUE(saveAndWait());
     EXPECT_FALSE(document.isModified());
     EXPECT_EQ(store->saves, 1);
     EXPECT_DOUBLE_EQ(savedContrast("/pictures/a.tif"), 20);
@@ -144,7 +170,8 @@ TEST_F(DocumentTest, SavesNothingWithoutAChange)
     document.setSettings(contrast(20));
     document.resetSettings();
     QTest::qWait(SETTLE_MS);
-    EXPECT_TRUE(document.save());
+    document.save();
+    EXPECT_FALSE(document.isSaving());
     EXPECT_EQ(store->saves, 0);
     EXPECT_TRUE(store->files.empty());
 }
@@ -153,12 +180,52 @@ TEST_F(DocumentTest, SavesAtOnceOnRequest)
 {
     openAndWait("/pictures/a.tif");
     document.setSettings(contrast(20));
-    ASSERT_TRUE(document.save());
+    ASSERT_TRUE(saveAndWait());
     EXPECT_EQ(store->saves, 1);
     EXPECT_FALSE(document.isModified());
     // The save waiting was that one.
     QTest::qWait(SETTLE_MS);
     EXPECT_EQ(store->saves, 1);
+}
+
+TEST_F(DocumentTest, SavesOffTheCallersThread)
+{
+    openAndWait("/pictures/a.tif");
+    document.setSettings(contrast(20));
+    document.save();
+    // Asked, not written yet: the write is the background's.
+    EXPECT_TRUE(document.isSaving());
+    EXPECT_TRUE(document.isModified());
+    ASSERT_TRUE(QTest::qWaitFor([&] { return !document.isSaving(); }, 5000));
+    EXPECT_EQ(store->saves, 1);
+    EXPECT_NE(store->lastThread, std::this_thread::get_id());
+    EXPECT_FALSE(document.isModified());
+}
+
+TEST_F(DocumentTest, WritesTheSameSettingsOnce)
+{
+    openAndWait("/pictures/a.tif");
+    document.setSettings(contrast(20));
+    // E.g. Save pressed twice: the second asks for what the first writes already.
+    document.save();
+    document.save();
+    ASSERT_TRUE(QTest::qWaitFor([&] { return !document.isSaving(); }, 5000));
+    EXPECT_EQ(store->saves, 1);
+}
+
+TEST_F(DocumentTest, KeepsAChangeMadeWhileSaving)
+{
+    openAndWait("/pictures/a.tif");
+    document.setSettings(contrast(20));
+    document.save();
+    // Changed before the write of 20 ends: still to be written.
+    document.setSettings(contrast(30));
+    QSignalSpy saved{&document, &Document::saved};
+    ASSERT_TRUE(QTest::qWaitFor([&] { return !saved.isEmpty(); }, 5000));
+    EXPECT_TRUE(document.isModified());
+    ASSERT_TRUE(QTest::qWaitFor([&] { return store->saves == 2; }, 5000));
+    EXPECT_DOUBLE_EQ(savedContrast("/pictures/a.tif"), 30);
+    ASSERT_TRUE(QTest::qWaitFor([&] { return !document.isModified(); }, 5000));
 }
 
 TEST_F(DocumentTest, SavesBeforeAnotherPictureOpens)
@@ -187,7 +254,7 @@ TEST_F(DocumentTest, RevertsToTheSettingsItWasOpenedWith)
     core::Settings changed = opened;
     changed.setValue("Contrast2012", 20);
     document.setSettings(changed);
-    ASSERT_TRUE(document.save());
+    ASSERT_TRUE(saveAndWait());
 
     // Reverting is a change like any other, saved in turn.
     document.revertSettings();
@@ -204,7 +271,7 @@ TEST_F(DocumentTest, ReportsSettingsThatCannotBeSaved)
     document.setSettings(contrast(20));
     store->failSaving = true;
     QSignalSpy failed{&document, &Document::saveFailed};
-    EXPECT_FALSE(document.save());
+    EXPECT_FALSE(saveAndWait());
     EXPECT_EQ(failed.count(), 1);
     EXPECT_TRUE(failed.first().at(0).toString().contains("disk full"));
     EXPECT_TRUE(document.isModified());
@@ -240,7 +307,8 @@ TEST_F(DocumentTest, LoadsTheSettingsOfAnotherFileAsAChange)
     document.setSettings(contrast(20));
     QSignalSpy loaded{&document, &Document::settingsLoaded};
 
-    ASSERT_TRUE(document.loadSettings("/looks/warm.xmp"));
+    ASSERT_TRUE(loadSettingsAndWait("/looks/warm.xmp"));
+    EXPECT_NE(store->lastThread, std::this_thread::get_id());
     ASSERT_EQ(loaded.count(), 1);
     EXPECT_EQ(loaded.first().at(0).toString(), "/looks/warm.xmp");
     EXPECT_DOUBLE_EQ(document.settings().value(core::ExposureEffect::EXPOSURE), 0.8);
@@ -261,11 +329,30 @@ TEST_F(DocumentTest, ReportsSettingsThatCannotBeLoaded)
     openAndWait("/pictures/a.tif");
     document.setSettings(contrast(20));
     QSignalSpy failed{&document, &Document::settingsLoadFailed};
-    EXPECT_FALSE(document.loadSettings("/looks/missing.xmp"));
+    EXPECT_FALSE(loadSettingsAndWait("/looks/missing.xmp"));
     ASSERT_EQ(failed.count(), 1);
     EXPECT_TRUE(failed.first().at(0).toString().contains("missing.xmp"));
     // The settings are as they were.
     EXPECT_DOUBLE_EQ(document.settings().values().at("Contrast2012"), 20);
+}
+
+TEST_F(DocumentTest, DropsSettingsAskedForThePictureLeft)
+{
+    openAndWait("/pictures/a.tif");
+    core::Settings other;
+    other.setValue("Exposure2012", 0.8);
+    store->files["/looks/warm.xmp"] = other;
+    QSignalSpy loaded{&document, &Document::settingsLoaded};
+    QSignalSpy opened{&document, &Document::opened};
+    // Asked for a while b is read: b opens first, as the files are read in turn, and the
+    // settings are not b's.
+    document.open("/pictures/b.tif");
+    ASSERT_TRUE(document.loadSettings("/looks/warm.xmp"));
+    ASSERT_TRUE(QTest::qWaitFor([&] { return !opened.isEmpty(); }, 5000));
+    QTest::qWait(SETTLE_MS);
+    EXPECT_EQ(document.path(), "/pictures/b.tif");
+    EXPECT_FALSE(document.settings().has("Exposure2012"));
+    EXPECT_TRUE(loaded.isEmpty());
 }
 
 TEST(DocumentWithoutPictureTest, LoadsNoSettings)
@@ -288,6 +375,8 @@ TEST_F(PreviewRendererTest, RendersAPreviewThenTheFullImage)
     settings.setValue("Exposure2012", 1.0);
     renderer.render(settings);
 
+    // The preview is reduced in the first pass, not here.
+    EXPECT_EQ(rendered.count(), 0);
     ASSERT_TRUE(QTest::qWaitFor([&] { return rendered.count() >= 2; }, 5000));
     const QImage preview = rendered.at(0).at(0).value<QImage>();
     EXPECT_EQ(preview.width(), 100);

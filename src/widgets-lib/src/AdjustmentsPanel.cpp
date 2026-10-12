@@ -1,9 +1,9 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/widgets/AdjustmentsPanel.h"
-#include "editor/widgets/CollapsibleSection.h"
-#include "editor/widgets/ParameterSlider.h"
+#include "widgets/AdjustmentsPanel.h"
+#include "widgets/CollapsibleSection.h"
+#include "widgets/ParameterSlider.h"
 
 #include <QFrame>
 #include <QScrollArea>

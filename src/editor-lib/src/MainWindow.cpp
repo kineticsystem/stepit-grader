@@ -7,8 +7,8 @@
 #include "editor/PreviewRenderer.h"
 #include "editor/Theme.h"
 #include "editor/WhiteBalancePicker.h"
-#include "editor/widgets/ImageView.h"
-#include "editor/widgets/RecentFilesMenu.h"
+#include "widgets/ImageView.h"
+#include "widgets/RecentFilesMenu.h"
 
 #include <QActionGroup>
 #include <QApplication>
@@ -24,6 +24,7 @@
 #include <QStatusBar>
 #include <QToolBar>
 #include <QToolButton>
+#include <QtConcurrent>
 
 #include "core/effects/WhiteBalanceEffect.h"
 
@@ -113,12 +114,14 @@ MainWindow::MainWindow(
     connect(m_document, &Document::saved, this, [this](const QString &path) {
         statusBar()
             ->showMessage(tr("Saved %1").arg(QDir::toNativeSeparators(path)), SAVED_MESSAGE_MS);
+        continueWhenSaved(false);
     });
     // The document saves by itself and tries again at the next change: a dialog for each failure
     // would interrupt every slider move.
     connect(m_document, &Document::saveFailed, this, [this](const QString &message) {
         statusBar()
             ->showMessage(tr("Cannot save the settings: %1").arg(message), SAVE_FAILED_MESSAGE_MS);
+        continueWhenSaved(true);
     });
     connect(
         m_renderer,
@@ -263,12 +266,14 @@ void MainWindow::openFile(const QString &path)
             tr("%1 is not a TIFF, DNG or camera raw file.").arg(QFileInfo{path}.fileName()));
         return;
     }
-    if (m_document->isOpening() || !settingsSaved()) {
+    if (m_document->isOpening()) {
         return;
     }
-    QApplication::setOverrideCursor(Qt::WaitCursor);
-    m_fileLabel->setText(tr("Opening %1…").arg(QDir::toNativeSeparators(path)));
-    m_document->open(path);
+    whenSaved([this, path] {
+        QApplication::setOverrideCursor(Qt::WaitCursor);
+        m_fileLabel->setText(tr("Opening %1…").arg(QDir::toNativeSeparators(path)));
+        m_document->open(path);
+    });
 }
 
 void MainWindow::onOpened()
@@ -286,29 +291,55 @@ void MainWindow::onOpened()
     // The settings are rendered once the document announces them, right after.
 }
 
-bool MainWindow::settingsSaved()
+void MainWindow::whenSaved(std::function<void()> then)
 {
-    if (m_document->save()) {
-        return true;
+    m_whenSaved = std::move(then);
+    m_document->save();
+    continueWhenSaved(false);
+}
+
+void MainWindow::continueWhenSaved(bool failed)
+{
+    // A save asked before may end first: the action waits for the last one.
+    if (!m_whenSaved || m_document->isSaving()) {
+        return;
     }
-    // Only here would the edit be lost, so only here does a failure ask.
-    const auto answer = QMessageBox::warning(
-        this,
-        tr("Cannot Save"),
-        tr("The settings of %1 cannot be saved. Leave them unsaved?")
-            .arg(QFileInfo{m_document->path()}.fileName()),
-        QMessageBox::Discard | QMessageBox::Cancel,
-        QMessageBox::Cancel);
-    return answer == QMessageBox::Discard;
+    if (m_document->isModified()) {
+        if (!failed) {
+            // Changed again while it was written: written again.
+            m_document->save();
+            if (m_document->isSaving()) {
+                return;
+            }
+        }
+        // Only here would the edit be lost, so only here does a failure ask.
+        const auto answer = QMessageBox::warning(
+            this,
+            tr("Cannot Save"),
+            tr("The settings of %1 cannot be saved. Leave them unsaved?")
+                .arg(QFileInfo{m_document->path()}.fileName()),
+            QMessageBox::Discard | QMessageBox::Cancel,
+            QMessageBox::Cancel);
+        if (answer != QMessageBox::Discard) {
+            m_whenSaved = {};
+            return;
+        }
+    }
+    std::exchange(m_whenSaved, {})();
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    if (settingsSaved()) {
+    if (m_closing || (!m_document->isModified() && !m_document->isSaving())) {
         event->accept();
-    } else {
-        event->ignore();
+        return;
     }
+    // The window waits for the settings to be written, then closes again, from the event loop.
+    event->ignore();
+    whenSaved([this] {
+        m_closing = true;
+        QMetaObject::invokeMethod(this, &QWidget::close, Qt::QueuedConnection);
+    });
 }
 
 void MainWindow::updateTitle()
@@ -326,16 +357,39 @@ void MainWindow::pickWhiteBalanceAt(QPointF point, double radius)
     if (!m_document->isOpen()) {
         return;
     }
-    const auto pick = pickWhiteBalance(*m_document->image(), m_document->settings(), point, radius);
-    if (!pick) {
-        statusBar()->showMessage(pick.error(), 6000);
-        return;
-    }
-    m_document->setSettings(pick->settings);
-    QString message = pick->clamped ? tr("White balance set as near neutral as the sliders go.")
-                                    : tr("White balance set from the area picked.");
-    if (pick->clipped > 0) {
-        message += ' ' + tr("%n clipped pixel(s) left out.", nullptr, pick->clipped);
+    const auto image = m_document->image();
+    auto *watcher = new QFutureWatcher<std::expected<WhiteBalancePick, QString>>{this};
+    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, image] {
+        watcher->deleteLater();
+        // Measured on a picture since left: not this one's white balance.
+        if (m_document->image() != image) {
+            return;
+        }
+        const auto pick = watcher->result();
+        if (!pick) {
+            statusBar()->showMessage(pick.error(), 6000);
+            return;
+        }
+        // The settings may have changed meanwhile: only the white balance is the pick's.
+        core::Settings settings = m_document->settings();
+        for (const core::Parameter &parameter :
+             {core::WhiteBalanceEffect::TEMPERATURE, core::WhiteBalanceEffect::TINT}) {
+            settings.setValue(parameter.id, pick->settings.value(parameter));
+        }
+        m_document->setSettings(settings);
+        showWhiteBalancePicked(*pick);
+    });
+    watcher->setFuture(QtConcurrent::run([image, settings = m_document->settings(), point, radius] {
+        return pickWhiteBalance(*image, settings, point, radius);
+    }));
+}
+
+void MainWindow::showWhiteBalancePicked(const WhiteBalancePick &pick)
+{
+    QString message = pick.clamped ? tr("White balance set as near neutral as the sliders go.")
+                                   : tr("White balance set from the area picked.");
+    if (pick.clipped > 0) {
+        message += ' ' + tr("%n clipped pixel(s) left out.", nullptr, pick.clipped);
     }
     statusBar()->showMessage(message, 6000);
 }
