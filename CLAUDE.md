@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-StepIt Grader is a C++23/Qt 6 desktop application that edits the tones and colours of one picture (TIFF, DNG, camera raw) with Lightroom-like sliders, an eyedropper for the white balance and an HDR compression, live, and saves the edit by itself, a second after the last change, as a Lightroom-compatible XMP sidecar. It must build on Linux, macOS and Windows (MSYS2). How it is built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); keep it true with the `architect` skill, and review the design with the `reviewer` skill, both in `.claude/skills/`.
+StepIt Grader is a C++23/Qt 6 desktop application that edits the tones and colours of one picture (TIFF, DNG, camera raw) with the usual sliders of a raw editor, an eyedropper for the white balance and an HDR compression, live, and saves the edit by itself, a second after the last change, as an XMP sidecar next to the picture. It must build on Linux, macOS and Windows (MSYS2). How it is built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); keep it true with the `architect` skill, and review the design with the `reviewer` skill, both in `.claude/skills/`.
 
 ## Build Commands
 
@@ -31,7 +31,7 @@ libtiff, pugixml and GoogleTest come from Lentigram's `lib/` (`-DLENTIGRAM_LIB`,
 
 ## Rules
 
-- An edit is a set of named values, never pixels. A parameter's id is Lightroom's name for the setting (e.g. `Exposure2012`): never rename one, it breaks saved sidecars.
+- An edit is a set of named values, never pixels. A parameter's id is its name in the sidecar's XMP namespace (e.g. `Exposure2012`), the name other raw editors use too: never rename one, it breaks saved sidecars.
 - Every effect at its defaults leaves the image unchanged, and has a test that says so and one that it moves the picture the right way.
 - Inject dependencies (reader, store, pipeline) through constructors; no singletons besides the thread pool in `Parallel.cpp`.
 - A widget emits signals for the user's changes only, never for a `setValue()` from its client.

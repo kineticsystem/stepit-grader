@@ -29,7 +29,7 @@ Answer each with a verdict and the evidence, file and function:
 - **Interfaces and abstractions.** A table: interface (`Effect`, `ImageReader`, `SettingsStore`, ...), where, judgement.
 - **Separation of concerns.** Each place where knowledge sits in the wrong part: rules in widgets, policy in `MainWindow`, rendering in the document.
 - **SOLID.** A table, one row per principle, verdict and the place that proves it. Say "no violation found" when none is.
-- **Coupling and duplication.** Rules kept in step by hand, e.g. the effects and `makeStandardPipeline()`, the ids and Lightroom's names, and copied code, each with a weight.
+- **Coupling and duplication.** Rules kept in step by hand, e.g. the effects and `makeStandardPipeline()`, the ids and the names other raw editors give the settings, and copied code, each with a weight.
 - **Testability and tests.** What is tested, what is not, and what seam is missing that makes it hard.
 - **Implementation issues**, ordered by severity: threads, memory, colour accuracy, files a user could lose.
 - **Recommendations**, ordered by value against effort, each small enough for one pull request, each naming the findings it fixes and its trade-off.

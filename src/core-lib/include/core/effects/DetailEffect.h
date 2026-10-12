@@ -8,9 +8,9 @@
 namespace core {
 
 /**
- * The contrast of the fine texture, a few pixels across, e.g. hairs and surface grain: what
- * Lightroom calls Texture. Above 0 it is boosted, below 0 smoothed. Variations no larger than the
- * noise are left alone, so the grain of the sensor is not boosted with the texture.
+ * The contrast of the fine texture, a few pixels across, e.g. hairs and surface grain: texture,
+ * as raw editors also call it. Above 0 it is boosted, below 0 smoothed. Variations no larger than
+ * the noise are left alone, so the grain of the sensor is not boosted with the texture.
  */
 class DetailEffect : public Effect
 {

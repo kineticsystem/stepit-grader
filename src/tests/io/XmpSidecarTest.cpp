@@ -33,10 +33,9 @@ std::string read(const fs::path &path)
     return text.str();
 }
 
-// What Lightroom Classic writes next to a raw file, cut down: settings as attributes, and other
+// What a raw editor writes next to a raw file, cut down: settings as attributes, and other
 // metadata as elements.
-constexpr const char *LIGHTROOM_SIDECAR
-    = R"(<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0-c000">
+constexpr const char *EDITOR_SIDECAR = R"(<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="XMP Core 7.0">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <rdf:Description rdf:about=""
     xmlns:xmp="http://ns.adobe.com/xap/1.0/"
@@ -62,7 +61,7 @@ constexpr const char *LIGHTROOM_SIDECAR
 
 } // namespace
 
-TEST(XmpSidecarTest, FormatsValuesAsLightroomDoes)
+TEST(XmpSidecarTest, FormatsValuesAsRawEditorsDo)
 {
     EXPECT_EQ(imageio::xmp::format(ExposureEffect::EXPOSURE, 0.5), "+0.50");
     EXPECT_EQ(imageio::xmp::format(ExposureEffect::EXPOSURE, -1.25), "-1.25");
@@ -70,9 +69,9 @@ TEST(XmpSidecarTest, FormatsValuesAsLightroomDoes)
     EXPECT_EQ(imageio::xmp::format(core::SharpnessEffect::SHARPNESS, 40), "40");
 }
 
-TEST(XmpSidecarTest, ReadsWhatLightroomWrites)
+TEST(XmpSidecarTest, ReadsWhatAnotherEditorWrites)
 {
-    const core::Settings settings = imageio::xmp::parse(LIGHTROOM_SIDECAR, parameters());
+    const core::Settings settings = imageio::xmp::parse(EDITOR_SIDECAR, parameters());
     EXPECT_DOUBLE_EQ(settings.value(ExposureEffect::EXPOSURE), 0.65);
     EXPECT_EQ(settings.values().at("Contrast2012"), -12);
     EXPECT_EQ(settings.values().at("Clarity2012"), 20);
@@ -95,7 +94,7 @@ TEST(XmpSidecarTest, UpdatingKeepsEverythingElse)
 {
     core::Settings settings;
     settings.setValue(ExposureEffect::EXPOSURE.id, 1.0);
-    const std::string updated = imageio::xmp::write(LIGHTROOM_SIDECAR, settings, parameters());
+    const std::string updated = imageio::xmp::write(EDITOR_SIDECAR, settings, parameters());
     EXPECT_NE(updated.find(R"(xmp:Rating="4")"), std::string::npos);
     EXPECT_NE(updated.find("<crs:ToneCurvePV2012>"), std::string::npos);
     EXPECT_NE(updated.find(R"(crs:WhiteBalance="As Shot")"), std::string::npos);
@@ -136,7 +135,7 @@ TEST(XmpSidecarTest, LoadsTheSettingsOfAFileOfAnyName)
 {
     const fs::path folder = testutils::outputFolder();
     const fs::path file = folder / "warm look.xmp";
-    std::ofstream{file} << LIGHTROOM_SIDECAR;
+    std::ofstream{file} << EDITOR_SIDECAR;
     const imageio::XmpSidecar sidecar;
     EXPECT_EQ(sidecar.extension(), "xmp");
     EXPECT_DOUBLE_EQ(sidecar.loadFile(file, parameters()).value(ExposureEffect::EXPOSURE), 0.65);

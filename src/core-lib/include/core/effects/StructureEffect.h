@@ -9,7 +9,7 @@ namespace core {
 
 /**
  * The contrast of the medium-sized shapes, about a hundredth of the picture across, e.g. a leg
- * against a body: what Lightroom calls Clarity. The local contrast is measured against an
+ * against a body: clarity, as raw editors also call it. The local contrast is measured against an
  * edge-preserving smoothing, so strong edges draw no halo.
  */
 class StructureEffect : public Effect

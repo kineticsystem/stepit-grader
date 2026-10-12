@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 
 project(stepit-grader
     VERSION 0.1.0
-    DESCRIPTION "A photo editor for the tones and colours of a picture, with Lightroom-compatible sidecars"
+    DESCRIPTION "A photo editor for the tones and colours of a picture, with XMP sidecars"
     LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)

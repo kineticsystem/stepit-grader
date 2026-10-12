@@ -12,8 +12,8 @@
 namespace core {
 
 /**
- * Temperature and tint, relative to the white balance the image has: what Lightroom calls them for
- * a TIFF or a JPEG. The image is adapted, with the Bradford transform, as if the light had been
+ * Temperature and tint, relative to the white balance the image has, for a raw file as for a TIFF
+ * or a JPEG. The image is adapted, with the Bradford transform, as if the light had been
  * bluer (temperature above 0, the picture gets warmer) or greener (tint above 0, the picture gets
  * more magenta) than its white balance assumed. 100 is about 100 mired, e.g. from 6500 K to 18600 K.
  */

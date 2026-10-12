@@ -18,7 +18,7 @@ namespace {
 
 constexpr const char *RDF_NAMESPACE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
-/// What Lightroom needs to read the settings with the 2012 meaning of the tone controls.
+/// What other editors need to read the tone controls with the meaning the editor gives them.
 constexpr const char *PROCESS_VERSION = "11.0";
 
 constexpr unsigned PARSE_OPTIONS = pugi::parse_default | pugi::parse_declaration | pugi::parse_pi
