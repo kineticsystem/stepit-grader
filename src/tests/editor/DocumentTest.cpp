@@ -14,8 +14,10 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <string>
 #include <thread>
 
 namespace {
@@ -82,6 +84,57 @@ struct Fixture : ::testing::Test
 
 using DocumentTest = Fixture;
 using PreviewRendererTest = Fixture;
+
+/// How long each slow effect takes, long enough for a test to change the settings meanwhile.
+constexpr std::chrono::milliseconds SLOW_EFFECT{40};
+/// The slow effects of a pass: a preview takes four times as long as one.
+constexpr int SLOW_EFFECTS = 4;
+
+/// An effect that only takes time, and counts how often it was applied.
+class SlowEffect : public core::Effect
+{
+public:
+    SlowEffect(std::string id, std::shared_ptr<std::atomic<int>> applied)
+        : m_id{std::move(id)}
+        , m_applied{std::move(applied)}
+    {}
+    std::string section() const override { return "Slow"; }
+    std::vector<core::Parameter> parameters() const override { return {{m_id, m_id}}; }
+    void apply(core::Image &, const core::Settings &, const core::RenderContext &) const override
+    {
+        std::this_thread::sleep_for(SLOW_EFFECT);
+        ++*m_applied;
+    }
+
+private:
+    std::string m_id;
+    std::shared_ptr<std::atomic<int>> m_applied;
+};
+
+/// A renderer whose passes take SLOW_EFFECTS × SLOW_EFFECT, without a full pass in a test's time.
+struct SlowRendererFixture : Fixture
+{
+    std::shared_ptr<std::atomic<int>> applied = std::make_shared<std::atomic<int>>(0);
+    std::shared_ptr<const core::Pipeline> slow = [this] {
+        std::vector<std::shared_ptr<const core::Effect>> effects;
+        for (int i = 0; i < SLOW_EFFECTS; ++i) {
+            effects.push_back(std::make_shared<SlowEffect>("Slow" + std::to_string(i), applied));
+        }
+        return std::make_shared<const core::Pipeline>(std::move(effects));
+    }();
+
+    /// Every slow effect on, at `value`, so none is skipped.
+    static core::Settings slowSettings(double value)
+    {
+        core::Settings settings;
+        for (int i = 0; i < SLOW_EFFECTS; ++i) {
+            settings.setValue("Slow" + std::to_string(i), value);
+        }
+        return settings;
+    }
+};
+
+using SlowRendererTest = SlowRendererFixture;
 
 } // namespace
 
@@ -449,4 +502,54 @@ TEST_F(PreviewRendererTest, ShowsSettingsRenderedAlreadyAtOnce)
     renderer.render(after);
     EXPECT_EQ(rendered.count(), 0);
     ASSERT_TRUE(waitForFull());
+}
+
+TEST_F(SlowRendererTest, StopsAPreviewMadeOldByAChange)
+{
+    openAndWait("/pictures/a.tif");
+    PreviewRenderer renderer{slow, 100, std::chrono::seconds{60}};
+    QSignalSpy rendered{&renderer, &PreviewRenderer::rendered};
+    renderer.setSource(document.image());
+
+    renderer.render(slowSettings(1));
+    // The first effect of the first preview runs: the slider moves again.
+    QTest::qWait(SLOW_EFFECT.count() / 2);
+    renderer.render(slowSettings(2));
+
+    ASSERT_TRUE(QTest::qWaitFor([&] { return !rendered.isEmpty(); }, 5000));
+    QTest::qWait(2 * SLOW_EFFECTS * SLOW_EFFECT.count());
+    // The old preview stopped after the effect it was in, and was not shown: only the new one.
+    EXPECT_EQ(rendered.count(), 1);
+    EXPECT_LT(*applied, 2 * SLOW_EFFECTS);
+}
+
+TEST_F(SlowRendererTest, KeepsShowingPicturesWhileASliderIsDragged)
+{
+    openAndWait("/pictures/a.tif");
+    PreviewRenderer renderer{slow, 100, std::chrono::seconds{60}};
+    QSignalSpy rendered{&renderer, &PreviewRenderer::rendered};
+    renderer.setSource(document.image());
+
+    // A change every 10 ms for five previews' time: stopping each preview would show nothing.
+    const int pass = SLOW_EFFECTS * SLOW_EFFECT.count();
+    for (int elapsed = 0, step = 1; elapsed < 5 * pass; elapsed += 10, ++step) {
+        renderer.render(slowSettings(step));
+        QTest::qWait(10);
+    }
+    EXPECT_GE(rendered.count(), 2);
+}
+
+TEST_F(SlowRendererTest, StopsAPreviewOfAPictureLeft)
+{
+    openAndWait("/pictures/a.tif");
+    PreviewRenderer renderer{slow, 100, std::chrono::seconds{60}};
+    QSignalSpy rendered{&renderer, &PreviewRenderer::rendered};
+    renderer.setSource(document.image());
+    renderer.render(slowSettings(1));
+    QTest::qWait(SLOW_EFFECT.count() / 2);
+
+    renderer.setSource(document.image());
+    QTest::qWait(2 * SLOW_EFFECTS * SLOW_EFFECT.count());
+    EXPECT_TRUE(rendered.isEmpty());
+    EXPECT_LT(*applied, SLOW_EFFECTS);
 }

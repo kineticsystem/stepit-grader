@@ -27,7 +27,9 @@
  * 2. Once the settings have not changed for `fullDelay`, the full image, for the detail.
  *
  * Each pass ends with rendered(). A change of the settings drops the passes the new settings make
- * useless: only the latest settings are rendered.
+ * useless: only the latest settings are rendered. A pass made old by a change stops at its next
+ * effect; the preview, at most once between two pictures shown, so a slider dragged on and on
+ * still shows a picture as often as a preview can be made.
  *
  * The last two pictures rendered in full are kept: settings rendered already, e.g. switching
  * between the picture before and after its edit, are shown at once, in full, without a pass.
@@ -57,6 +59,9 @@ Q_SIGNALS:
 private:
     void startPreview();
     void startFull();
+    /// Stops the preview running, if any, at its next effect.
+    void stopPreview();
+    void emitRendered(const QImage &image, QSize fullSize, bool full);
     /// Keeps a full picture, forgetting the oldest beyond the number kept.
     void remember(const core::Settings &settings, const QImage &image);
 
@@ -73,6 +78,10 @@ private:
     std::shared_ptr<std::atomic<int>> m_generation = std::make_shared<std::atomic<int>>(0);
     bool m_previewRunning = false;
     bool m_previewPending = false;
+    /// Set to stop the preview running at its next effect.
+    std::shared_ptr<std::atomic<bool>> m_stopPreview = std::make_shared<std::atomic<bool>>(false);
+    /// A preview was stopped since the last picture shown: the next one runs to its end.
+    bool m_previewStopped = false;
     /// The last pictures rendered in full, the latest last, with their settings.
     std::vector<std::pair<core::Settings, QImage>> m_rendered;
 

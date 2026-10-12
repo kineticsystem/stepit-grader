@@ -26,6 +26,7 @@ PreviewRenderer::PreviewRenderer(
 PreviewRenderer::~PreviewRenderer()
 {
     ++*m_generation;
+    m_stopPreview->store(true);
     m_previewJob.waitForFinished();
     for (QFuture<void> &job : m_fullJobs) {
         job.waitForFinished();
@@ -42,6 +43,8 @@ constexpr std::size_t KEPT_RENDERS = 2;
 void PreviewRenderer::setSource(std::shared_ptr<const core::Image> image)
 {
     ++*m_generation;
+    // A preview of another picture is of no use.
+    stopPreview();
     m_fullTimer.stop();
     m_rendered.clear();
     m_full = std::move(image);
@@ -60,15 +63,21 @@ void PreviewRenderer::render(const core::Settings &settings)
     const auto parameters = m_pipeline->parameters();
     for (const auto &[kept, image] : m_rendered) {
         if (kept.sameAs(settings, parameters)) {
-            // Rendered already: shown in full at once. A preview still running is now stale,
-            // and is dropped when it ends.
+            // Rendered already: shown in full at once. A preview still running is of no use.
             m_previewPending = false;
-            Q_EMIT rendered(image, image.size(), true);
+            stopPreview();
+            emitRendered(image, image.size(), true);
             return;
         }
     }
     if (m_previewRunning) {
         m_previewPending = true;
+        // The preview running is for older settings: stopped, so the latest start sooner. Only
+        // once until a picture is shown, or a slider dragged on would never show one.
+        if (!m_previewStopped) {
+            m_previewStopped = true;
+            stopPreview();
+        }
     } else {
         startPreview();
     }
@@ -78,6 +87,7 @@ void PreviewRenderer::startPreview()
 {
     m_previewRunning = true;
     m_previewPending = false;
+    m_stopPreview = std::make_shared<std::atomic<bool>>(false);
     const int generation = *m_generation;
     QPointer<PreviewRenderer> self{this};
     m_previewJob = QtConcurrent::run([self,
@@ -87,12 +97,15 @@ void PreviewRenderer::startPreview()
                                       side = m_previewSide,
                                       settings = m_settings,
                                       counter = m_generation,
+                                      stop = m_stopPreview,
                                       generation] {
         const auto preview = source ? source
                                     : std::make_shared<const core::Image>(
                                           core::geometry::downscale(*full, side));
         const double scale = static_cast<double>(preview->width) / full->width;
-        const auto image = pipeline->render(*preview, settings, core::RenderContext{scale});
+        const auto image = pipeline->render(*preview, settings, core::RenderContext{scale}, [stop] {
+            return stop->load();
+        });
         QImage shown = image ? toQImage(*image) : QImage{};
         const QSize fullSize{full->width, full->height};
         QMetaObject::invokeMethod(
@@ -109,7 +122,7 @@ void PreviewRenderer::startPreview()
                 // A preview of older settings is still shown while a newer one is made: better
                 // than nothing. One whose settings were shown in full meanwhile is not.
                 if (!shown.isNull() && (*counter == generation || self->m_previewPending)) {
-                    Q_EMIT self->rendered(shown, fullSize, false);
+                    self->emitRendered(shown, fullSize, false);
                 }
                 if (self->m_previewPending) {
                     self->startPreview();
@@ -148,11 +161,23 @@ void PreviewRenderer::startFull()
             [self, settings, shown = std::move(shown), counter, generation] {
                 if (self && *counter == generation) {
                     self->remember(settings, shown);
-                    Q_EMIT self->rendered(shown, shown.size(), true);
+                    self->emitRendered(shown, shown.size(), true);
                 }
             },
             Qt::QueuedConnection);
     });
+}
+
+void PreviewRenderer::stopPreview()
+{
+    m_stopPreview->store(true);
+}
+
+void PreviewRenderer::emitRendered(const QImage &image, QSize fullSize, bool full)
+{
+    // A picture shown: the next change may stop a preview again.
+    m_previewStopped = false;
+    Q_EMIT rendered(image, fullSize, full);
 }
 
 void PreviewRenderer::remember(const core::Settings &settings, const QImage &image)
