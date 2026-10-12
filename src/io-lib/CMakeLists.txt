@@ -11,5 +11,5 @@ add_library(io-lib STATIC
 target_include_directories(io-lib PUBLIC include)
 target_link_libraries(io-lib
     PUBLIC core-lib
-    PRIVATE rawconv::rawconv TIFF::TIFF ZLIB::ZLIB pugixml::pugixml PkgConfig::LCMS2)
+    PRIVATE rawconv::rawconv TIFF::TIFF Pugixml::Pugixml LCMS2::LCMS2)
 stepit_grader_warnings(io-lib)

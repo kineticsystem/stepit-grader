@@ -1,30 +1,33 @@
 # Where the libraries are found.
 #
-# - LibRaw, Little CMS, libtiff, pugixml and GoogleTest: in deps/, made by
-#   install-deps.sh from their own source releases; or, without deps/, from
-#   the system.
+# - LibRaw, Little CMS, libtiff, pugixml and GoogleTest: each in its own folder
+#   of deps/, built by install-deps.sh from its own source release; or, without
+#   deps/, in the system. The find modules of cmake/ look in deps/<library>
+#   first; raw-converter finds LibRaw and Little CMS itself, with pkg-config.
 # - Qt 6, for the editor and the tests only: from Qt6_DIR, e.g.
 #   ~/Qt/6.11.0/gcc_64/lib/cmake/Qt6, or CMAKE_PREFIX_PATH.
 
-list(APPEND CMAKE_PREFIX_PATH "${PROJECT_SOURCE_DIR}/deps")
+set(STEPIT_GRADER_DEPS_DIR "${PROJECT_SOURCE_DIR}/deps")
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+
+# The libraries of deps/ that pkg-config finds: their lib/pkgconfig, through
+# CMAKE_PREFIX_PATH. They are shared, so their lib/ goes on the programs' run
+# path, and they start without LD_LIBRARY_PATH.
+set(STEPIT_GRADER_SHARED_DEPS libraw lcms2)
+foreach(library ${STEPIT_GRADER_SHARED_DEPS})
+    list(APPEND CMAKE_PREFIX_PATH "${STEPIT_GRADER_DEPS_DIR}/${library}")
+    list(APPEND CMAKE_BUILD_RPATH "${STEPIT_GRADER_DEPS_DIR}/${library}/lib")
+endforeach()
+set(CMAKE_SKIP_BUILD_RPATH FALSE)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 if(STEPIT_GRADER_BUILD_EDITOR OR STEPIT_GRADER_BUILD_TESTS)
     find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Concurrent Svg Test)
 endif()
 find_package(TIFF REQUIRED)
-# libtiff's Deflate: named for the static libtiff of deps/, which does not bring
-# its own.
-find_package(ZLIB REQUIRED)
-find_package(pugixml REQUIRED)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LCMS2 REQUIRED IMPORTED_TARGET lcms2)
+find_package(Pugixml REQUIRED)
+find_package(LCMS2 REQUIRED)
 find_package(Threads REQUIRED)
-
-# The shared libraries of deps/, LibRaw and Little CMS, on the run path of the
-# programs built, so they start without LD_LIBRARY_PATH.
-set(CMAKE_SKIP_BUILD_RPATH FALSE)
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-list(APPEND CMAKE_BUILD_RPATH "${PROJECT_SOURCE_DIR}/deps/lib")
 
 function(stepit_grader_warnings target)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

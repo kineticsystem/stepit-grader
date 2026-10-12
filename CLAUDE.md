@@ -16,7 +16,7 @@ cmake --build build
 ctest --test-dir build                 # or build/bin/stepit-grader-tests --gtest_filter='EffectsTest.*'
 ```
 
-LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/`, built by `./install-deps.sh` from their own source releases, or the system. Build in Release: the effects are about ten times slower in Debug.
+LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/<library>`, built by `./install-deps.sh` (one script per library in `scripts/`) and found by the modules of `cmake/`; without `deps/`, from the system. Build in Release: the effects are about ten times slower in Debug.
 
 ## Architecture
 

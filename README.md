@@ -111,11 +111,13 @@ git submodule update --init
 
 ### Install the Libraries
 
-Build the libraries into `deps/`, once, about half a minute: each from its own source release, at a fixed version, checked against its checksum. The build looks in `deps/` first, and in the system without it.
+Build the libraries once, in about half a minute. Each is downloaded from its own project, at a fixed version, and installed into a folder of its own in `deps/`, which the build looks in first.
 
 ```bash
 ./install-deps.sh
 ```
+
+There is one script per library in `scripts/`. A library already in `deps/` is skipped: delete its folder to build it again.
 
 ### Build the Project
 
