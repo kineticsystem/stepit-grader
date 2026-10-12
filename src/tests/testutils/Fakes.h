@@ -48,6 +48,18 @@ public:
         const auto file = files.find(image);
         return file != files.end() ? std::optional{file->second} : stored;
     }
+    /// The settings saved for `file`, as an image's, or an error.
+    core::Settings loadFile(
+        const std::filesystem::path &file, const std::vector<core::Parameter> &) const override
+    {
+        const std::lock_guard lock{mutex};
+        const auto found = files.find(file);
+        if (found == files.end()) {
+            throw imageio::Error{"Cannot read " + file.string() + ": no such file"};
+        }
+        return found->second;
+    }
+    std::string extension() const override { return "xmp"; }
     void save(
         const std::filesystem::path &image,
         const core::Settings &settings,

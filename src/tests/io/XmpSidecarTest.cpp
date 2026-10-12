@@ -131,3 +131,14 @@ TEST(XmpSidecarTest, ReportsASidecarThatIsNotXml)
     EXPECT_THROW(imageio::XmpSidecar{}.load(image, parameters()), imageio::Error);
     EXPECT_THROW(imageio::XmpSidecar{}.save(image, {}, parameters()), imageio::Error);
 }
+
+TEST(XmpSidecarTest, LoadsTheSettingsOfAFileOfAnyName)
+{
+    const fs::path folder = testutils::outputFolder();
+    const fs::path file = folder / "warm look.xmp";
+    std::ofstream{file} << LIGHTROOM_SIDECAR;
+    const imageio::XmpSidecar sidecar;
+    EXPECT_EQ(sidecar.extension(), "xmp");
+    EXPECT_DOUBLE_EQ(sidecar.loadFile(file, parameters()).value(ExposureEffect::EXPOSURE), 0.65);
+    EXPECT_THROW(sidecar.loadFile(folder / "missing.xmp", parameters()), imageio::Error);
+}

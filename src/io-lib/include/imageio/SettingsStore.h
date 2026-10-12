@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace imageio {
@@ -28,6 +29,18 @@ public:
     virtual std::optional<core::Settings> load(
         const std::filesystem::path &image, const std::vector<core::Parameter> &parameters) const
         = 0;
+
+    /**
+     * The settings in a file of the store's kind of any name, e.g. one saved for another image,
+     * for the given parameters; those it does not have are left out. Throws imageio::Error when
+     * it cannot be read.
+     */
+    virtual core::Settings loadFile(
+        const std::filesystem::path &file, const std::vector<core::Parameter> &parameters) const
+        = 0;
+
+    /// The extension of its files, lower case, without the dot, e.g. "xmp".
+    virtual std::string extension() const = 0;
 
     /// Saves every parameter's value. Throws imageio::Error when they cannot be written.
     virtual void save(

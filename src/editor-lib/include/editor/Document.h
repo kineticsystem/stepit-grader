@@ -61,6 +61,9 @@ public:
      */
     bool isModified() const;
 
+    /// The file names of settings it loads, for an open dialog, e.g. "*.xmp".
+    QString settingsNameFilter() const;
+
     /// The file names it reads, for an open dialog, e.g. "*.tif *.dng".
     QStringList nameFilters() const;
     bool canOpen(const QString &path) const;
@@ -71,6 +74,12 @@ public Q_SLOTS:
     void resetSettings();
     /// The settings back to those the picture had when it was opened: its sidecar's, or none.
     void revertSettings();
+    /**
+     * Applies the settings of a file of the store's kind, e.g. a sidecar saved for another
+     * picture, to this one: every value, those the file lacks at their defaults. A change like any
+     * other, so saved and reverted like one. Ends with settingsLoaded() or settingsLoadFailed().
+     */
+    bool loadSettings(const QString &file);
     /**
      * Saves the settings now, if they are not written yet; ends with saved() or saveFailed().
      * Returns false only when they could not be written.
@@ -84,6 +93,8 @@ Q_SIGNALS:
     void modifiedChanged(bool modified);
     void saved(const QString &settingsPath);
     void saveFailed(const QString &message);
+    void settingsLoaded(const QString &file);
+    void settingsLoadFailed(const QString &message);
 
 private:
     struct Loaded

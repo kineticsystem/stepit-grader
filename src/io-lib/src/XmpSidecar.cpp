@@ -198,7 +198,7 @@ std::string write(
 } // namespace xmp
 
 core::Settings XmpSidecar::loadFile(
-    const std::filesystem::path &xmp, const std::vector<core::Parameter> &parameters)
+    const std::filesystem::path &xmp, const std::vector<core::Parameter> &parameters) const
 {
     if (!std::filesystem::exists(xmp)) {
         throw Error{"Cannot read " + xmp.string() + ": no such file"};

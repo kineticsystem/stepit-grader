@@ -155,6 +155,8 @@ The editor saves the settings by itself, next to the picture, e.g. `IMG_0001.xmp
 
 The window's title shows `*` while the settings are not written yet: for the second after a change, or until the next change after a save that failed. A failed save is shown in the status bar and tried again at the next change; only when the edit would be lost, on closing the window or opening another picture, does the editor ask whether to go on without it. **File > Save Settings** saves at once.
 
+**File > Load Settings…**, `Ctrl+L`, applies the settings of any sidecar to the picture open: one saved for another picture, a look kept aside, or one Lightroom wrote. Every value comes from the file, those it lacks at their defaults. It is a change like any other: saved next to the picture, and undone with Revert to Opened.
+
 **Edit > Revert to Opened** goes back to the settings the picture had when it was opened, from its sidecar or none, and **Edit > Reset All** to a picture with no edit. Both are changes like any other, saved in turn.
 
 ### Choose the Theme
@@ -167,6 +169,7 @@ The window's title shows `*` while the settings are not written yet: for the sec
 |---|---|
 | `Ctrl+O` | Open a picture. |
 | `Ctrl+S` | Save the settings now, rather than 1 second after the last change. |
+| `Ctrl+L` | Load the settings of another sidecar. |
 | `Ctrl+Shift+R` | Reset all the sliders. |
 | `W` | Pick the white balance from an area; `Esc` cancels. |
 | `\` | Show the picture before the edit, or after. |

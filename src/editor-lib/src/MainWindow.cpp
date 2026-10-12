@@ -30,6 +30,8 @@
 namespace {
 
 constexpr const char *LAST_FOLDER_KEY = "lastFolder";
+/// Where settings were last loaded from: often not where the pictures are.
+constexpr const char *LAST_SETTINGS_FOLDER_KEY = "lastSettingsFolder";
 constexpr const char *RECENT_FILES_KEY = "recentPictures";
 /// The pictures listed in File > Open Recent.
 constexpr int RECENT_FILES = 10;
@@ -96,6 +98,13 @@ MainWindow::MainWindow(
         m_renderer->render(settings);
     });
     connect(m_document, &Document::opened, this, &MainWindow::onOpened);
+    connect(m_document, &Document::settingsLoaded, this, [this](const QString &file) {
+        statusBar()
+            ->showMessage(tr("Loaded the settings of %1").arg(QDir::toNativeSeparators(file)), 5000);
+    });
+    connect(m_document, &Document::settingsLoadFailed, this, [this](const QString &message) {
+        QMessageBox::warning(this, tr("Cannot Load Settings"), message);
+    });
     connect(m_document, &Document::openFailed, this, [this](const QString &message) {
         QApplication::restoreOverrideCursor();
         QMessageBox::warning(this, tr("Cannot Open"), message);
@@ -154,6 +163,10 @@ void MainWindow::createActions()
     QAction *save
         = file->addAction(tr("&Save Settings"), QKeySequence::Save, m_document, &Document::save);
     setThemedIcon(save, "document-save");
+    QAction *loadSettings = file->addAction(
+        tr("&Load Settings…"), QKeySequence{tr("Ctrl+L")}, this, &MainWindow::chooseSettings);
+    loadSettings->setToolTip(
+        tr("Apply the settings of a sidecar, e.g. one saved for another picture"));
     file->addSeparator();
     file->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
 
@@ -217,7 +230,7 @@ void MainWindow::createActions()
         toolbar->addAction(action);
     }
 
-    for (QAction *action : {save, revert, reset, m_pickWhite, m_showBefore}) {
+    for (QAction *action : {save, loadSettings, revert, reset, m_pickWhite, m_showBefore}) {
         action->setEnabled(false);
         connect(m_document, &Document::opened, action, [action] { action->setEnabled(true); });
     }
@@ -375,5 +388,19 @@ void MainWindow::refreshIcons()
     // An icon keeps the drawing of the theme it was made in: each is made again for the new one.
     for (const auto &[action, name] : m_themedIcons) {
         action->setIcon(themedIcon(name));
+    }
+}
+
+void MainWindow::chooseSettings()
+{
+    QSettings settings;
+    const QString folder
+        = settings.value(LAST_SETTINGS_FOLDER_KEY, QFileInfo{m_document->path()}.absolutePath())
+              .toString();
+    const QString filter = tr("Settings (%1)").arg(m_document->settingsNameFilter());
+    const QString path = QFileDialog::getOpenFileName(this, tr("Load Settings"), folder, filter);
+    if (!path.isEmpty()) {
+        settings.setValue(LAST_SETTINGS_FOLDER_KEY, QFileInfo{path}.absolutePath());
+        m_document->loadSettings(path);
     }
 }

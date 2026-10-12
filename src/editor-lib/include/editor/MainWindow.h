@@ -49,6 +49,8 @@ private:
     /// Shows the picture before its edit, or after.
     void showBefore(bool before);
     void chooseFile();
+    /// Asks for a file of settings, and applies it to the picture open.
+    void chooseSettings();
     /**
      * Saves the settings that wait to be; when that fails, asks whether to go on without them.
      * Returns false when the user stays.

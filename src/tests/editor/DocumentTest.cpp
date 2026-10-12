@@ -5,6 +5,7 @@
 #include "../testutils/TestImages.h"
 
 #include "core/StandardPipeline.h"
+#include "core/effects/ExposureEffect.h"
 #include "editor/Document.h"
 #include "editor/PreviewRenderer.h"
 
@@ -227,6 +228,53 @@ TEST_F(DocumentTest, RetriesAFailedSaveAtTheNextChange)
     ASSERT_TRUE(QTest::qWaitFor([&] { return store->saves > 0; }, 5000));
     EXPECT_DOUBLE_EQ(savedContrast("/pictures/a.tif"), 30);
     EXPECT_FALSE(document.isModified());
+}
+
+TEST_F(DocumentTest, LoadsTheSettingsOfAnotherFileAsAChange)
+{
+    openAndWait("/pictures/a.tif");
+    // A grading saved for another picture: every value of it, the others at their defaults.
+    core::Settings other;
+    other.setValue("Exposure2012", 0.8);
+    store->files["/looks/warm.xmp"] = other;
+    document.setSettings(contrast(20));
+    QSignalSpy loaded{&document, &Document::settingsLoaded};
+
+    ASSERT_TRUE(document.loadSettings("/looks/warm.xmp"));
+    ASSERT_EQ(loaded.count(), 1);
+    EXPECT_EQ(loaded.first().at(0).toString(), "/looks/warm.xmp");
+    EXPECT_DOUBLE_EQ(document.settings().value(core::ExposureEffect::EXPOSURE), 0.8);
+    EXPECT_FALSE(document.settings().has("Contrast2012"));
+
+    // Saved to the picture's own sidecar, as any change.
+    ASSERT_TRUE(QTest::qWaitFor([&] { return store->files.contains("/pictures/a.tif"); }, 5000));
+    EXPECT_DOUBLE_EQ(store->files["/pictures/a.tif"].values().at("Exposure2012"), 0.8);
+
+    // Undone as any change.
+    document.revertSettings();
+    EXPECT_FALSE(document.settings().has("Exposure2012"));
+    EXPECT_EQ(document.settingsNameFilter(), "*.xmp");
+}
+
+TEST_F(DocumentTest, ReportsSettingsThatCannotBeLoaded)
+{
+    openAndWait("/pictures/a.tif");
+    document.setSettings(contrast(20));
+    QSignalSpy failed{&document, &Document::settingsLoadFailed};
+    EXPECT_FALSE(document.loadSettings("/looks/missing.xmp"));
+    ASSERT_EQ(failed.count(), 1);
+    EXPECT_TRUE(failed.first().at(0).toString().contains("missing.xmp"));
+    // The settings are as they were.
+    EXPECT_DOUBLE_EQ(document.settings().values().at("Contrast2012"), 20);
+}
+
+TEST(DocumentWithoutPictureTest, LoadsNoSettings)
+{
+    Document document{
+        std::make_shared<testutils::FakeReader>(),
+        std::make_shared<testutils::FakeStore>(),
+        core::makeStandardPipeline()->parameters()};
+    EXPECT_FALSE(document.loadSettings("/looks/warm.xmp"));
 }
 
 TEST_F(PreviewRendererTest, RendersAPreviewThenTheFullImage)

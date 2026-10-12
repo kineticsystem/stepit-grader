@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
     std::optional<core::Settings> settings;
     if (options->settings) {
         try {
-            settings = imageio::XmpSidecar::loadFile(*options->settings, pipeline->parameters());
+            settings = imageio::XmpSidecar{}.loadFile(*options->settings, pipeline->parameters());
         } catch (const std::exception &e) {
             std::cerr << program << ": " << e.what() << "\n";
             return 2;

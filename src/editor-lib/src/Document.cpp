@@ -158,3 +158,25 @@ void Document::changeSettings(const core::Settings &settings)
         m_saveTimer.stop();
     }
 }
+
+QString Document::settingsNameFilter() const
+{
+    return "*." + QString::fromStdString(m_store->extension());
+}
+
+bool Document::loadSettings(const QString &file)
+{
+    if (!isOpen()) {
+        return false;
+    }
+    core::Settings settings;
+    try {
+        settings = m_store->loadFile(toPath(file), m_parameters);
+    } catch (const std::exception &e) {
+        Q_EMIT settingsLoadFailed(QString::fromUtf8(e.what()));
+        return false;
+    }
+    setSettings(settings);
+    Q_EMIT settingsLoaded(file);
+    return true;
+}
