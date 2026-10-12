@@ -20,6 +20,13 @@ namespace imageio {
 class XmpSidecar : public SettingsStore
 {
 public:
+    /**
+     * The settings in an XMP file of any name, e.g. one saved for a picture and applied to
+     * others. Throws imageio::Error when it cannot be read.
+     */
+    static core::Settings loadFile(
+        const std::filesystem::path &xmp, const std::vector<core::Parameter> &parameters);
+
     std::filesystem::path location(const std::filesystem::path &image) const override;
     std::optional<core::Settings> load(
         const std::filesystem::path &image,

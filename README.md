@@ -16,6 +16,7 @@
   - [Edit It](#edit-it)
   - [Save the Settings](#save-the-settings)
   - [Keyboard Shortcuts](#keyboard-shortcuts)
+- [Grade from the Command Line](#grade-from-the-command-line)
 - [The Tools](#the-tools)
 - [The Sidecar](#the-sidecar)
 - [Tests](#tests)
@@ -31,7 +32,8 @@ With StepIt Grader we can:
 - open a TIFF, 8 or 16 bits or float, with its ICC profile, a DNG, or a camera raw file, e.g. a Canon CR2;
 - set the white balance, by hand or by picking an area that should be white or grey, remove purple fringing, set the exposure, the contrast, the highlights, the shadows, the blacks, the detail, the structure, the vibrance, the saturation, an HDR compression of the highlights and the sharpness, and see the result as the slider moves;
 - zoom from the whole picture to 800%, and drag it around;
-- save the settings in an XMP sidecar that Lightroom and Camera Raw can read, and open them again with the picture.
+- save the settings in an XMP sidecar that Lightroom and Camera Raw can read, and open them again with the picture;
+- grade any number of pictures from the command line with those settings, into 16-bit TIFFs in sRGB, Adobe RGB, ProPhoto RGB or linear Rec. 2020.
 
 How it is built is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -120,7 +122,7 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-The programs are in `build/bin`: `stepit-grader` and `stepit-grader-tests`. Build in `Release`: the effects are about ten times slower in `Debug`.
+The programs are in `build/bin`: `stepit-grader`, the editor, `stepit-grader-cli`, the command line, and `stepit-grader-tests`. Build in `Release`: the effects are about ten times slower in `Debug`.
 
 ## Running the Application
 
@@ -159,6 +161,36 @@ Zoom with the wheel, around the cursor, or with the **View** menu; drag the pict
 | `Ctrl+1` | Show it at 100%. |
 
 On macOS, `Cmd` replaces `Ctrl`.
+
+## Grade from the Command Line
+
+`stepit-grader-cli` applies saved settings to pictures without a window, e.g. in a script or on a server: it reads each picture, applies the settings at full size, and writes a 16-bit TIFF with the picture's name into the output folder.
+
+Grade every picture with the settings saved for one of them:
+
+```bash
+build/bin/stepit-grader-cli --settings ~/Pictures/IMG_0001.xmp --output ~/Pictures/graded ~/Pictures/*.CR2
+```
+
+Without `--settings`, each picture is graded with its own sidecar, or with no edit when it has none.
+
+| Option | Default | What it does |
+|---|---|---|
+| `-s`, `--settings <file.xmp>` | each picture's own sidecar | The settings for every picture: any sidecar the editor or Lightroom saved. |
+| `-o`, `--output <folder>` | required | Where the TIFFs go, made if missing: `<folder>/<picture's name>.tif`. |
+| `-c`, `--colour-space <name>` | `srgb` | The TIFFs' colour space, with its ICC profile embedded: `srgb`, `adobe-rgb`, `prophoto` or `rec2020-linear`. sRGB is what every screen assumes; Adobe RGB and ProPhoto RGB keep the saturated colours sRGB clips, for prints; linear Rec. 2020 is the editor's own working space, for more processing. |
+| `--compress` | off | Deflate, lossless: about half the size. |
+| `--overwrite` | off | Replace the TIFFs already in the output folder. |
+
+It never writes over a picture it reads, nor over a TIFF already there unless given `--overwrite`, nor over the TIFF of another picture of the same run, e.g. `a.CR2` and `a.tif`. A picture that cannot be read or written is reported, and the others are graded. It prints each TIFF written, and ends with:
+
+| Exit status | Meaning |
+|---|---|
+| `0` | Every picture is graded. |
+| `1` | Some are not: each is reported, with the reason. |
+| `2` | The command line is wrong, or the settings cannot be read: nothing is graded. |
+
+A raw file of 21 megapixels takes about 5 seconds, most of it to develop.
 
 ## The Tools
 

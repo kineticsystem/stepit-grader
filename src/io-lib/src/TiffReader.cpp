@@ -4,6 +4,8 @@
 #include "imageio/TiffReader.h"
 #include "imageio/Error.h"
 
+#include "ColourProfiles.h"
+
 #include "core/Geometry.h"
 #include "core/Parallel.h"
 
@@ -19,21 +21,13 @@ namespace imageio {
 
 namespace {
 
+using profiles::Profile;
+using profiles::Transform;
+
 struct TiffCloser
 {
     void operator()(TIFF *tiff) const { TIFFClose(tiff); }
 };
-struct ProfileCloser
-{
-    void operator()(void *profile) const { cmsCloseProfile(profile); }
-};
-struct TransformDeleter
-{
-    void operator()(void *transform) const { cmsDeleteTransform(transform); }
-};
-using Profile = std::unique_ptr<void, ProfileCloser>;
-using Transform = std::unique_ptr<void, TransformDeleter>;
-
 TIFF *open(const std::filesystem::path &path)
 {
 #ifdef _WIN32
@@ -43,23 +37,11 @@ TIFF *open(const std::filesystem::path &path)
 #endif
 }
 
-/// The working space as an ICC profile: Rec. 2020 primaries, D65 white, linear.
-Profile workingSpaceProfile()
-{
-    const cmsCIExyY white{0.3127, 0.3290, 1.0};
-    const cmsCIExyYTRIPLE primaries{{0.708, 0.292, 1.0}, {0.170, 0.797, 1.0}, {0.131, 0.046, 1.0}};
-    cmsToneCurve *linear = cmsBuildGamma(nullptr, 1.0);
-    cmsToneCurve *curves[3] = {linear, linear, linear};
-    Profile profile{cmsCreateRGBProfile(&white, &primaries, curves)};
-    cmsFreeToneCurve(linear);
-    return profile;
-}
-
 /// The profile a file without one is taken to have.
 Profile defaultProfile(bool grey, bool floating)
 {
     if (floating) {
-        return workingSpaceProfile();
+        return profiles::workingSpace();
     }
     if (grey) {
         // The grey of sRGB: its white and, near enough, its curve.
@@ -87,6 +69,10 @@ cmsUInt32Number inputFormat(bool grey, int bits)
 core::Image TiffReader::read(const std::filesystem::path &path) const
 {
     const std::string name = path.string();
+    // Said here rather than by libtiff, which prints its own line on the error output.
+    if (!std::filesystem::exists(path)) {
+        throw Error{"Cannot read " + name + ": no such file"};
+    }
     TIFFSetWarningHandler(nullptr);
     std::unique_ptr<TIFF, TiffCloser> tiff{open(path)};
     if (!tiff) {
@@ -161,7 +147,7 @@ core::Image TiffReader::read(const std::filesystem::path &path) const
     if (!input) {
         input = defaultProfile(grey, floating);
     }
-    const Profile output = workingSpaceProfile();
+    const Profile output = profiles::workingSpace();
     // Without a cache, one transform can be used by several threads at once.
     const Transform transform{cmsCreateTransform(
         input.get(),

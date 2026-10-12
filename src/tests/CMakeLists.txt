@@ -9,11 +9,13 @@ add_executable(stepit-grader-tests
     core/EffectsTest.cpp
     core/EngineTest.cpp
     io/ReadersTest.cpp
+    io/TiffWriterTest.cpp
     io/XmpSidecarTest.cpp
     editor/DocumentTest.cpp
-    editor/WidgetsTest.cpp)
+    editor/WidgetsTest.cpp
+    cli/CliTest.cpp)
 target_link_libraries(stepit-grader-tests PRIVATE
-    editor-lib rawconv::rawconv TIFF::TIFF GTest::gtest Qt6::Test)
+    editor-lib cli-lib rawconv::rawconv TIFF::TIFF GTest::gtest Qt6::Test)
 # The camera raw samples of raw-converter, downloaded by its bin/fetch-samples.sh.
 target_compile_definitions(stepit-grader-tests PRIVATE
     RAW_SAMPLES_DIR="${PROJECT_SOURCE_DIR}/modules/raw-converter/samples")

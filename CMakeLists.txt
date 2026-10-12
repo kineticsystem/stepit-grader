@@ -26,6 +26,8 @@ add_subdirectory(src/core-lib)
 add_subdirectory(src/io-lib)
 add_subdirectory(src/editor-lib)
 add_subdirectory(src/editor-app)
+add_subdirectory(src/cli-lib)
+add_subdirectory(src/cli-app)
 
 option(STEPIT_GRADER_BUILD_TESTS "Build the tests" ON)
 if(STEPIT_GRADER_BUILD_TESTS)

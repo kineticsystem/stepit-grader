@@ -197,6 +197,19 @@ std::string write(
 
 } // namespace xmp
 
+core::Settings XmpSidecar::loadFile(
+    const std::filesystem::path &xmp, const std::vector<core::Parameter> &parameters)
+{
+    if (!std::filesystem::exists(xmp)) {
+        throw Error{"Cannot read " + xmp.string() + ": no such file"};
+    }
+    try {
+        return xmp::parse(readFile(xmp), parameters);
+    } catch (const Error &e) {
+        throw Error{"Cannot read " + xmp.string() + ": " + e.what()};
+    }
+}
+
 std::filesystem::path XmpSidecar::location(const std::filesystem::path &image) const
 {
     std::filesystem::path sidecar = image;

@@ -24,7 +24,10 @@ libtiff, pugixml and GoogleTest come from Lentigram's `lib/` (`-DLENTIGRAM_LIB`,
 - `src/io-lib` (namespace `imageio`): `ImageReader` (TIFF with ICC via libtiff and Little CMS, raw and DNG via the raw-converter submodule) and `SettingsStore` (`XmpSidecar`, pugixml). No Qt.
 - `src/editor-lib`: Qt. Reusable widgets in `widgets/` (`ImageView`, `ParameterSlider`, `CollapsibleSection`, `AdjustmentsPanel`) that know nothing of their clients and report with signals; `Document`; `PreviewRenderer`; `MainWindow`, which only connects the parts.
 - `src/editor-app`: `main()`, the composition root.
-- Dependencies go downward only: editor-app → editor-lib → io-lib → core-lib.
+- `src/cli-lib` (namespace `cli`): `parseOptions()` and `Grader`, which grades pictures with saved settings into 16-bit TIFFs (`imageio::TiffWriter`). No Qt.
+- `src/cli-app`: `stepit-grader-cli`'s `main()`.
+- Dependencies go downward only: editor-app → editor-lib → io-lib → core-lib, and cli-app → cli-lib → io-lib → core-lib.
+- StepIt Grader is independent software: never mention the projects that use it in its code or docs.
 
 ## Rules
 
@@ -43,4 +46,4 @@ libtiff, pugixml and GoogleTest come from Lentigram's `lib/` (`-DLENTIGRAM_LIB`,
 
 ## Testing
 
-GoogleTest and Qt Test, in one program, `src/tests`, organised by library: `core/`, `io/`, `editor/`. `Main.cpp` creates one offscreen `QApplication`. Fakes of `ImageReader` and `SettingsStore` are in `editor/DocumentTest.cpp`. The raw tests need raw-converter's samples (`modules/raw-converter/bin/fetch-samples.sh`) and are skipped without them.
+GoogleTest and Qt Test, in one program, `src/tests`, organised by library: `core/`, `io/`, `editor/`, `cli/`. `Main.cpp` creates one offscreen `QApplication`. Fakes of `ImageReader` and `SettingsStore` are in `testutils/Fakes.h`. The raw tests need raw-converter's samples (`modules/raw-converter/bin/fetch-samples.sh`) and are skipped without them.

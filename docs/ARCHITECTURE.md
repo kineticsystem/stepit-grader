@@ -14,6 +14,7 @@
 - [Reading and Saving](#reading-and-saving)
   - [The Readers](#the-readers)
   - [The XMP Sidecar](#the-xmp-sidecar)
+- [The Command Line](#the-command-line)
 - [The Editor](#the-editor)
   - [The Widgets](#the-widgets)
   - [The Document](#the-document)
@@ -29,11 +30,11 @@
 
 This document explains how StepIt Grader is built, what each part is responsible for, and where to start when we want to change something. It assumes we have read the [README](../README.md), built the project and edited a picture once.
 
-It follows one idea: **an edit is a set of named values, never pixels**. The sliders show the values, the sidecar stores them, and the engine turns them into pixels, the same way for any picture. That is what lets a command line tool, later, grade a whole sequence of pictures with the sidecar of one.
+It follows one idea: **an edit is a set of named values, never pixels**. The sliders show the values, the sidecar stores them, and the engine turns them into pixels, the same way for any picture. That is what lets the command line grade a whole sequence of pictures with the sidecar of one, exactly as the editor shows it.
 
 ## The Big Picture
 
-The code is four static libraries and a program. Each library depends only on those below it, and the two at the bottom know nothing of Qt.
+The code is five static libraries and two programs, the editor and the command line, which share the engine and the files. Each library depends only on those below it, and only the editor's knows Qt.
 
 ```mermaid
 ---
@@ -91,15 +92,20 @@ config:
     errorTextColor: "#ffffff"
 ---
 flowchart TB
-    App["stepit-grader<br/>main(), the composition root"]
+    App["stepit-grader<br/>the editor's main()"]
+    Cli["stepit-grader-cli<br/>the command line's main()"]
     Editor["editor-lib<br/>widgets, Document, PreviewRenderer, MainWindow"]
-    IO["io-lib<br/>readers, XMP sidecar"]
+    CliLib["cli-lib<br/>Options, Grader"]
+    IO["io-lib<br/>readers, TIFF writer, XMP sidecar"]
     Core["core-lib<br/>Image, Effect, Pipeline, the effects"]
     Raw["raw-converter<br/>submodule"]
-    Qt["Qt 6<br/>Widgets, Concurrent"]
+    Qt["Qt 6<br/>Widgets, Concurrent, Svg"]
     Libs["libtiff, Little CMS, pugixml"]
     LibRaw["LibRaw"]
     App --> Editor
+    Cli --> CliLib
+    CliLib --> IO
+    CliLib --> Core
     Editor --> IO
     Editor --> Core
     Editor --> Qt
@@ -114,6 +120,7 @@ flowchart TB
 | Program | What it is |
 |---|---|
 | `stepit-grader` | The editor, [`src/editor-app/src/main.cpp`](../src/editor-app/src/main.cpp): builds the parts and opens the window. |
+| `stepit-grader-cli` | The command line, [`src/cli-app/src/main.cpp`](../src/cli-app/src/main.cpp): grades pictures with saved settings, without a window. |
 | `stepit-grader-tests` | Every test, of every library, in one program: [`src/tests`](../src/tests). |
 
 ## The Libraries
@@ -121,11 +128,13 @@ flowchart TB
 | Library | Owns | Links | Must never |
 |---|---|---|---|
 | [`core-lib`](../src/core-lib) | The image in the working space, the `Effect` interface, the `Pipeline`, the thirteen effects, the area sampling, the filters, the colour maths, the threads, the conversion for the screen. | Threads only. | Include Qt, read or write a file, know which effects exist outside `StandardPipeline.cpp`. |
-| [`io-lib`](../src/io-lib) | Reading images into the working space, and the settings in XMP sidecars. | `core-lib`; privately raw-converter, libtiff, Little CMS, pugixml. | Include Qt, change pixels beyond bringing them into the working space, expose a third-party type in a header. |
+| [`io-lib`](../src/io-lib) | Reading images into the working space, writing them as TIFFs out of it, and the settings in XMP sidecars. | `core-lib`; privately raw-converter, libtiff, Little CMS, pugixml. | Include Qt, change pixels beyond bringing them into the working space, expose a third-party type in a header. |
 | [`editor-lib`](../src/editor-lib) | The widgets, the document, the background rendering, the main window and its icons. | `core-lib`, `io-lib`, Qt Widgets, Concurrent and Svg. | Change pixels itself: it asks the engine. Create its own reader, store or pipeline: it is given them. |
 | [`editor-app`](../src/editor-app) | `main()`. | `editor-lib`. | Hold any logic beyond choosing the parts. |
+| [`cli-lib`](../src/cli-lib) | The command line's options and the grading of many pictures. | `core-lib`, `io-lib`. | Include Qt, print: it reports results, `main()` prints them. |
+| [`cli-app`](../src/cli-app) | `main()`. | `cli-lib`. | Hold any logic beyond choosing the parts and printing. |
 
-`core-lib` is about 2,000 lines, `io-lib` 800, `editor-lib` 1,400 and the tests 1,000.
+`core-lib` is about 2,500 lines, `io-lib` 1,150, `editor-lib` 2,000, `cli-lib` 300 and the tests 1,750.
 
 ## The Engine
 
@@ -210,6 +219,12 @@ An [`ImageReader`](../src/io-lib/include/imageio/ImageReader.h) reads one kind o
 | [`RawReader`](../src/io-lib/src/RawReader.cpp) | `.dng` and the camera raw formats LibRaw reads. | raw-converter's `readRawFile()` and `renderImage()` into Rec. 2020: demosaiced, white balanced as shot, nothing else. |
 | [`ImageLoader`](../src/io-lib/include/imageio/ImageLoader.h) | What its readers read. | The first reader that reads the file. `makeStandardImageReader()` gives the TIFF and the raw readers. |
 
+### The TIFF Writer
+
+[`TiffWriter`](../src/io-lib/include/imageio/TiffWriter.h) writes an image of the working space as a 16-bit RGB TIFF in a [`ColourSpace`](../src/io-lib/include/imageio/ColourSpace.h): sRGB, Adobe RGB (1998), ProPhoto RGB or linear Rec. 2020. Little CMS converts it, several rows at a time, clipping what is outside the space or above white, and the space's ICC profile is embedded, so every program that reads the file knows its colours. Deflate with a horizontal predictor when asked. The file is written under a hidden temporary name, `.<name>.part`, then renamed over the old one, so a failure never leaves half a file nor harms the one it would replace.
+
+The profiles, of the working space and of the four colour spaces, are made in one place, [`ColourProfiles.cpp`](../src/io-lib/src/ColourProfiles.cpp), private to `io-lib`, for the reader and the writer alike. Adobe RGB and ProPhoto RGB are made from their published primaries, white and gamma, and named "compatible": the names are Adobe's and Kodak's.
+
 ### The XMP Sidecar
 
 A [`SettingsStore`](../src/io-lib/include/imageio/SettingsStore.h) says where the settings of an image are, loads them and saves them. [`XmpSidecar`](../src/io-lib/src/XmpSidecar.cpp) is the one there is, built on pugixml:
@@ -218,7 +233,19 @@ A [`SettingsStore`](../src/io-lib/include/imageio/SettingsStore.h) says where th
 - **Reading**: every `rdf:Description` that binds the Camera Raw namespace, whatever its prefix, and each parameter as an attribute or an element named by its id.
 - **Writing**: the existing file is read, the values of the parameters replaced, `crs:ProcessVersion="11.0"` added when missing, so Lightroom reads the tone controls with their 2012 meaning, and everything else kept. Values are formatted as Lightroom writes them: `+0.50`, `-12`, `0`. The file is written to `<name>.xmp.tmp` and renamed over the sidecar, so a failure never leaves half a file.
 
-The parsing and the writing are free functions, `xmp::parse()` and `xmp::write()`, on strings, so the tests need no file.
+The parsing and the writing are free functions, `xmp::parse()` and `xmp::write()`, on strings, so the tests need no file. `XmpSidecar::loadFile()` reads the settings of an XMP file of any name, e.g. one saved for a picture and applied to others.
+
+## The Command Line
+
+`stepit-grader-cli` grades pictures with saved settings, without a window. It is a console program on every system, linking `cli-lib`, `io-lib` and `core-lib`, without Qt, so it prints, even on Windows, and runs where there is no screen.
+
+- [`parseOptions()`](../src/cli-lib/include/cli/Options.h) turns the arguments into `Options`, or a message for what is wrong with them; `usage()` is the help.
+- [`Grader`](../src/cli-lib/include/cli/Grader.h) grades the pictures, one after the other, each at full size with `RenderContext{1.0}`: the effects already use every core. It is given its `ImageReader`, its `SettingsStore` and its `Pipeline`, so the tests give it fakes. For each picture it returns a `GradeResult`, and reports it as it goes through a callback: graded, or why not. It refuses to write over the picture itself, over a TIFF already there without `--overwrite`, or over a TIFF written earlier in the same run.
+- [`main()`](../src/cli-app/src/main.cpp) reads `--settings` once, before any picture, so settings that cannot be read stop the run with status 2; makes the standard pipeline, reader and sidecar store; prints each result; and exits with 0 when every picture is graded and 1 when some are not.
+
+The editor and the command line make the same picture of the same settings: one pipeline, one reader, one sidecar, and the full size in both.
+
+## The Editor
 
 ## The Editor
 
@@ -368,10 +395,11 @@ All the tests are in one program, [`src/tests`](../src/tests), with GoogleTest a
 | Folder | Test cases | What they cover |
 |---|---|---|
 | [`core`](../src/tests/core) | 32 | Every effect at its defaults changes nothing; parameter ids unique, defaults in range; each effect moves the picture the right way, e.g. the highlights change the bright side of a step and leave the dark one; the defringe greys a purple fringe beside an edge, keeps a purple patch away from edges and a green fringe, and finds the same fringe in a preview a third of the size; a warm and a cool grey turned neutral by the white balance found for them, a grey needing none, black giving none, a cast beyond the sliders clamped; the HDR curve untouched below its knee, smooth at it, rising to white, the highlights brought below white with their hue, and local contrast keeping the texture of bright areas; the area sampling's disc and clipped pixels; the box blur, the guided filter's edge without overshoot; Oklab round trip; D65 adapted to D65; middle grey as sRGB 118; downscale and orientation; a cancelled render. |
-| [`io`](../src/tests/io) | 13 | A 16-bit linear Rec. 2020 TIFF read unchanged; an untagged 8-bit TIFF taken for sRGB; orientation; a broken file reported; readers chosen by extension; a Canon CR2 and a DNG, when the samples are there; the sidecar's formatting, a Lightroom sidecar read, elements with another prefix, an update that keeps everything else, a round trip on disk, a sidecar that is not XML. |
+| [`io`](../src/tests/io) | 18 | A 16-bit linear Rec. 2020 TIFF read unchanged; an untagged 8-bit TIFF taken for sRGB; orientation; a broken file reported; readers chosen by extension; a Canon CR2 and a DNG, when the samples are there; the sidecar's formatting, a Lightroom sidecar read, elements with another prefix, an update that keeps everything else, a round trip on disk, a sidecar that is not XML; the TIFF writer in each of the four colour spaces read back through its embedded profile, white clipped, a file replaced whole without a temporary file left, a folder that does not exist; the colour spaces' names. |
 | [`editor`](../src/tests/editor) | 22 | The slider emits the user's changes only, and resets on a double click; a section folds on a click on its title, and reports the user's clicks only; the panel's sections fold and report it, and still fold and scroll with the sliders disabled; the recent files menu keeps the latest first, without duplicates and up to its maximum, shows numbered names with the paths as tooltips, reports the file chosen with its path, removes and clears; the eyedropper is built in and painted in the theme's colour, dark and light; the view in pick mode reports the click in pixels of the full image and leaves pick mode with `Esc`; the picker sets the white balance of a warm card and keeps the other values, and explains a clipped or black area; the sections follow the pipeline; the panel emits every value; the view fits, zooms, and keeps the zoom when the full picture replaces the preview; the document, with a fake reader and store, opens with the saved settings, reports what it cannot read, tracks changes, saves, reverts and reports a failed save; the renderer sends a preview then the full picture, and only one full pass for many quick changes. |
+| [`cli`](../src/tests/cli) | 7 | Every option read, the defaults, what is wrong reported with a message, `--` before a name with a dash; the grader, with a fake reader and store, applies the settings given to every picture, or each picture's own sidecar, or none; never writes over the picture, nor over a TIFF without `--overwrite`; reports a picture that fails and grades the others, and refuses a second picture of the same name. |
 
-The 67 tests take about 5 seconds, most of it reading the two raw samples, which [`fetch-samples.sh`](https://github.com/kineticsystem/raw-converter/blob/main/bin/fetch-samples.sh) of raw-converter downloads; without them, those two are skipped.
+The 82 tests take about 6 seconds, most of it reading the two raw samples, which [`fetch-samples.sh`](https://github.com/kineticsystem/raw-converter/blob/main/bin/fetch-samples.sh) of raw-converter downloads; without them, those two are skipped.
 
 What has no automated test, and how to check it by hand:
 
@@ -389,7 +417,8 @@ What has no automated test, and how to check it by hand:
 | Change how strong an effect is | The constants at the top of its source. |
 | Read another kind of file, e.g. JPEG | A class implementing `ImageReader`, added in `makeStandardImageReader()`. |
 | Keep the settings elsewhere, e.g. inside a DNG | A class implementing `SettingsStore`, given to the `Document` in `main()`. |
-| Grade many pictures from a command line | A program linking `core-lib` and `io-lib`: read each picture, load the sidecar with `XmpSidecar`, `makeStandardPipeline()->render()`, and write the result. No Qt. |
+| Write another format, e.g. PNG | A writer beside `TiffWriter` in `io-lib`, and an option in `parseOptions()` to choose it. |
+| Add an output colour space, e.g. Display P3 | A value of `ColourSpace`, its name in `ColourProfiles.cpp`, and its profile in `profiles::of()`. |
 | Change the preview's size or delay | The arguments of `PreviewRenderer` in `main()`. |
 
 ## Design Decisions and Trade-offs
@@ -417,5 +446,9 @@ What has no automated test, and how to check it by hand:
 **Lentigram's libraries.** libtiff, pugixml and GoogleTest are already built for the three systems in Lentigram's `lib/`. The price: a dependency on a folder next to the repository, with the system's packages as the fallback, and Lentigram's libtiff needs Lentigram's libjpeg-turbo on the run path.
 
 **LibRaw and Little CMS built by a script.** raw-converter finds them with pkg-config. `install-deps.sh` builds them into `deps/` where no package can be installed, e.g. without administrator rights. LibRaw is built without OpenMP, which Apple's compiler lacks: a raw file takes about 2.5 seconds to develop.
+
+**A command line of its own, not the editor's window with options.** A program with a window is a GUI program on Windows: it cannot print to the console it was started from. A console program without Qt also runs on a server or in a container without a screen. The price: two programs to build and ship, sharing everything but `main()`.
+
+**sRGB by default, wide gamut on request.** sRGB is what every viewer assumes, so a TIFF in it looks right everywhere. Prints reach colours sRGB clips: Adobe RGB and ProPhoto RGB keep them, and their profile says so to any program that reads the file. The price: a ProPhoto TIFF looks dull in a program that ignores the profile.
 
 **No undo yet.** Revert and Reset cover the common cases: the settings are values, and an undo would be a list of `Settings`, in the `Document`.
