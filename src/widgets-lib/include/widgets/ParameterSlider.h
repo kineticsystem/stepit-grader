@@ -5,13 +5,13 @@
 
 #include <QWidget>
 
-class QDoubleSpinBox;
 class QLabel;
 class QSlider;
 
 /**
- * A named value set with a slider or typed in, e.g. "Exposure +0.50". A double click on the name
- * or the slider puts the default back. It knows nothing of what the value does.
+ * A named value set with a slider, e.g. "Exposure 0.50": the name, the value as text, and the
+ * slider, the one way to change it. A double click on the name, the value or the slider puts the
+ * default back. It knows nothing of what the value does.
  */
 class ParameterSlider : public QWidget
 {
@@ -37,7 +37,7 @@ public Q_SLOTS:
     void reset();
 
 Q_SIGNALS:
-    /// The user changed the value: with the slider, the box or a reset. Not sent by setValue().
+    /// The user changed the value: with the slider or a reset. Not sent by setValue().
     void valueChanged(double value);
 
 protected:
@@ -50,8 +50,10 @@ private:
 
     QLabel *m_label;
     QSlider *m_slider;
-    QDoubleSpinBox *m_box;
+    /// The value, as text: shown, not edited.
+    QLabel *m_valueLabel;
     double m_value;
     double m_default;
+    int m_decimals;
     double m_scale;
 };
