@@ -217,3 +217,31 @@ TEST(WhiteBalancePickerTest, ExplainsAnAreaItCannotUse)
     const core::Image black = testutils::uniform(20, 20, 0, 0, 0);
     EXPECT_FALSE(pickWhiteBalance(black, {}, QPointF{10, 10}, 3));
 }
+
+TEST(AdjustmentsPanelTest, SectionsFoldAndScrollWithTheSlidersDisabled)
+{
+    AdjustmentsPanel panel{sectionsOf(*core::makeStandardPipeline())};
+    panel.resize(300, 200);
+    panel.show();
+    panel.setControlsEnabled(false);
+    EXPECT_FALSE(panel.slider("Exposure2012")->isEnabled());
+
+    // A real click, through the window, on the title: it must still fold the section.
+    const auto headers = panel.findChildren<QToolButton *>();
+    const auto tone = std::ranges::find_if(headers, [](QToolButton *b) {
+        return b->text() == "Tone";
+    });
+    ASSERT_NE(tone, headers.end());
+    EXPECT_TRUE((*tone)->isEnabled());
+    QTest::mouseClick(*tone, Qt::LeftButton);
+    EXPECT_FALSE(panel.isSectionExpanded("Tone"));
+
+    // The panel, too small for its sections, scrolls.
+    const auto bars = panel.findChildren<QScrollBar *>();
+    const auto vertical = std::ranges::find_if(bars, [](QScrollBar *b) {
+        return b->orientation() == Qt::Vertical;
+    });
+    ASSERT_NE(vertical, bars.end());
+    EXPECT_TRUE((*vertical)->isEnabled());
+    EXPECT_GT((*vertical)->maximum(), 0);
+}

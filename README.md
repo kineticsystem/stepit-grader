@@ -136,7 +136,7 @@ Open a picture with **File > Open**, or drop it on the window. A raw file takes 
 
 ### Edit It
 
-Move a slider on the right, or type its value. A click on a section's title, e.g. **Tone**, folds it away, and it stays folded the next time. The picture follows at once, on a reduced preview, then, once the sliders stop for 0.3 seconds, in full, which is what to look at at 100%. A double click on a slider or its name puts it back to 0.
+Move a slider on the right, or type its value. The sections start folded: a click on a section's title, e.g. **Tone**, opens it, and another folds it away. The picture follows at once, on a reduced preview, then, once the sliders stop for 0.3 seconds, in full, which is what to look at at 100%. A double click on a slider or its name puts it back to 0.
 
 To set the white balance from the picture, click the eyedropper next to **White Balance**, or press `W`, then click an area that should be white or grey, e.g. a grey card or a white wall. The cursor shows the circle averaged, about 10 screen pixels across, whatever the zoom; its clipped pixels are left out. The temperature and the tint are set so the area turns neutral, and the eyedropper goes back to dragging. `Esc` cancels.
 

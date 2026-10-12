@@ -25,8 +25,6 @@
 namespace {
 
 constexpr const char *LAST_FOLDER_KEY = "lastFolder";
-/// Followed by a section's title: whether it is closed.
-constexpr const char *COLLAPSED_KEY = "collapsedSections/";
 constexpr int PANEL_WIDTH = 300;
 
 } // namespace
@@ -52,7 +50,8 @@ MainWindow::MainWindow(
     dock->setFeatures(QDockWidget::NoDockWidgetFeatures);
     dock->setWidget(m_panel);
     m_panel->setMinimumWidth(PANEL_WIDTH);
-    m_panel->setEnabled(false);
+    // Without a picture, the sliders have nothing to change; the sections still fold and scroll.
+    m_panel->setControlsEnabled(false);
     addDockWidget(Qt::RightDockWidgetArea, dock);
 
     statusBar()->addWidget(m_fileLabel, 1);
@@ -61,18 +60,10 @@ MainWindow::MainWindow(
 
     createActions();
 
-    // The sections closed stay closed the next time.
-    const QSettings settings;
+    // Every section starts folded: the user opens the tools they need.
     for (const QString &title : m_panel->sectionTitles()) {
-        m_panel->setSectionExpanded(title, !settings.value(COLLAPSED_KEY + title, false).toBool());
+        m_panel->setSectionExpanded(title, false);
     }
-    connect(
-        m_panel,
-        &AdjustmentsPanel::sectionExpandedChanged,
-        this,
-        [](const QString &title, bool expanded) {
-            QSettings{}.setValue(COLLAPSED_KEY + title, !expanded);
-        });
 
     connect(m_panel, &AdjustmentsPanel::settingsChanged, m_document, &Document::setSettings);
     connect(m_document, &Document::settingsChanged, this, [this](const core::Settings &settings) {
@@ -184,7 +175,7 @@ void MainWindow::onOpened()
     QApplication::restoreOverrideCursor();
     const auto image = m_document->image();
     m_renderer->setSource(image);
-    m_panel->setEnabled(true);
+    m_panel->setControlsEnabled(true);
     m_fileLabel->setText(tr("%1 — %2 × %3")
                              .arg(QDir::toNativeSeparators(m_document->path()))
                              .arg(image->width)

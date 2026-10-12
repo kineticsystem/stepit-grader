@@ -43,6 +43,12 @@ public:
 
     ParameterSlider *slider(const std::string &id) const;
 
+    /**
+     * Enables or disables the sliders only: the sections still fold and the panel still scrolls.
+     * Disabling the whole panel would disable its titles and its scroll bar too.
+     */
+    void setControlsEnabled(bool enabled);
+
     QStringList sectionTitles() const;
     bool isSectionExpanded(const QString &title) const;
     /// Opens or closes the section, without emitting sectionExpandedChanged().

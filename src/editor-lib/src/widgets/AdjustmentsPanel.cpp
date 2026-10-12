@@ -104,3 +104,10 @@ void AdjustmentsPanel::addSectionHeaderWidget(const QString &title, QWidget *wid
         it->second->addHeaderWidget(widget);
     }
 }
+
+void AdjustmentsPanel::setControlsEnabled(bool enabled)
+{
+    for (const auto &[id, slider] : m_sliders) {
+        slider->setEnabled(enabled);
+    }
+}
