@@ -38,7 +38,7 @@ With StepIt Grader we can:
 
 How it is built is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-![The editor with a raw file open](docs/img/main.png)
+![StepIt Grader in its dark theme: a macro of a wasp in the middle, the tools on the right, the Tone section open](docs/img/screenshot.png)
 
 ## Prerequisites
 
