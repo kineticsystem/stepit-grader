@@ -267,11 +267,12 @@ Each widget is reusable: it is given what it shows, knows nothing of who uses it
 
 ### The Document
 
-[`Document`](../src/editor-lib/include/editor/Document.h) is the picture being edited: its path, its pixels, the settings saved and the settings current. It is given its `ImageReader`, its `SettingsStore` and the parameters, so the tests give it fakes.
+[`Document`](../src/editor-lib/include/editor/Document.h) is the picture being edited: its path, its pixels, and three sets of settings: those it was opened with, those its sidecar holds, and the current ones. It is given its `ImageReader`, its `SettingsStore`, the parameters and the delay before it saves, 1 second by default, so the tests give it fakes and 200 ms.
 
-- `open()` reads the image and its sidecar on a worker thread, and ends with `opened()` then `settingsChanged()`, or `openFailed()` with the reader's message.
-- `setSettings()`, `resetSettings()` and `revertSettings()` emit `settingsChanged()` only when a value changes, and `modifiedChanged()` when the settings start or stop differing from those saved.
-- `save()` writes through the store and emits `saved()` or `saveFailed()`.
+- `open()` first saves what waits to be saved, then reads the image and its sidecar on a worker thread, and ends with `opened()` then `settingsChanged()`, or `openFailed()` with the reader's message. The sliders stay live while it reads, so `finishOpening()` saves once more before it takes the new picture: a change made meanwhile belongs to the old one.
+- `setSettings()`, `resetSettings()` and `revertSettings()` emit `settingsChanged()` only when a value changes, and `modifiedChanged()` when the settings start or stop differing from what the sidecar holds, or from the defaults without a sidecar. `revertSettings()` goes back to the settings the picture was opened with.
+- Each change that leaves the settings different from the sidecar restarts a single-shot `QTimer`; when it fires, `save()` runs. A slider dragged restarts it at every step, so the file is written once, a second after it stops. A change back to what the sidecar holds stops the timer: nothing is written, and a picture opened and closed without a change gets no sidecar.
+- `save()` writes through the store, if the settings differ from the sidecar, and emits `saved()` or `saveFailed()`. It returns false only when the store failed. After a failure the settings stay modified and the timer is not restarted: the next change tries again, rather than a loop writing to a full disk every second.
 
 ### The Preview Renderer
 
@@ -291,7 +292,11 @@ A counter, shared with the passes, goes up with every change. A full pass compar
 | `AdjustmentsPanel` | `settingsChanged` | `Document::setSettings` |
 | `Document` | `settingsChanged` | `AdjustmentsPanel::setSettings`, `PreviewRenderer::render` |
 | `Document` | `opened` | `PreviewRenderer::setSource`, the panel enabled |
-| `Document` | `modifiedChanged` | the window's `*` |
+| `Document` | `modifiedChanged` | the window's `*`: settings not written yet, waiting or after a failure |
+| `Document` | `saved` | the status bar, for 3 seconds |
+| `Document` | `saveFailed` | the status bar, for 15 seconds, without a dialog |
+| **File > Save Settings**, `Ctrl+S` | `triggered` | `Document::save`, at once |
+| **Edit > Revert to Opened** | `triggered` | `Document::revertSettings` |
 | `PreviewRenderer` | `rendered` | `ImageView::setImage` |
 | `ImageView` | `fileDropped` | `MainWindow::openFile` |
 | `RecentFilesMenu`, **File > Open Recent** | `fileSelected` | `MainWindow::openFile`, which removes a file that no longer exists |
@@ -301,7 +306,7 @@ A counter, shared with the passes, goes up with every change. A full pass compar
 | `ImageView` | `pointPicked` | `pickWhiteBalance()`, then `Document::setSettings`; the action unchecked: one pick, then back to dragging |
 | `ImageView` | `pickCancelled` | the action unchecked |
 
-Before another picture is opened, or the window closed, `maybeSave()` asks to save settings that changed.
+Before another picture is opened, or the window closed, `settingsSaved()` calls `Document::save()` so nothing waits. It asks only when that save fails, whether to go on without the edit: there, and only there, the edit would be lost.
 
 [`main()`](../src/editor-app/src/main.cpp) is the composition root: it makes the standard pipeline, the standard reader, the XMP sidecar, the document, the renderer and the window, and gives each its parts.
 
@@ -396,17 +401,17 @@ All the tests are in one program, [`src/tests`](../src/tests), with GoogleTest a
 |---|---|---|
 | [`core`](../src/tests/core) | 32 | Every effect at its defaults changes nothing; parameter ids unique, defaults in range; each effect moves the picture the right way, e.g. the highlights change the bright side of a step and leave the dark one; the defringe greys a purple fringe beside an edge, keeps a purple patch away from edges and a green fringe, and finds the same fringe in a preview a third of the size; a warm and a cool grey turned neutral by the white balance found for them, a grey needing none, black giving none, a cast beyond the sliders clamped; the HDR curve untouched below its knee, smooth at it, rising to white, the highlights brought below white with their hue, and local contrast keeping the texture of bright areas; the area sampling's disc and clipped pixels; the box blur, the guided filter's edge without overshoot; Oklab round trip; D65 adapted to D65; middle grey as sRGB 118; downscale and orientation; a cancelled render. |
 | [`io`](../src/tests/io) | 18 | A 16-bit linear Rec. 2020 TIFF read unchanged; an untagged 8-bit TIFF taken for sRGB; orientation; a broken file reported; readers chosen by extension; a Canon CR2 and a DNG, when the samples are there; the sidecar's formatting, a Lightroom sidecar read, elements with another prefix, an update that keeps everything else, a round trip on disk, a sidecar that is not XML; the TIFF writer in each of the four colour spaces read back through its embedded profile, white clipped, a file replaced whole without a temporary file left, a folder that does not exist; the colour spaces' names. |
-| [`editor`](../src/tests/editor) | 22 | The slider emits the user's changes only, and resets on a double click; a section folds on a click on its title, and reports the user's clicks only; the panel's sections fold and report it, and still fold and scroll with the sliders disabled; the recent files menu keeps the latest first, without duplicates and up to its maximum, shows numbered names with the paths as tooltips, reports the file chosen with its path, removes and clears; the eyedropper is built in and painted in the theme's colour, dark and light; the view in pick mode reports the click in pixels of the full image and leaves pick mode with `Esc`; the picker sets the white balance of a warm card and keeps the other values, and explains a clipped or black area; the sections follow the pipeline; the panel emits every value; the view fits, zooms, and keeps the zoom when the full picture replaces the preview; the document, with a fake reader and store, opens with the saved settings, reports what it cannot read, tracks changes, saves, reverts and reports a failed save; the renderer sends a preview then the full picture, and only one full pass for many quick changes. |
+| [`editor`](../src/tests/editor) | 29 | The slider emits the user's changes only, and resets on a double click; a section folds on a click on its title, and reports the user's clicks only; the panel's sections fold and report it, and still fold and scroll with the sliders disabled; the recent files menu keeps the latest first, without duplicates and up to its maximum, shows numbered names with the paths as tooltips, reports the file chosen with its path, removes and clears; the eyedropper is built in and painted in the theme's colour, dark and light; the view in pick mode reports the click in pixels of the full image and leaves pick mode with `Esc`; the picker sets the white balance of a warm card and keeps the other values, and explains a clipped or black area; the sections follow the pipeline; the panel emits every value; the view fits, zooms, and keeps the zoom when the full picture replaces the preview; the document, with a fake reader and store, opens with the saved settings, reports what it cannot read, tracks the changes not written yet; saves a change after the delay and not before, many quick changes once, nothing without a change, at once on request and before another picture opens; reverts to the settings it was opened with and saves that; reports a failed save and tries again at the next change; the renderer sends a preview then the full picture, and only one full pass for many quick changes. |
 | [`cli`](../src/tests/cli) | 7 | Every option read, the defaults, what is wrong reported with a message, `--` before a name with a dash; the grader, with a fake reader and store, applies the settings given to every picture, or each picture's own sidecar, or none; never writes over the picture, nor over a TIFF without `--overwrite`; reports a picture that fails and grades the others, and refuses a second picture of the same name. |
 
-The 82 tests take about 6 seconds, most of it reading the two raw samples, which [`fetch-samples.sh`](https://github.com/kineticsystem/raw-converter/blob/main/bin/fetch-samples.sh) of raw-converter downloads; without them, those two are skipped.
+The 89 tests take about 10 seconds, most of it reading the two raw samples and waiting for the document's saves, which [`fetch-samples.sh`](https://github.com/kineticsystem/raw-converter/blob/main/bin/fetch-samples.sh) of raw-converter downloads; without them, those two are skipped.
 
 What has no automated test, and how to check it by hand:
 
 | Part | How to check it |
 |---|---|
 | The look of the effects | Open a raw file, move each slider to both ends, and look for halos along strong edges, banding in skies, and colour shifts in greys. |
-| The menus and the dialogs | Open, change, close: the window asks to save; drop a JPEG: it says it cannot open it. |
+| The menus and the dialogs | Open, change, wait a second: the sidecar is there and the `*` gone; change and close at once: the sidecar has the change; make the folder read-only and change: the status bar says it cannot save and the `*` stays, and closing asks whether to leave the edit unsaved; drop a JPEG: it says it cannot open it. |
 | Lightroom reading the sidecar | Save the settings of a CR2, then in Lightroom Classic, **Metadata > Read Metadata from File**. |
 
 ## How to Extend StepIt Grader
@@ -420,6 +425,7 @@ What has no automated test, and how to check it by hand:
 | Write another format, e.g. PNG | A writer beside `TiffWriter` in `io-lib`, and an option in `parseOptions()` to choose it. |
 | Add an output colour space, e.g. Display P3 | A value of `ColourSpace`, its name in `ColourProfiles.cpp`, and its profile in `profiles::of()`. |
 | Change the preview's size or delay | The arguments of `PreviewRenderer` in `main()`. |
+| Change the delay before a save | The `saveDelay` argument of `Document` in `main()`. |
 
 ## Design Decisions and Trade-offs
 
@@ -450,5 +456,7 @@ What has no automated test, and how to check it by hand:
 **A command line of its own, not the editor's window with options.** A program with a window is a GUI program on Windows: it cannot print to the console it was started from. A console program without Qt also runs on a server or in a container without a screen. The price: two programs to build and ship, sharing everything but `main()`.
 
 **sRGB by default, wide gamut on request.** sRGB is what every viewer assumes, so a TIFF in it looks right everywhere. Prints reach colours sRGB clips: Adobe RGB and ProPhoto RGB keep them, and their profile says so to any program that reads the file. The price: a ProPhoto TIFF looks dull in a program that ignores the profile.
+
+**Saved by itself, a second after the last change.** An edit is a few values, and the sidecar a few kB: writing it costs nothing, while an edit lost to a forgotten save, or to a "Save the settings?" answered wrong, costs the work. So the document saves without asking, and a picture always reopens as it was left. The delay lets a slider dragged write once, when it stops, not at each of its steps. The window's `*` keeps its usual meaning, "not written yet", which with auto-save is the second after a change, and after a failure, the one sign that stays once the status bar's message is gone. The price: there is no "close without saving"; trying a change is keeping it, and **Edit > Revert to Opened** is the way back to the picture as it was opened. An edit made in another program on the same sidecar while the picture is open is overwritten at the next change.
 
 **No undo yet.** Revert and Reset cover the common cases: the settings are values, and an undo would be a list of `Settings`, in the `Document`.

@@ -11,6 +11,7 @@
 #include "imageio/ImageReader.h"
 #include "imageio/SettingsStore.h"
 
+#include <map>
 #include <mutex>
 
 namespace testutils {
@@ -29,7 +30,10 @@ public:
     }
 };
 
-/// Keeps the settings in memory.
+/**
+ * Keeps the settings in memory, per picture in `files`, which saving fills; a picture without its
+ * own has `stored`, the settings of every picture.
+ */
 class FakeStore : public imageio::SettingsStore
 {
 public:
@@ -38,26 +42,28 @@ public:
         return std::filesystem::path{image}.replace_extension(".xmp");
     }
     std::optional<core::Settings> load(
-        const std::filesystem::path &, const std::vector<core::Parameter> &) const override
+        const std::filesystem::path &image, const std::vector<core::Parameter> &) const override
     {
         const std::lock_guard lock{mutex};
-        return stored;
+        const auto file = files.find(image);
+        return file != files.end() ? std::optional{file->second} : stored;
     }
     void save(
-        const std::filesystem::path &,
+        const std::filesystem::path &image,
         const core::Settings &settings,
         const std::vector<core::Parameter> &) const override
     {
+        const std::lock_guard lock{mutex};
         if (failSaving) {
             throw imageio::Error{"disk full"};
         }
-        const std::lock_guard lock{mutex};
-        stored = settings;
+        files[image] = settings;
         ++saves;
     }
 
     mutable std::mutex mutex;
     mutable std::optional<core::Settings> stored;
+    mutable std::map<std::filesystem::path, core::Settings> files;
     mutable int saves = 0;
     bool failSaving = false;
 };

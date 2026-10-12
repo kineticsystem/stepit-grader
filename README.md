@@ -32,7 +32,7 @@ With StepIt Grader we can:
 - open a TIFF, 8 or 16 bits or float, with its ICC profile, a DNG, or a camera raw file, e.g. a Canon CR2;
 - set the white balance, by hand or by picking an area that should be white or grey, remove purple fringing, set the exposure, the contrast, the highlights, the shadows, the blacks, the detail, the structure, the vibrance, the saturation, an HDR compression of the highlights and the sharpness, and see the result as the slider moves;
 - zoom from the whole picture to 800%, and drag it around;
-- save the settings in an XMP sidecar that Lightroom and Camera Raw can read, and open them again with the picture;
+- save the settings by itself in an XMP sidecar that Lightroom and Camera Raw can read, and open them again with the picture;
 - grade any number of pictures from the command line with those settings, into 16-bit TIFFs in sRGB, Adobe RGB, ProPhoto RGB or linear Rec. 2020.
 
 How it is built is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -146,14 +146,18 @@ Zoom with the wheel, around the cursor, or with the **View** menu; drag the pict
 
 ### Save the Settings
 
-**File > Save Settings** writes the settings next to the picture, e.g. `IMG_0001.xmp` for `IMG_0001.CR2`. The window's title shows `*` while they differ from those saved, and closing the window or opening another picture asks whether to save them. **Edit > Revert to Saved** goes back to them, **Edit > Reset All** to a picture with no edit.
+The editor saves the settings by itself, next to the picture, e.g. `IMG_0001.xmp` for `IMG_0001.CR2`: 1 second after the last change, so a slider dragged writes the file once, when it stops. Opening another picture or closing the window saves at once what is still waiting, without asking. A picture opened and closed without a change gets no sidecar. When we open the picture again, it opens with its sidecar's settings, ready for another change.
+
+The window's title shows `*` while the settings are not written yet: for the second after a change, or until the next change after a save that failed. A failed save is shown in the status bar and tried again at the next change; only when the edit would be lost, on closing the window or opening another picture, does the editor ask whether to go on without it. **File > Save Settings** saves at once.
+
+**Edit > Revert to Opened** goes back to the settings the picture had when it was opened, from its sidecar or none, and **Edit > Reset All** to a picture with no edit. Both are changes like any other, saved in turn.
 
 ### Keyboard Shortcuts
 
 | Keys | What they do |
 |---|---|
 | `Ctrl+O` | Open a picture. |
-| `Ctrl+S` | Save the settings. |
+| `Ctrl+S` | Save the settings now, rather than 1 second after the last change. |
 | `Ctrl+Shift+R` | Reset all the sliders. |
 | `W` | Pick the white balance from an area; `Esc` cancels. |
 | `Ctrl++`, `Ctrl+-` | Zoom in, zoom out. |

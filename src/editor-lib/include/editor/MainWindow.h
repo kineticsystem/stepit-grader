@@ -30,7 +30,7 @@ public:
         QWidget *parent = nullptr);
 
 public Q_SLOTS:
-    /// Opens the file, after asking to save the settings of the picture open, if changed.
+    /// Opens the file, after saving the settings of the picture open that wait to be.
     void openFile(const QString &path);
 
 protected:
@@ -39,8 +39,11 @@ protected:
 private:
     void createActions();
     void chooseFile();
-    /// Whether the user saved the changes or let them go; false when cancelled.
-    bool maybeSave();
+    /**
+     * Saves the settings that wait to be; when that fails, asks whether to go on without them.
+     * Returns false when the user stays.
+     */
+    bool settingsSaved();
     void onOpened();
     void updateTitle();
     void updateZoom(double zoom);

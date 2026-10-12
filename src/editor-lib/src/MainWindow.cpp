@@ -30,6 +30,10 @@ constexpr const char *RECENT_FILES_KEY = "recentPictures";
 /// The pictures listed in File > Open Recent.
 constexpr int RECENT_FILES = 10;
 constexpr int PANEL_WIDTH = 300;
+/// How long the status bar shows that the settings were saved, which happens after every edit.
+constexpr int SAVED_MESSAGE_MS = 3000;
+/// How long it shows a failed save; the title's * stays until a save succeeds.
+constexpr int SAVE_FAILED_MESSAGE_MS = 15000;
 
 } // namespace
 
@@ -82,10 +86,14 @@ MainWindow::MainWindow(
     });
     connect(m_document, &Document::modifiedChanged, this, &MainWindow::setWindowModified);
     connect(m_document, &Document::saved, this, [this](const QString &path) {
-        statusBar()->showMessage(tr("Saved %1").arg(QDir::toNativeSeparators(path)), 5000);
+        statusBar()
+            ->showMessage(tr("Saved %1").arg(QDir::toNativeSeparators(path)), SAVED_MESSAGE_MS);
     });
+    // The document saves by itself and tries again at the next change: a dialog for each failure
+    // would interrupt every slider move.
     connect(m_document, &Document::saveFailed, this, [this](const QString &message) {
-        QMessageBox::warning(this, tr("Cannot Save"), message);
+        statusBar()
+            ->showMessage(tr("Cannot save the settings: %1").arg(message), SAVE_FAILED_MESSAGE_MS);
     });
     connect(
         m_renderer,
@@ -131,7 +139,7 @@ void MainWindow::createActions()
     file->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
 
     QMenu *edit = menuBar()->addMenu(tr("&Edit"));
-    QAction *revert = edit->addAction(tr("&Revert to Saved"), m_document, &Document::revertSettings);
+    QAction *revert = edit->addAction(tr("&Revert to Opened"), m_document, &Document::revertSettings);
     QAction *reset = edit->addAction(
         tr("Reset &All"), QKeySequence{tr("Ctrl+Shift+R")}, m_document, &Document::resetSettings);
     edit->addSeparator();
@@ -181,7 +189,7 @@ void MainWindow::openFile(const QString &path)
             tr("%1 is not a TIFF, DNG or camera raw file.").arg(QFileInfo{path}.fileName()));
         return;
     }
-    if (m_document->isOpening() || !maybeSave()) {
+    if (m_document->isOpening() || !settingsSaved()) {
         return;
     }
     QApplication::setOverrideCursor(Qt::WaitCursor);
@@ -204,25 +212,25 @@ void MainWindow::onOpened()
     // The settings are rendered once the document announces them, right after.
 }
 
-bool MainWindow::maybeSave()
+bool MainWindow::settingsSaved()
 {
-    if (!m_document->isModified()) {
+    if (m_document->save()) {
         return true;
     }
-    const auto answer = QMessageBox::question(
+    // Only here would the edit be lost, so only here does a failure ask.
+    const auto answer = QMessageBox::warning(
         this,
-        tr("Save Settings"),
-        tr("Save the settings of %1?").arg(QFileInfo{m_document->path()}.fileName()),
-        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-    if (answer == QMessageBox::Save) {
-        return m_document->save();
-    }
+        tr("Cannot Save"),
+        tr("The settings of %1 cannot be saved. Leave them unsaved?")
+            .arg(QFileInfo{m_document->path()}.fileName()),
+        QMessageBox::Discard | QMessageBox::Cancel,
+        QMessageBox::Cancel);
     return answer == QMessageBox::Discard;
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    if (maybeSave()) {
+    if (settingsSaved()) {
         event->accept();
     } else {
         event->ignore();

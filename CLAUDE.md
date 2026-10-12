@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-StepIt Grader is a C++23/Qt 6 desktop application that edits the tones and colours of one picture (TIFF, DNG, camera raw) with Lightroom-like sliders, an eyedropper for the white balance and an HDR compression, live, and saves the edit as a Lightroom-compatible XMP sidecar. It must build on Linux, macOS and Windows (MSYS2). How it is built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); keep it true with the `architect` skill, and review the design with the `reviewer` skill, both in `.claude/skills/`.
+StepIt Grader is a C++23/Qt 6 desktop application that edits the tones and colours of one picture (TIFF, DNG, camera raw) with Lightroom-like sliders, an eyedropper for the white balance and an HDR compression, live, and saves the edit by itself, a second after the last change, as a Lightroom-compatible XMP sidecar. It must build on Linux, macOS and Windows (MSYS2). How it is built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); keep it true with the `architect` skill, and review the design with the `reviewer` skill, both in `.claude/skills/`.
 
 ## Build Commands
 
@@ -22,7 +22,7 @@ libtiff, pugixml and GoogleTest come from Lentigram's `lib/` (`-DLENTIGRAM_LIB`,
 
 - `src/core-lib` (namespace `core`): the engine. Standard C++ only, no Qt, no files. `Image` is linear Rec. 2020 float. Each effect is one header in `include/core/effects` and one source in `src/effects`, implementing `Effect`; `makeStandardPipeline()` is the only place that lists them.
 - `src/io-lib` (namespace `imageio`): `ImageReader` (TIFF with ICC via libtiff and Little CMS, raw and DNG via the raw-converter submodule) and `SettingsStore` (`XmpSidecar`, pugixml). No Qt.
-- `src/editor-lib`: Qt. Reusable widgets in `widgets/` (`ImageView`, `ParameterSlider`, `CollapsibleSection`, `AdjustmentsPanel`) that know nothing of their clients and report with signals; `Document`; `PreviewRenderer`; `MainWindow`, which only connects the parts.
+- `src/editor-lib`: Qt. Reusable widgets in `widgets/` (`ImageView`, `ParameterSlider`, `CollapsibleSection`, `AdjustmentsPanel`) that know nothing of their clients and report with signals; `Document`, which also saves the settings by itself after a delay it is given; `PreviewRenderer`; `MainWindow`, which only connects the parts.
 - `src/editor-app`: `main()`, the composition root.
 - `src/cli-lib` (namespace `cli`): `parseOptions()` and `Grader`, which grades pictures with saved settings into 16-bit TIFFs (`imageio::TiffWriter`). No Qt.
 - `src/cli-app`: `stepit-grader-cli`'s `main()`.

@@ -10,7 +10,9 @@
 #include <QFutureWatcher>
 #include <QObject>
 #include <QString>
+#include <QTimer>
 
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -21,9 +23,12 @@ class SettingsStore;
 } // namespace imageio
 
 /**
- * The picture being edited: its file, its pixels, and its settings, the saved ones and the
- * current ones. It reads and saves through the reader and the store it is given, so tests give it
- * fakes, and it knows nothing of the window.
+ * The picture being edited: its file, its pixels, and its settings: those it was opened with, those
+ * its sidecar holds, and the current ones. It reads and saves through the reader and the store it is
+ * given, so tests give it fakes, and it knows nothing of the window.
+ *
+ * It saves by itself: `saveDelay` after the last change of the settings, so a slider dragged writes
+ * the sidecar once, when it stops. A save that fails is reported, and tried again at the next change.
  */
 class Document : public QObject
 {
@@ -34,9 +39,13 @@ public:
         std::shared_ptr<const imageio::ImageReader> reader,
         std::shared_ptr<const imageio::SettingsStore> store,
         std::vector<core::Parameter> parameters,
+        std::chrono::milliseconds saveDelay = std::chrono::seconds{1},
         QObject *parent = nullptr);
 
-    /// Reads the image and its settings in the background; ends with opened() or openFailed().
+    /**
+     * Saves the settings of the picture open, if they wait to be, then reads the image and its
+     * settings in the background; ends with opened() or openFailed().
+     */
     void open(const QString &path);
 
     bool isOpen() const { return m_image != nullptr; }
@@ -46,7 +55,10 @@ public:
     std::shared_ptr<const core::Image> image() const { return m_image; }
 
     const core::Settings &settings() const { return m_settings; }
-    /// Whether the settings differ from those saved, or, with none saved, from the defaults.
+    /**
+     * Whether the settings are not written yet: they differ from those the sidecar holds, or, with
+     * no sidecar, from the defaults. True while a save waits, and after one failed.
+     */
     bool isModified() const;
 
     /// The file names it reads, for an open dialog, e.g. "*.tif *.dng".
@@ -57,9 +69,12 @@ public Q_SLOTS:
     void setSettings(const core::Settings &settings);
     /// Every parameter back to its default.
     void resetSettings();
-    /// The settings back to those saved.
+    /// The settings back to those the picture had when it was opened: its sidecar's, or none.
     void revertSettings();
-    /// Saves the settings; ends with saved() or saveFailed(). Returns whether they were saved.
+    /**
+     * Saves the settings now, if they are not written yet; ends with saved() or saveFailed().
+     * Returns false only when they could not be written.
+     */
     bool save();
 
 Q_SIGNALS:
@@ -91,6 +106,10 @@ private:
     QString m_path;
     std::shared_ptr<const core::Image> m_image;
     core::Settings m_settings;
+    /// What the sidecar holds, or the defaults without one: a save writes only what differs.
     core::Settings m_saved;
+    /// The settings the picture was opened with, for revertSettings().
+    core::Settings m_opened;
     bool m_modified = false;
+    QTimer m_saveTimer;
 };
