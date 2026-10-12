@@ -15,7 +15,7 @@ namespace core {
  * the brightness of whole areas, measured with an edge-preserving filter, and keeps the texture
  * within them, e.g. the clouds of a bright sky.
  *
- * Lightroom has no such setting: the ids are the editor's own.
+ * The ids are the editor's own: other raw editors have no such setting.
  */
 class ToneCompressionEffect : public Effect
 {

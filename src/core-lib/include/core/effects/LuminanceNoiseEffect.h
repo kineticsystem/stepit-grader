@@ -11,7 +11,7 @@ namespace core {
  * Smooths the grain of the luminance, as a high ISO makes, and keeps the edges: an
  * edge-preserving filter on the square root of the luminance, where the sensor's noise is about
  * the same in the shadows and the highlights, so one setting cleans both. The detail puts back
- * part of what the smoothing took. What Lightroom calls Luminance and Detail, with its names.
+ * part of what the smoothing took.
  */
 class LuminanceNoiseEffect : public Effect
 {

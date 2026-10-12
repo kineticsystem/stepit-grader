@@ -10,9 +10,9 @@
 namespace imageio {
 
 /**
- * The settings in an XMP sidecar, as Lightroom and Camera Raw write them: next to the image, with
+ * The settings in an XMP sidecar, as most raw editors write them: next to the image, with
  * its name and the extension .xmp, e.g. IMG_0001.xmp for IMG_0001.CR2, and each parameter as the
- * attribute of the Camera Raw namespace named by its id, e.g. crs:Exposure2012="+0.50".
+ * attribute of the `crs` namespace named by its id, e.g. crs:Exposure2012="+0.50".
  *
  * Saving keeps everything else the file holds, e.g. a rating or keywords written by another
  * program, and replaces only the values of the parameters.
@@ -42,7 +42,7 @@ public:
 
 namespace xmp {
 
-/// The namespace of the Camera Raw settings.
+/// The namespace of the settings, `crs`, the one most raw editors use.
 inline constexpr const char *CRS_NAMESPACE = "http://ns.adobe.com/camera-raw-settings/1.0/";
 
 /// The settings found in an XMP document; those it does not have are left out.
@@ -57,7 +57,7 @@ std::string write(
     const core::Settings &settings,
     const std::vector<core::Parameter> &parameters);
 
-/// A value as Lightroom writes it: "+0.50", "-12", "0", "40".
+/// A value as raw editors write it: "+0.50", "-12", "0", "40".
 std::string format(const core::Parameter &parameter, double value);
 
 } // namespace xmp

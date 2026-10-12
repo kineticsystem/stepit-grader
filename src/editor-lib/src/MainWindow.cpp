@@ -183,7 +183,6 @@ void MainWindow::createActions()
     connect(m_pickWhite, &QAction::toggled, m_view, &ImageView::setPickMode);
 
     QMenu *view = menuBar()->addMenu(tr("&View"));
-    // Lightroom's key for it.
     m_showBefore = view->addAction(tr("&Before and After"));
     setThemedIcon(m_showBefore, "image-v-split");
     m_showBefore->setShortcut(QKeySequence{Qt::Key_Backslash});

@@ -26,14 +26,14 @@
 
 ## Introduction
 
-StepIt Grader is a desktop application, in C++ and Qt 6, for the tones and colours of a picture: the few sliders of a Lightroom-like Basic panel, applied to the whole picture, live. It saves the edit, never the pixels: a sidecar of values next to the picture, as Lightroom does, which a command line tool can later apply, unchanged, to many pictures.
+StepIt Grader is a desktop application, in C++ and Qt 6, for the tones and colours of a picture: the few sliders a photographer uses most, applied to the whole picture, live. It saves the edit, never the pixels: a sidecar of values next to the picture, which a command line tool can later apply, unchanged, to many pictures.
 
 With StepIt Grader we can:
 
 - open a TIFF, 8 or 16 bits or float, with its ICC profile, a DNG, or a camera raw file, e.g. a Canon CR2;
 - set the white balance, by hand or by picking an area that should be white or grey, reduce the luminance and the colour noise of a high ISO, remove purple fringing, set the exposure, the contrast, the highlights, the shadows, the blacks, the detail, the structure, the vibrance, the saturation, an HDR compression of the highlights and the sharpness, and see the result as the slider moves;
 - zoom from the whole picture to 800%, and drag it around;
-- save the settings by itself in an XMP sidecar that Lightroom and Camera Raw can read, and open them again with the picture;
+- save the settings by itself in an XMP sidecar next to the picture, and open them again with it;
 - grade any number of pictures from the command line with those settings, into 16-bit TIFFs in sRGB, Adobe RGB, ProPhoto RGB or linear Rec. 2020.
 
 How it is built is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -155,7 +155,7 @@ The editor saves the settings by itself, next to the picture, e.g. `IMG_0001.xmp
 
 The window's title shows `*` while the settings are not written yet: for the second after a change, or until the next change after a save that failed. A failed save is shown in the status bar and tried again at the next change; only when the edit would be lost, on closing the window or opening another picture, does the editor ask whether to go on without it. **File > Save Settings** saves at once.
 
-**File > Load Settings…**, `Ctrl+L`, applies the settings of any sidecar to the picture open: one saved for another picture, a look kept aside, or one Lightroom wrote. Every value comes from the file, those it lacks at their defaults. It is a change like any other: saved next to the picture, and undone with Revert to Opened.
+**File > Load Settings…**, `Ctrl+L`, applies the settings of any sidecar to the picture open: one saved for another picture, a look kept aside, or one another raw editor wrote. Every value comes from the file, those it lacks at their defaults. It is a change like any other: saved next to the picture, and undone with Revert to Opened.
 
 **Edit > Revert to Opened** goes back to the settings the picture had when it was opened, from its sidecar or none, and **Edit > Reset All** to a picture with no edit. Both are changes like any other, saved in turn.
 
@@ -193,7 +193,7 @@ Without `--settings`, each picture is graded with its own sidecar, or with no ed
 
 | Option | Default | What it does |
 |---|---|---|
-| `-s`, `--settings <file.xmp>` | each picture's own sidecar | The settings for every picture: any sidecar the editor or Lightroom saved. |
+| `-s`, `--settings <file.xmp>` | each picture's own sidecar | The settings for every picture: any sidecar the editor saved. |
 | `-o`, `--output <folder>` | required | Where the TIFFs go, made if missing: `<folder>/<picture's name>.tif`. |
 | `-c`, `--colour-space <name>` | `srgb` | The TIFFs' colour space, with its ICC profile embedded: `srgb`, `adobe-rgb`, `prophoto` or `rec2020-linear`. sRGB is what every screen assumes; Adobe RGB and ProPhoto RGB keep the saturated colours sRGB clips, for prints; linear Rec. 2020 is the editor's own working space, for more processing. |
 | `--compress` | off | Deflate, lossless: about half the size. |
@@ -240,7 +240,7 @@ The picture is edited in linear Rec. 2020 with 32-bit floats: no colour is clipp
 
 ## The Sidecar
 
-The settings are saved as Lightroom saves them: an XMP file with the picture's name, each value an attribute of the Camera Raw namespace, under Lightroom's own name:
+The settings are saved in an XMP file with the picture's name, each value an attribute of the `crs` namespace, the one most raw editors keep their settings in, under the name they give it:
 
 ```xml
 <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="stepit-grader">
@@ -256,12 +256,11 @@ The settings are saved as Lightroom saves them: an XMP file with the picture's n
 
 What that means in practice:
 
-- **The editor reads Lightroom's sidecars**: the values of its tools, whether written as attributes or as elements. Lightroom's other settings, e.g. its tone curve or its lens corrections, are ignored.
+- **The editor reads the sidecars of other raw editors** that use the same namespace: the values of its tools, whether written as attributes or as elements. Their other settings, e.g. a tone curve or lens corrections, are ignored.
 - **Saving keeps the rest of the file**, e.g. a rating or keywords: only the values of the tools are replaced.
-- **Lightroom reads the editor's sidecar of a raw file**, e.g. a CR2, with **Metadata > Read Metadata from File**. For a DNG or a TIFF, Lightroom reads the settings stored inside the file, which the editor does not write.
-- **The same numbers do not give the same picture.** The names and the ranges are Lightroom's, but Adobe's processing is its own: `Shadows2012="+45"` lifts the shadows in both, by different amounts.
-- **The HDR sliders are the editor's own**, `HDRToneCompression`, `HDRCompressionPoint` and `HDRLocalContrast`: Lightroom has no such setting, and ignores them.
-- **The temperature and the tint are relative**, `IncrementalTemperature` and `IncrementalTint`, as Lightroom writes them for a TIFF. For a raw file, Lightroom uses an absolute temperature in kelvin instead, and ignores these two.
+- **The same numbers do not give the same picture** in another editor: the names and the ranges are shared, the processing is each editor's own.
+- **The HDR sliders are the editor's own**, `HDRToneCompression`, `HDRCompressionPoint` and `HDRLocalContrast`: other editors ignore them.
+- **The temperature and the tint are relative**, `IncrementalTemperature` and `IncrementalTint`, the same for a raw file as for a TIFF.
 
 ## Tests
 

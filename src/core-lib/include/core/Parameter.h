@@ -9,7 +9,7 @@ namespace core {
 
 /**
  * One value the user sets, e.g. the exposure: what it is called, its range and its default. The
- * id is the name Lightroom gives the setting in an XMP file, e.g. "Exposure2012", so that the
+ * id is the setting's name in the XMP sidecar's namespace, e.g. "Exposure2012", so that the
  * sidecar needs no table of its own.
  */
 struct Parameter
