@@ -5,10 +5,10 @@
 #include "editor/Document.h"
 #include "editor/Icons.h"
 #include "editor/PreviewRenderer.h"
+#include "editor/RecentFilesMenu.h"
 #include "editor/Theme.h"
 #include "editor/WhiteBalancePicker.h"
 #include "widgets/ImageView.h"
-#include "widgets/RecentFilesMenu.h"
 
 #include <QActionGroup>
 #include <QApplication>
