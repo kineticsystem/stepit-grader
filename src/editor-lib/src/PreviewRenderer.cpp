@@ -1,0 +1,135 @@
+// Copyright (c) 2026 Giovanni Remigi
+// SPDX-License-Identifier: MIT
+
+#include "editor/PreviewRenderer.h"
+#include "editor/ImageConversion.h"
+
+#include "core/Geometry.h"
+
+#include <QPointer>
+#include <QtConcurrent>
+
+PreviewRenderer::PreviewRenderer(
+    std::shared_ptr<const core::Pipeline> pipeline,
+    int previewSide,
+    std::chrono::milliseconds fullDelay,
+    QObject *parent)
+    : QObject{parent}
+    , m_pipeline{std::move(pipeline)}
+    , m_previewSide{previewSide}
+{
+    m_fullTimer.setSingleShot(true);
+    m_fullTimer.setInterval(fullDelay);
+    connect(&m_fullTimer, &QTimer::timeout, this, &PreviewRenderer::startFull);
+}
+
+PreviewRenderer::~PreviewRenderer()
+{
+    ++*m_generation;
+    m_previewJob.waitForFinished();
+    for (QFuture<void> &job : m_fullJobs) {
+        job.waitForFinished();
+    }
+}
+
+void PreviewRenderer::setSource(std::shared_ptr<const core::Image> image)
+{
+    ++*m_generation;
+    m_fullTimer.stop();
+    m_full = std::move(image);
+    if (m_full) {
+        auto preview = std::make_shared<core::Image>(
+            core::geometry::downscale(*m_full, m_previewSide));
+        m_previewScale = static_cast<double>(preview->width) / m_full->width;
+        m_preview = std::move(preview);
+    } else {
+        m_preview.reset();
+    }
+}
+
+void PreviewRenderer::render(const core::Settings &settings)
+{
+    if (!m_full) {
+        return;
+    }
+    m_settings = settings;
+    ++*m_generation;
+    m_fullTimer.stop();
+    if (m_previewRunning) {
+        m_previewPending = true;
+    } else {
+        startPreview();
+    }
+}
+
+void PreviewRenderer::startPreview()
+{
+    m_previewRunning = true;
+    m_previewPending = false;
+    const int generation = *m_generation;
+    QPointer<PreviewRenderer> self{this};
+    m_previewJob = QtConcurrent::run([self,
+                                      pipeline = m_pipeline,
+                                      source = m_preview,
+                                      full = m_full,
+                                      settings = m_settings,
+                                      scale = m_previewScale,
+                                      counter = m_generation,
+                                      generation] {
+        const auto image = pipeline->render(*source, settings, core::RenderContext{scale});
+        QImage shown = image ? toQImage(*image) : QImage{};
+        const QSize fullSize{full->width, full->height};
+        QMetaObject::invokeMethod(
+            qApp,
+            [self, shown = std::move(shown), fullSize, counter, generation] {
+                if (!self) {
+                    return;
+                }
+                self->m_previewRunning = false;
+                // A preview of older settings is still shown: better than nothing while
+                // the newer one is made.
+                if (!shown.isNull()) {
+                    Q_EMIT self->rendered(shown, fullSize, false);
+                }
+                if (self->m_previewPending) {
+                    self->startPreview();
+                } else if (*counter == generation) {
+                    self->m_fullTimer.start();
+                }
+            },
+            Qt::QueuedConnection);
+    });
+}
+
+void PreviewRenderer::startFull()
+{
+    if (!m_full) {
+        return;
+    }
+    // A full pass of older settings may still be running: it sees it is stale and stops at its
+    // next effect, without being waited for here.
+    m_fullJobs.removeIf([](const QFuture<void> &job) { return job.isFinished(); });
+    const int generation = *m_generation;
+    QPointer<PreviewRenderer> self{this};
+    m_fullJobs << QtConcurrent::run([self,
+                                     pipeline = m_pipeline,
+                                     source = m_full,
+                                     settings = m_settings,
+                                     counter = m_generation,
+                                     generation] {
+        const auto stale = [counter, generation] { return *counter != generation; };
+        const auto image = pipeline->render(*source, settings, core::RenderContext{1.0}, stale);
+        if (!image || stale()) {
+            return;
+        }
+        QImage shown = toQImage(*image);
+        QMetaObject::invokeMethod(
+            qApp,
+            [self, shown = std::move(shown), counter, generation] {
+                if (self && *counter == generation) {
+                    Q_EMIT self->rendered(shown, shown.size(), true);
+                }
+            },
+            Qt::QueuedConnection);
+    });
+}

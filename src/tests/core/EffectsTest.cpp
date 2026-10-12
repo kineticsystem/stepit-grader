@@ -1,0 +1,407 @@
+// Copyright (c) 2026 Giovanni Remigi
+// SPDX-License-Identifier: MIT
+
+#include "../testutils/TestImages.h"
+
+#include "core/Color.h"
+#include "core/Sampling.h"
+#include "core/StandardPipeline.h"
+#include "core/effects/BlacksEffect.h"
+#include "core/effects/ContrastEffect.h"
+#include "core/effects/DefringeEffect.h"
+#include "core/effects/DetailEffect.h"
+#include "core/effects/ExposureEffect.h"
+#include "core/effects/HighlightsEffect.h"
+#include "core/effects/SaturationEffect.h"
+#include "core/effects/ShadowsEffect.h"
+#include "core/effects/SharpnessEffect.h"
+#include "core/effects/StructureEffect.h"
+#include "core/effects/ToneCompressionEffect.h"
+#include "core/effects/VibranceEffect.h"
+#include "core/effects/WhiteBalanceEffect.h"
+
+#include <gtest/gtest.h>
+
+#include <cmath>
+#include <set>
+
+using namespace core;
+using testutils::mean;
+
+namespace {
+
+Image applied(const Effect &effect, Image image, const std::string &id, double value)
+{
+    Settings settings;
+    settings.setValue(id, value);
+    effect.apply(image, settings, RenderContext{});
+    return image;
+}
+
+Image colourful()
+{
+    Image image{64, 64};
+    for (int y = 0; y < 64; ++y) {
+        for (int x = 0; x < 64; ++x) {
+            float *p = image.pixel(x, y);
+            p[0] = 0.05f + x / 80.0f;
+            p[1] = 0.05f + y / 80.0f;
+            p[2] = 0.05f + (x + y) / 160.0f;
+        }
+    }
+    return image;
+}
+
+} // namespace
+
+// Every effect at its defaults leaves the image as it is: a new sidecar changes nothing.
+TEST(EffectsTest, EveryEffectAtItsDefaultsChangesNothing)
+{
+    const Image original = colourful();
+    const auto pipeline = makeStandardPipeline();
+    for (const auto &effect : pipeline->effects()) {
+        Image image = original;
+        effect->apply(image, Settings{}, RenderContext{});
+        EXPECT_LT(testutils::maxDifference(image, original), 1e-5f) << effect->section();
+        EXPECT_TRUE(effect->isIdentity(Settings{}));
+    }
+}
+
+TEST(EffectsTest, ParametersHaveUniqueIdsAndDefaultsInRange)
+{
+    std::set<std::string> ids;
+    for (const Parameter &parameter : makeStandardPipeline()->parameters()) {
+        EXPECT_TRUE(ids.insert(parameter.id).second) << parameter.id;
+        EXPECT_LE(parameter.minimum, parameter.defaultValue);
+        EXPECT_GE(parameter.maximum, parameter.defaultValue);
+    }
+    EXPECT_EQ(ids.size(), 18u);
+}
+
+TEST(EffectsTest, ExposureOfOneStopDoublesTheLight)
+{
+    const Image image = applied(
+        ExposureEffect{},
+        testutils::uniform(4, 4, 0.1f, 0.2f, 0.3f),
+        ExposureEffect::EXPOSURE.id,
+        1.0);
+    EXPECT_FLOAT_EQ(image.pixel(0, 0)[0], 0.2f);
+    EXPECT_FLOAT_EQ(image.pixel(0, 0)[2], 0.6f);
+}
+
+TEST(EffectsTest, PositiveTemperatureWarmsAndPositiveTintAddsMagenta)
+{
+    const Image grey = testutils::uniform(4, 4, 0.18f, 0.18f, 0.18f);
+    const Image warm = applied(WhiteBalanceEffect{}, grey, WhiteBalanceEffect::TEMPERATURE.id, 50);
+    EXPECT_GT(warm.pixel(0, 0)[0], warm.pixel(0, 0)[2]);
+    const Image cool = applied(WhiteBalanceEffect{}, grey, WhiteBalanceEffect::TEMPERATURE.id, -50);
+    EXPECT_LT(cool.pixel(0, 0)[0], cool.pixel(0, 0)[2]);
+    const Image magenta = applied(WhiteBalanceEffect{}, grey, WhiteBalanceEffect::TINT.id, 50);
+    const float *p = magenta.pixel(0, 0);
+    EXPECT_GT((p[0] + p[2]) / 2, p[1]);
+}
+
+TEST(EffectsTest, ContrastSpreadsTonesAroundMiddleGrey)
+{
+    const Image image = testutils::step(32, 8, 0.05f, 0.6f);
+    const Image more = applied(ContrastEffect{}, image, ContrastEffect::CONTRAST.id, 100);
+    EXPECT_LT(more.pixel(0, 0)[1], 0.05f);
+    EXPECT_GT(more.pixel(31, 0)[1], 0.6f);
+    const Image grey = applied(
+        ContrastEffect{},
+        testutils::uniform(4, 4, 0.18f, 0.18f, 0.18f),
+        ContrastEffect::CONTRAST.id,
+        100);
+    EXPECT_NEAR(grey.pixel(0, 0)[1], 0.18f, 1e-4f);
+}
+
+TEST(EffectsTest, HighlightsChangeTheBrightAreaOnly)
+{
+    const Image image = testutils::step(200, 50, 0.02f, 1.2f);
+    const Image lower = applied(HighlightsEffect{}, image, HighlightsEffect::HIGHLIGHTS.id, -100);
+    EXPECT_LT(mean(lower, 1, 150, 0, 200, 50), 0.8);
+    EXPECT_NEAR(mean(lower, 1, 0, 0, 50, 50), 0.02, 1e-3);
+}
+
+TEST(EffectsTest, ShadowsChangeTheDarkAreaOnly)
+{
+    const Image image = testutils::step(200, 50, 0.01f, 0.5f);
+    const Image lifted = applied(ShadowsEffect{}, image, ShadowsEffect::SHADOWS.id, 100);
+    EXPECT_GT(mean(lifted, 1, 0, 0, 50, 50), 0.025);
+    EXPECT_NEAR(mean(lifted, 1, 150, 0, 200, 50), 0.5, 0.02);
+}
+
+TEST(EffectsTest, BlacksCrushOrLiftTheDarkestTonesOnly)
+{
+    const Image image = testutils::step(32, 8, 0.005f, 0.5f);
+    const Image crushed = applied(BlacksEffect{}, image, BlacksEffect::BLACKS.id, -100);
+    EXPECT_LT(crushed.pixel(0, 0)[1], 0.002f);
+    EXPECT_NEAR(crushed.pixel(31, 0)[1], 0.5f, 0.025f);
+    const Image lifted
+        = applied(BlacksEffect{}, testutils::uniform(4, 4, 0, 0, 0), BlacksEffect::BLACKS.id, 100);
+    EXPECT_GT(lifted.pixel(0, 0)[1], 0.01f);
+    EXPECT_FLOAT_EQ(lifted.pixel(0, 0)[0], lifted.pixel(0, 0)[2]);
+}
+
+TEST(EffectsTest, SaturationOfMinusHundredIsBlackAndWhite)
+{
+    const Image image = applied(
+        SaturationEffect{},
+        testutils::uniform(4, 4, 0.4f, 0.1f, 0.05f),
+        SaturationEffect::SATURATION.id,
+        -100);
+    const float *p = image.pixel(0, 0);
+    EXPECT_NEAR(p[0], p[1], 1e-4f);
+    EXPECT_NEAR(p[1], p[2], 1e-4f);
+}
+
+TEST(EffectsTest, VibranceChangesDullColoursMoreThanVividOnes)
+{
+    auto chroma = [](const Image &image) {
+        float lab[3];
+        color::rec2020ToOklab(image.pixel(0, 0), lab);
+        return std::hypot(lab[1], lab[2]);
+    };
+    const Image dull = testutils::uniform(4, 4, 0.20f, 0.18f, 0.17f);
+    const Image vivid = testutils::uniform(4, 4, 0.6f, 0.02f, 0.02f);
+    const double dullGain = chroma(applied(VibranceEffect{}, dull, VibranceEffect::VIBRANCE.id, 100))
+                            / chroma(dull);
+    const double vividGain = chroma(
+                                 applied(VibranceEffect{}, vivid, VibranceEffect::VIBRANCE.id, 100))
+                             / chroma(vivid);
+    EXPECT_GT(dullGain, 1.5);
+    EXPECT_LT(vividGain, 1.1);
+}
+
+TEST(EffectsTest, DetailBoostsFineTextureAndLeavesFlatAreas)
+{
+    const Image texture = testutils::checker(64, 64, 4, 0.15f, 0.21f);
+    const Image boosted = applied(DetailEffect{}, texture, DetailEffect::DETAIL.id, 100);
+    EXPECT_GT(
+        testutils::luminanceSpread(boosted, 8, 8, 56, 56),
+        1.2 * testutils::luminanceSpread(texture, 8, 8, 56, 56));
+    const Image smoothed = applied(DetailEffect{}, texture, DetailEffect::DETAIL.id, -100);
+    EXPECT_LT(
+        testutils::luminanceSpread(smoothed, 8, 8, 56, 56),
+        testutils::luminanceSpread(texture, 8, 8, 56, 56));
+    const Image flat = testutils::uniform(16, 16, 0.18f, 0.18f, 0.18f);
+    EXPECT_LT(
+        testutils::maxDifference(applied(DetailEffect{}, flat, DetailEffect::DETAIL.id, 100), flat),
+        1e-6f);
+}
+
+TEST(EffectsTest, StructureBoostsMediumSizedShapes)
+{
+    const Image shapes = testutils::checker(400, 400, 4, 0.12f, 0.25f);
+    const Image boosted = applied(StructureEffect{}, shapes, StructureEffect::STRUCTURE.id, 100);
+    EXPECT_GT(
+        testutils::luminanceSpread(boosted, 50, 50, 350, 350),
+        1.1 * testutils::luminanceSpread(shapes, 50, 50, 350, 350));
+}
+
+TEST(EffectsTest, SharpnessSteepensEdges)
+{
+    const Image edge = testutils::step(32, 8, 0.1f, 0.4f);
+    const Image sharp = applied(SharpnessEffect{}, edge, SharpnessEffect::SHARPNESS.id, 100);
+    // Overshoot on both sides of the edge, flat far from it.
+    EXPECT_LT(sharp.pixel(15, 4)[1], 0.1f);
+    EXPECT_GT(sharp.pixel(16, 4)[1], 0.4f);
+    EXPECT_NEAR(sharp.pixel(2, 4)[1], 0.1f, 1e-4f);
+}
+
+namespace {
+
+float chromaAt(const Image &image, int x, int y)
+{
+    float lab[3];
+    color::rec2020ToOklab(image.pixel(x, y), lab);
+    return std::hypot(lab[1], lab[2]);
+}
+
+/**
+ * A dark bar on a bright background, with a 2-pixel fringe of `fringe` beside its edges, and a
+ * flat patch of the same colour far from any edge.
+ */
+Image fringed(const float *fringe)
+{
+    Image image = testutils::uniform(120, 60, 0.8f, 0.8f, 0.8f);
+    for (int y = 0; y < 60; ++y) {
+        for (int x = 0; x < 120; ++x) {
+            float *p = image.pixel(x, y);
+            if (x >= 20 && x < 30) {
+                std::fill_n(p, 3, 0.02f);
+            } else if (x == 30 || x == 31) {
+                std::copy(fringe, fringe + 3, p);
+            }
+        }
+    }
+    // The patch: 30 pixels wide, its inside 10 pixels from its own edges.
+    for (int y = 15; y < 45; ++y) {
+        for (int x = 70; x < 100; ++x) {
+            std::copy(fringe, fringe + 3, image.pixel(x, y));
+        }
+    }
+    return image;
+}
+
+constexpr float PURPLE[3] = {0.35f, 0.12f, 0.55f};
+constexpr float GREEN[3] = {0.15f, 0.45f, 0.12f};
+
+} // namespace
+
+TEST(EffectsTest, DefringeRemovesPurpleBesideEdgesOnly)
+{
+    const Image image = fringed(PURPLE);
+    const Image fixed = applied(DefringeEffect{}, image, DefringeEffect::AMOUNT.id, 20);
+    // The fringe loses its colour, the patch away from edges keeps it.
+    EXPECT_LT(chromaAt(fixed, 30, 30), 0.2f * chromaAt(image, 30, 30));
+    EXPECT_NEAR(chromaAt(fixed, 85, 30), chromaAt(image, 85, 30), 1e-4f);
+}
+
+TEST(EffectsTest, DefringeLeavesHuesOutsideTheRange)
+{
+    const Image image = fringed(GREEN);
+    const Image fixed = applied(DefringeEffect{}, image, DefringeEffect::AMOUNT.id, 20);
+    EXPECT_NEAR(chromaAt(fixed, 30, 30), chromaAt(image, 30, 30), 1e-4f);
+}
+
+TEST(EffectsTest, DefringeWithoutAnAmountChangesNothingWhateverTheHues)
+{
+    Settings settings;
+    settings.setValue(DefringeEffect::HUE_LOW.id, 0);
+    settings.setValue(DefringeEffect::HUE_HIGH.id, 100);
+    EXPECT_TRUE(DefringeEffect{}.isIdentity(settings));
+    settings.setValue(DefringeEffect::AMOUNT.id, 5);
+    EXPECT_FALSE(DefringeEffect{}.isIdentity(settings));
+}
+
+TEST(EffectsTest, DefringeFindsTheSameFringeInAPreview)
+{
+    // A third of the size, as the preview: the fringe is a pixel wide there, beside the edge.
+    Image image = fringed(PURPLE);
+    Image small{40, 20};
+    for (int y = 0; y < 20; ++y) {
+        for (int x = 0; x < 40; ++x) {
+            std::copy(
+                image.pixel(x * 3 + 1, y * 3 + 1),
+                image.pixel(x * 3 + 1, y * 3 + 1) + 3,
+                small.pixel(x, y));
+        }
+    }
+    Settings settings;
+    settings.setValue(DefringeEffect::AMOUNT.id, 20);
+    Image fixed = small;
+    DefringeEffect{}.apply(fixed, settings, RenderContext{1.0 / 3.0});
+    EXPECT_LT(chromaAt(fixed, 10, 10), 0.2f * chromaAt(small, 10, 10));
+    EXPECT_NEAR(chromaAt(fixed, 28, 10), chromaAt(small, 28, 10), 1e-4f);
+}
+
+TEST(EffectsTest, WhiteBalanceFromAColourMakesItNeutral)
+{
+    // A grey card under warm, slightly green light; then a cool, magenta one.
+    for (const std::array<float, 3> cast :
+         {std::array{0.22f, 0.19f, 0.13f}, std::array{0.15f, 0.17f, 0.22f}}) {
+        const auto neutral = WhiteBalanceEffect::neutralFor(cast);
+        ASSERT_TRUE(neutral);
+        EXPECT_FALSE(neutral->clamped);
+        Settings settings;
+        settings.setValue(WhiteBalanceEffect::TEMPERATURE.id, neutral->temperature);
+        settings.setValue(WhiteBalanceEffect::TINT.id, neutral->tint);
+        Image image = testutils::uniform(2, 2, cast[0], cast[1], cast[2]);
+        WhiteBalanceEffect{}.apply(image, settings, RenderContext{});
+        const float *p = image.pixel(0, 0);
+        // Neutral within the sliders' whole steps: under 1%.
+        EXPECT_NEAR(p[0] / p[1], 1.0f, 0.01f);
+        EXPECT_NEAR(p[2] / p[1], 1.0f, 0.01f);
+    }
+}
+
+TEST(EffectsTest, WhiteBalanceOfAGreyChangesNothingAndBlackHasNone)
+{
+    const auto grey = WhiteBalanceEffect::neutralFor({0.18f, 0.18f, 0.18f});
+    ASSERT_TRUE(grey);
+    EXPECT_EQ(grey->temperature, 0);
+    EXPECT_EQ(grey->tint, 0);
+    EXPECT_FALSE(WhiteBalanceEffect::neutralFor({0, 0, 0}));
+}
+
+TEST(EffectsTest, WhiteBalanceBeyondTheSlidersIsClamped)
+{
+    const auto neutral = WhiteBalanceEffect::neutralFor({0.3f, 0.1f, 0.01f});
+    ASSERT_TRUE(neutral);
+    EXPECT_TRUE(neutral->clamped);
+    EXPECT_GE(neutral->temperature, WhiteBalanceEffect::TEMPERATURE.minimum);
+    EXPECT_LE(neutral->temperature, WhiteBalanceEffect::TEMPERATURE.maximum);
+}
+
+TEST(SamplingTest, AveragesADiscAndLeavesClippedPixelsOut)
+{
+    Image image = testutils::uniform(20, 20, 0.2f, 0.4f, 0.6f);
+    image.pixel(10, 10)[1] = 1.0f;  // clipped, in the middle
+    image.pixel(0, 0)[0] = 0.9f;    // outside the disc
+    const sampling::Sample sample = sampling::meanColour(image, 10.5, 10.5, 3.0);
+    EXPECT_EQ(sample.clipped, 1);
+    EXPECT_EQ(sample.used, 28);
+    EXPECT_NEAR(sample.rgb[0], 0.2f, 1e-6f);
+    EXPECT_NEAR(sample.rgb[1], 0.4f, 1e-6f);
+
+    const sampling::Sample outside = sampling::meanColour(image, -50, -50, 3.0);
+    EXPECT_EQ(outside.used, 0);
+}
+
+TEST(EffectsTest, ToneCompressionCurveRollsOffAboveTheKneeOnly)
+{
+    const float knee = 0.4f, white = 8.0f;
+    EXPECT_FLOAT_EQ(ToneCompressionEffect::compress(0.2f, knee, white), 0.2f);
+    EXPECT_FLOAT_EQ(ToneCompressionEffect::compress(knee, knee, white), knee);
+    // The white given ends at white, smoothly: no step at the knee, and ever brighter.
+    EXPECT_NEAR(ToneCompressionEffect::compress(white, knee, white), 1.0f, 1e-4f);
+    EXPECT_NEAR(ToneCompressionEffect::compress(knee + 1e-3f, knee, white), knee + 1e-3f, 1e-5f);
+    float previous = knee;
+    for (float v = 0.5f; v < white; v *= 1.3f) {
+        const float out = ToneCompressionEffect::compress(v, knee, white);
+        EXPECT_GT(out, previous);
+        EXPECT_LT(out, 1.0f);
+        previous = out;
+    }
+    // Without anything above white to fit, it is the identity.
+    EXPECT_FLOAT_EQ(ToneCompressionEffect::compress(0.95f, knee, 1.0f), 0.95f);
+}
+
+TEST(EffectsTest, ToneCompressionBringsHighlightsBackAndKeepsTheirHue)
+{
+    // A sky three stops above white, orange-ish, beside a mid-grey ground.
+    Image image = testutils::step(200, 50, 0.18f, 1.0f);
+    for (int y = 0; y < 50; ++y) {
+        for (int x = 100; x < 200; ++x) {
+            float *p = image.pixel(x, y);
+            p[0] = 8.0f, p[1] = 6.0f, p[2] = 4.0f;
+        }
+    }
+    Settings settings;
+    settings.setValue(ToneCompressionEffect::AMOUNT.id, 100);
+    settings.setValue(ToneCompressionEffect::LOCAL.id, 0);
+    ToneCompressionEffect{}.apply(image, settings, RenderContext{});
+    const float *sky = image.pixel(150, 25);
+    EXPECT_LE(sky[0], 1.0f);
+    EXPECT_GT(sky[0], 0.8f);
+    EXPECT_NEAR(sky[1] / sky[0], 0.75f, 1e-4f);
+    EXPECT_NEAR(sky[2] / sky[0], 0.5f, 1e-4f);
+    // The ground, below the knee, is untouched.
+    EXPECT_FLOAT_EQ(image.pixel(20, 25)[1], 0.18f);
+}
+
+TEST(EffectsTest, ToneCompressionWithLocalContrastKeepsTheTextureOfBrightAreas)
+{
+    // Clouds: a bright checker, 2 and 6 times white, on 400 pixels.
+    const Image clouds = testutils::checker(400, 400, 6, 2.0f, 6.0f);
+    auto spread = [&](double local) {
+        Settings settings;
+        settings.setValue(ToneCompressionEffect::AMOUNT.id, 100);
+        settings.setValue(ToneCompressionEffect::LOCAL.id, local);
+        Image image = clouds;
+        ToneCompressionEffect{}.apply(image, settings, RenderContext{});
+        return testutils::luminanceSpread(image, 50, 50, 350, 350);
+    };
+    EXPECT_GT(spread(100), 1.5 * spread(0));
+}

@@ -1,0 +1,72 @@
+// Copyright (c) 2026 Giovanni Remigi
+// SPDX-License-Identifier: MIT
+
+#pragma once
+
+#include "core/Image.h"
+#include "core/Pipeline.h"
+#include "core/Settings.h"
+
+#include <QFuture>
+#include <QImage>
+#include <QList>
+#include <QObject>
+#include <QTimer>
+
+#include <atomic>
+#include <memory>
+#include <optional>
+
+/**
+ * Renders the image with the settings, off the user interface's thread, in two passes:
+ *
+ * 1. At once, a preview: the image reduced so its longer side is at most `previewSide`, quick
+ *    enough to follow a slider.
+ * 2. Once the settings have not changed for `fullDelay`, the full image, for the detail.
+ *
+ * Each pass ends with rendered(). A change of the settings drops the passes the new settings make
+ * useless: only the latest settings are rendered.
+ */
+class PreviewRenderer : public QObject
+{
+    Q_OBJECT
+
+public:
+    explicit PreviewRenderer(
+        std::shared_ptr<const core::Pipeline> pipeline,
+        int previewSide = 2048,
+        std::chrono::milliseconds fullDelay = std::chrono::milliseconds{300},
+        QObject *parent = nullptr);
+    ~PreviewRenderer() override;
+
+    /// The image to render, in full; the preview is made from it.
+    void setSource(std::shared_ptr<const core::Image> image);
+
+public Q_SLOTS:
+    void render(const core::Settings &settings);
+
+Q_SIGNALS:
+    /// A pass is done: `image` stands for the whole picture, of `fullSize`; `full` when it is.
+    void rendered(const QImage &image, QSize fullSize, bool full);
+
+private:
+    void startPreview();
+    void startFull();
+
+    std::shared_ptr<const core::Pipeline> m_pipeline;
+    int m_previewSide;
+    QTimer m_fullTimer;
+
+    std::shared_ptr<const core::Image> m_full;
+    std::shared_ptr<const core::Image> m_preview;
+    double m_previewScale = 1.0;
+
+    core::Settings m_settings;
+    /// Counts the changes; a pass whose number is no longer the latest stops.
+    std::shared_ptr<std::atomic<int>> m_generation = std::make_shared<std::atomic<int>>(0);
+    bool m_previewRunning = false;
+    bool m_previewPending = false;
+    QFuture<void> m_previewJob;
+    /// The full passes still running, the stale ones included: waited for on destruction.
+    QList<QFuture<void>> m_fullJobs;
+};

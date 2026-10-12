@@ -1,0 +1,8 @@
+# Builds, and the libraries install-deps.sh builds.
+build/
+deps/
+
+# Editors.
+.vscode/
+.qtcreator/
+*.user
