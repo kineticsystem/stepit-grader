@@ -11,7 +11,7 @@
 namespace {
 
 /// The circle to drag, in pixels: large enough to grab at once.
-constexpr int HANDLE_DIAMETER = 14;
+constexpr int HANDLE_DIAMETER = 18;
 /// The circle's ring and the line, in pixels.
 constexpr qreal RING_WIDTH = 1.5;
 constexpr qreal LINE_WIDTH = 2.0;
