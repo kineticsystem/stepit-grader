@@ -335,6 +335,17 @@ TEST_F(DocumentTest, SavesBeforeAnotherPictureOpens)
     EXPECT_EQ(store->saves, 1);
 }
 
+TEST_F(DocumentTest, MergesSomeValuesOverTheSettings)
+{
+    openAndWait("/pictures/a.tif");
+    document.setSettings(contrast(20));
+    core::Settings exposure;
+    exposure.setValue("Exposure2012", 0.5);
+    document.mergeSettings(exposure);
+    EXPECT_DOUBLE_EQ(document.settings().values().at("Contrast2012"), 20);
+    EXPECT_DOUBLE_EQ(document.settings().values().at("Exposure2012"), 0.5);
+}
+
 TEST_F(DocumentTest, RevertsToTheSettingsItWasOpenedWith)
 {
     core::Settings opened;

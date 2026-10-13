@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: MIT
 
 #include "editor/CameraLook.h"
+#include "../testutils/Fakes.h"
 #include "core/StandardPipeline.h"
 #include "editor/Status.h"
 #include "editor/WaitingDialog.h"
+#include "imageio/RawReader.h"
 
 #include <QBuffer>
 #include <QCloseEvent>
@@ -113,7 +115,10 @@ TEST(CameraLookTest, MatchesARawFileAndStopsWhenAsked)
         }
     });
     const auto result = matchCameraLook(
-        {QString::fromStdString(file.string())}, *core::makeStandardPipeline(), status);
+        {QString::fromStdString(file.string())},
+        imageio::RawShotReader{},
+        *core::makeStandardPipeline(),
+        status);
     ASSERT_TRUE(result.has_value()) << result.error().toStdString();
     EXPECT_TRUE(result->stopped);
     EXPECT_LT(result->errorAfter, result->errorBefore);
@@ -125,6 +130,7 @@ TEST(CameraLookTest, MatchesARawFileAndStopsWhenAsked)
 TEST(CameraLookTest, AFileThatIsNotARawIsReported)
 {
     StatusController status;
-    const auto result = matchCameraLook({"/no/such/file.CR2"}, *core::makeStandardPipeline(), status);
+    const auto result = matchCameraLook(
+        {"/no/such/file.CR2"}, imageio::RawShotReader{}, *core::makeStandardPipeline(), status);
     EXPECT_FALSE(result.has_value());
 }

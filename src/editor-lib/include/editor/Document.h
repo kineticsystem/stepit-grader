@@ -80,6 +80,11 @@ public:
 
 public Q_SLOTS:
     void setSettings(const core::Settings &settings);
+    /**
+     * Sets the values `values` holds and leaves the others as they are: a grade of some sliders,
+     * e.g. those a tool measured, over the picture's own.
+     */
+    void mergeSettings(const core::Settings &values);
     /// Every parameter back to its default.
     void resetSettings();
     /// The settings back to those the picture had when it was opened: its sidecar's, or none.

@@ -2,13 +2,16 @@
 // SPDX-License-Identifier: MIT
 
 #include "editor/Document.h"
+#include "editor/ImageExporter.h"
 #include "editor/MainWindow.h"
 #include "editor/PreviewRenderer.h"
 #include "editor/Theme.h"
+#include "editor/viewmodel/CameraLookViewModel.h"
 #include "widgets/Sections.h"
 
 #include "core/StandardPipeline.h"
 #include "imageio/ImageLoader.h"
+#include "imageio/RawReader.h"
 #include "imageio/XmpSidecar.h"
 
 #include <QApplication>
@@ -61,7 +64,15 @@ int main(int argc, char *argv[])
         std::make_shared<imageio::XmpSidecar>(),
         pipeline->parameters()};
     PreviewRenderer renderer{pipeline};
-    MainWindow window{&document, &renderer, sectionsOf(*pipeline, core::standardSectionOrder())};
+    QSettings settings;
+    ImageExporter exporter{&document, pipeline, &settings};
+    CameraLookViewModel cameraLook{&document, pipeline, std::make_shared<imageio::RawShotReader>()};
+    MainWindow window{
+        &document,
+        &renderer,
+        &exporter,
+        &cameraLook,
+        sectionsOf(*pipeline, core::standardSectionOrder())};
     window.show();
 
     if (!parser.positionalArguments().isEmpty()) {
