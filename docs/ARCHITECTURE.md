@@ -429,6 +429,8 @@ To add an action of this kind, see [How to Extend StepIt Grader](#how-to-extend-
 - **Above**, a fixed toolbar with the actions used most: open, save, before and after, and the zoom.
 - **The menus**: File, Edit, View and Settings, whose Theme is kept in `QSettings` under `theme` and applied by `main()` before the window is made; and the status bar.
 
+What the editor keeps between sessions in `QSettings`, the folders the dialogs start in, the recent pictures, the format saved last and the theme, is kept under the keys of [`SessionProperties`](../src/editor-lib/include/editor/SessionProperties.h), all in one header, grouped as `Files` and `Options`, so no two parts use the same key. A key is never renamed, or the value kept under it is lost.
+
 | From | Signal | To |
 |---|---|---|
 | `AdjustmentsPanel` | `settingsChanged` | `Document::setSettings` |
@@ -602,6 +604,7 @@ What has no automated test, and how to check it by hand:
 | Add an output colour space, e.g. Display P3 | A value of `ColourSpace`, its name in `ColourProfiles.cpp`, and its profile in `profiles::of()`. |
 | Change the preview's size or delay | The arguments of `PreviewRenderer` in `main()`. |
 | Change the delay before a save | The `saveDelay` argument of `Document` in `main()`. |
+| Keep a choice between sessions, e.g. the last zoom | A key in `SessionProperties`, under `Files` or `Options`, read and written with `QSettings`; never a key typed where it is used. |
 | Add helper functions without a state, e.g. for the icons | A namespace named after their topic, `<Topic>Utils`, in `<Topic>Utils.h` and `.cpp`, as `IconUtils`, `ThemeUtils` or `HistogramUtils`, with a comment before the namespace saying what its functions are for, never at global scope; in `core-lib` and `io-lib`, a namespace of the topic inside the library's, as `core::color`. |
 | Add a reusable widget | A header in `include/widgets` and a source in `src` of `widgets-lib`, both in its `CMakeLists.txt`, knowing nothing of the editor; a test in `WidgetsTest.cpp`. A widget of the editor's own, e.g. a menu, goes in `editor-lib`, as `RecentFilesMenu` does. |
 | Add a menu action with rules of its own, e.g. Export a Contact Sheet | A view model in `viewmodel/`, given the document and what else it needs, holding the rules and the work, in `QtConcurrent::run` or in the document's pool when it touches a file, its result back with a `QFutureWatcher`, and telling it with signals; an action in `actions/`, a `QAction` given the view model, holding the dialogs; both in `editor-lib`'s `CMakeLists.txt`. `main()` makes the view model and gives it to `MainWindow`, which makes the action, adds it to a menu and enables it once a picture opens. A test drives the view model with the fakes of `testutils/Fakes.h`. |
