@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "editor/CameraLookUtils.h"
+#include "core/Color.h"
 #include "core/Geometry.h"
 #include "imageio/Error.h"
 
@@ -18,11 +19,6 @@ constexpr int READING_SHARE = 10;
 /// How far the JPEG's shape may differ from the raw's, as a fraction: a camera may leave a few
 /// pixels out of its JPEG, never a strip of the picture.
 constexpr double SHAPE_TOLERANCE = 0.02;
-
-float decodeSrgb(float value)
-{
-    return value <= 0.04045f ? value / 12.92f : std::pow((value + 0.055f) / 1.055f, 2.4f);
-}
 
 } // namespace
 
@@ -49,7 +45,7 @@ std::expected<core::Image, QString> cameraJpegImage(
 
     std::array<float, 256> table{};
     for (int i = 0; i < 256; ++i) {
-        table[i] = decodeSrgb(i / 255.0f);
+        table[i] = static_cast<float>(core::color::srgbDecode(i / 255.0));
     }
     core::Image image{decoded.width(), decoded.height()};
     for (int y = 0; y < decoded.height(); ++y) {

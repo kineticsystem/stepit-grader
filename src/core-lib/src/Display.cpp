@@ -22,7 +22,7 @@ const std::array<std::uint8_t, LUT_SIZE + 1> &encodingTable()
         std::array<std::uint8_t, LUT_SIZE + 1> t{};
         for (int i = 0; i <= LUT_SIZE; ++i) {
             const double v = static_cast<double>(i) / LUT_SIZE;
-            const double e = v <= 0.0031308 ? 12.92 * v : 1.055 * std::pow(v, 1.0 / 2.4) - 0.055;
+            const double e = color::srgbEncode(v);
             t[i] = static_cast<std::uint8_t>(std::lround(std::clamp(e, 0.0, 1.0) * 255.0));
         }
         return t;

@@ -44,6 +44,18 @@ const Matrix3 &rec2020ToXyz();
 /// Linear Rec. 2020 to linear sRGB, both D65.
 const Matrix3 &rec2020ToSrgb();
 
+/// Linear sRGB to CIE XYZ, D65: the inverse of the matrix rec2020ToSrgb() goes through.
+const Matrix3 &srgbToXyz();
+
+/**
+ * The sRGB curve: a linear value to the tone a screen shows, 0 to 0 and 1 to 1, straight near
+ * black. Not clipped: a value outside [0, 1] gives a tone outside it.
+ */
+double srgbEncode(double linear);
+
+/// The inverse of srgbEncode(): a tone to its linear value.
+double srgbDecode(double tone);
+
 /**
  * The chromatic adaptation of linear Rec. 2020 values from a scene lit by `source` to one lit by
  * D65, with the Bradford transform: what was white under `source` becomes white.

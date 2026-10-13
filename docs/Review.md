@@ -21,7 +21,7 @@ This review judges how StepIt Grader is built, on 13 October 2026, at commit `a1
 It is a partial refresh of the review made at `1ab77b2`, brought up to date since with `LeavePictureViewModel`, `WhiteBalanceViewModel` and `PickWhiteBalanceAction`, read whole, and `MainWindow` read again. Read again, whole: `editor-lib`, about 2,800 lines, with its new view models and actions; what changed in `io-lib` since, the `CameraShotReader` interface and the XMP sidecar's names and damaged copies; and `core::match`. The parts unchanged since `1ab77b2`, `widgets-lib`, `cli-lib` and the rest of `core-lib` and `io-lib`, keep the judgements of that review.
 
 - **Counted**: the links of each library, the includes between libraries, and the test cases of each folder.
-- **Run**: the whole suite, 193 test cases in 196 runs, passing in about 10 seconds, the four raw tests skipped without raw-converter's samples; again built with AddressSanitizer and UndefinedBehaviorSanitizer, passing with no report; and with ThreadSanitizer under `setarch -R`, passing with 74 reports, none a race between two threads of our code, see [Implementation Issues](#implementation-issues).
+- **Run**: the whole suite, 195 test cases in 198 runs, passing in about 10 seconds, the four raw tests skipped without raw-converter's samples; again built with AddressSanitizer and UndefinedBehaviorSanitizer, passing with no report; and with ThreadSanitizer under `setarch -R`, passing with 74 reports, none a race between two threads of our code, see [Implementation Issues](#implementation-issues).
 - **Verified**: one suspicion, with a throwaway test, removed after. A finding marked *verified* was reproduced; the others are *from reading*.
 
 ## Verdict
@@ -89,8 +89,6 @@ Elsewhere, knowledge sits where it belongs: the document owns the files and thei
 
 | Kept in step by hand | Weight | Where |
 |---|---|---|
-| The sRGB curve, written out four times | Medium: a fix to one, e.g. for values below 0, misses the others. | Encoding in [`Display.cpp`](../src/core-lib/src/Display.cpp) and [`ToneCurveEffect.cpp`](../src/core-lib/src/effects/ToneCurveEffect.cpp); decoding in `ToneCurveEffect.cpp` and [`CameraLookUtils.cpp`](../src/editor-lib/src/CameraLookUtils.cpp). |
-| sRGB and CIE XYZ, one matrix and its inverse typed apart | Low: both from Lindbloom's tables, but one could be edited alone. | `XYZ_TO_SRGB` in [`Color.cpp`](../src/core-lib/src/Color.cpp), `SRGB_TO_XYZ` in [`CameraMatch.cpp`](../src/core-lib/src/CameraMatch.cpp). |
 | The slider ids of the camera match | Low: a test checks each names a slider of the pipeline. | String literals in `standardStages()`, against the `Parameter`s of the effects. |
 | The sliders the camera match sets, told to the user | Low: a stage added to `standardStages()` would go untold. | The Apply question of [`MatchCameraLookAction::showFound()`](../src/editor-lib/src/actions/MatchCameraLookAction.cpp) names "the white balance, the tone, the tone curve and the colour mixer". |
 | The highlights and the shadows | Low, and documented: the same code but for three constants, each computing the area luminance again. | [`HighlightsEffect.cpp`](../src/core-lib/src/effects/HighlightsEffect.cpp), [`ShadowsEffect.cpp`](../src/core-lib/src/effects/ShadowsEffect.cpp). |
@@ -100,7 +98,7 @@ Elsewhere, knowledge sits where it belongs: the document owns the files and thei
 
 | Folder | Test cases | Untested |
 |---|---|---|
-| `core` | 56 | The look of the effects, by design, see the architecture's manual checks. |
+| `core` | 58 | The look of the effects, by design, see the architecture's manual checks. |
 | `io` | 27 | `imageio::files::replace()` setting the old file aside where a system does not rename over a file: Linux always does. |
 | `editor` | 92 | `MainWindow` and the actions: no test constructs them. |
 | `cli` | 7 | |
@@ -126,6 +124,5 @@ Ordered by value against effort; each is one pull request.
 
 | # | Change | Fixes | Trade-off |
 |---|---|---|---|
-| 1 | One sRGB curve, each way, and one sRGB-to-XYZ matrix, in `core::color`. | Duplication | None. |
-| 2 | Clear `CameraLookViewModel`'s result when a match starts, and build the Apply question's list of sliders from the stages. | 1, coupling | None. |
-| 3 | Keep the sections' order in `AdjustmentsPanel`, and rename `ParameterSlider::show()` to `showValue()`. | 1 and the panel's titles | None. |
+| 1 | Clear `CameraLookViewModel`'s result when a match starts, and build the Apply question's list of sliders from the stages. | 1, coupling | None. |
+| 2 | Keep the sections' order in `AdjustmentsPanel`, and rename `ParameterSlider::show()` to `showValue()`. | 1 and the panel's titles | None. |
