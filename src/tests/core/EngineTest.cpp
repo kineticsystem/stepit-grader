@@ -62,6 +62,27 @@ TEST(ColorTest, AdaptingD65ToD65ChangesNothing)
     }
 }
 
+TEST(ColorTest, TheSrgbCurveRoundTripsAndHasItsKnownValues)
+{
+    EXPECT_DOUBLE_EQ(color::srgbEncode(0.0), 0.0);
+    EXPECT_NEAR(color::srgbEncode(1.0), 1.0, 1e-12);
+    // Middle grey is a tone of 117.6 of 255, shown as 118; half the tone is 21% of the light.
+    EXPECT_NEAR(color::srgbEncode(0.18) * 255, 117.65, 0.01);
+    EXPECT_NEAR(color::srgbDecode(0.5), 0.214, 0.001);
+    for (const double linear : {-0.1, 0.001, 0.0031308, 0.05, 0.18, 0.5, 1.0, 1.5}) {
+        EXPECT_NEAR(color::srgbDecode(color::srgbEncode(linear)), linear, 1e-9) << linear;
+    }
+}
+
+TEST(ColorTest, SrgbToXyzTakesWhiteToD65)
+{
+    const Matrix3 &m = color::srgbToXyz();
+    const double white[3]{m[0] + m[1] + m[2], m[3] + m[4] + m[5], m[6] + m[7] + m[8]};
+    EXPECT_NEAR(white[0], 0.95047, 1e-4);
+    EXPECT_NEAR(white[1], 1.0, 1e-4);
+    EXPECT_NEAR(white[2], 1.08883, 1e-4);
+}
+
 TEST(DisplayTest, MiddleGreyIsSrgb118AndWhiteIs255)
 {
     core::Image image = testutils::uniform(2, 1, 0.18f, 0.18f, 0.18f);

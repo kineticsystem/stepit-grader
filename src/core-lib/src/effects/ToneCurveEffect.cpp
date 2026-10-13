@@ -20,16 +20,6 @@ constexpr double MIN_GAP = 0.02;
 /// The samples of the curve per pixel lookup, from black to white.
 constexpr int TABLE_SIZE = 4096;
 
-double encode(double linear)
-{
-    return linear <= 0.0031308 ? 12.92 * linear : 1.055 * std::pow(linear, 1.0 / 2.4) - 0.055;
-}
-
-double decode(double tone)
-{
-    return tone <= 0.04045 ? tone / 12.92 : std::pow((tone + 0.055) / 1.055, 2.4);
-}
-
 } // namespace
 
 bool ToneCurveEffect::isIdentity(const Settings &settings) const
@@ -117,8 +107,8 @@ void ToneCurveEffect::apply(Image &image, const Settings &settings, const Render
     std::vector<float> gains(TABLE_SIZE + 1);
     for (int i = 0; i <= TABLE_SIZE; ++i) {
         const double tone = static_cast<double>(i) / TABLE_SIZE;
-        const double before = decode(tone);
-        const double after = decode(curve(points, tone));
+        const double before = color::srgbDecode(tone);
+        const double after = color::srgbDecode(curve(points, tone));
         gains[i] = before > 0 ? static_cast<float>(after / before) : 1.0f;
     }
     // Black has no colour to keep: its gain is that of the first tone above it.
@@ -130,7 +120,7 @@ void ToneCurveEffect::apply(Image &image, const Settings &settings, const Render
         if (luminance <= 0 || luminance >= 1) {
             return;
         }
-        const float position = static_cast<float>(encode(luminance)) * TABLE_SIZE;
+        const float position = static_cast<float>(color::srgbEncode(luminance)) * TABLE_SIZE;
         const int index = std::min(static_cast<int>(position), TABLE_SIZE - 1);
         const float fraction = position - index;
         const float gain = gains[index] + (gains[index + 1] - gains[index]) * fraction;

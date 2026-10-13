@@ -42,6 +42,11 @@ namespace color {
 
 namespace {
 
+/// The sRGB curve (IEC 61966-2-1): straight, of this slope, below this linear value, then a power.
+constexpr double SRGB_LINEAR_KNEE = 0.0031308;
+constexpr double SRGB_SLOPE = 12.92;
+constexpr double SRGB_GAMMA = 2.4;
+
 constexpr Matrix3 XYZ_TO_SRGB{
     3.2404542,
     -1.5371385,
@@ -154,6 +159,25 @@ const Matrix3 &rec2020ToSrgb()
 {
     static const Matrix3 m = multiply(XYZ_TO_SRGB, rec2020ToXyz());
     return m;
+}
+
+const Matrix3 &srgbToXyz()
+{
+    // The inverse computed, not typed: the two cannot drift apart.
+    static const Matrix3 m = inverse(XYZ_TO_SRGB);
+    return m;
+}
+
+double srgbEncode(double linear)
+{
+    return linear <= SRGB_LINEAR_KNEE ? SRGB_SLOPE * linear
+                                      : 1.055 * std::pow(linear, 1.0 / SRGB_GAMMA) - 0.055;
+}
+
+double srgbDecode(double tone)
+{
+    return tone <= SRGB_LINEAR_KNEE * SRGB_SLOPE ? tone / SRGB_SLOPE
+                                                 : std::pow((tone + 0.055) / 1.055, SRGB_GAMMA);
 }
 
 Matrix3 adaptToD65(Chromaticity source)

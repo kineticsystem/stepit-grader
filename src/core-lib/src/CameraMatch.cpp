@@ -30,9 +30,6 @@ constexpr double ERROR_TOLERANCE = 0.005;
 /// The seed of the pixels kept, so every run compares the same ones.
 constexpr unsigned SEED = 0;
 
-/// Linear sRGB to CIE XYZ, D65.
-constexpr std::array<double, 9> SRGB_TO_XYZ{
-    0.4124564, 0.3575761, 0.1804375, 0.2126729, 0.7151522, 0.0721750, 0.0193339, 0.1191920, 0.9503041};
 constexpr std::array<double, 3> D65_WHITE{0.95047, 1.0, 1.08883};
 
 /// Thrown from a trial once `stopped` says yes, to leave the search at once.
@@ -196,6 +193,7 @@ double matchingExposure(
     const std::vector<Sample> &samples, const Pipeline &pipeline, const Settings &settings)
 {
     const Matrix3 &toSrgb = color::rec2020ToSrgb();
+    const Matrix3 &toXyz = color::srgbToXyz();
     std::vector<double> stops;
     for (const Sample &sample : samples) {
         const auto graded = pipeline.render(sample.source, settings, RenderContext{sample.scale});
@@ -208,7 +206,7 @@ double matchingExposure(
             for (int column = 0; column < 3; ++column) {
                 const double srgb = toSrgb[column * 3] * p[0] + toSrgb[column * 3 + 1] * p[1]
                                     + toSrgb[column * 3 + 2] * p[2];
-                y += SRGB_TO_XYZ[3 + column] * srgb;
+                y += toXyz[3 + column] * srgb;
             }
             ours.push_back(y);
             const double f = (sample.target[i][0] + 16) / 116;
@@ -300,10 +298,11 @@ double deltaE2000(const Lab &a, const Lab &b)
 
 Lab labOfLinearSrgb(const float *rgb)
 {
+    const Matrix3 &toXyz = color::srgbToXyz();
     double xyz[3]{};
     for (int row = 0; row < 3; ++row) {
         for (int column = 0; column < 3; ++column) {
-            xyz[row] += SRGB_TO_XYZ[row * 3 + column] * std::clamp(rgb[column], 0.0f, 1.0f);
+            xyz[row] += toXyz[row * 3 + column] * std::clamp(rgb[column], 0.0f, 1.0f);
         }
         xyz[row] /= D65_WHITE[row];
     }
