@@ -59,11 +59,6 @@ private:
     /// Gives the action the icon `name` of the theme, and again when the theme changes.
     void setThemedIcon(QAction *action, const QString &name);
     void refreshIcons();
-    /// Shows the picture before its edit, or after.
-    void showBefore(bool before);
-    void chooseFile();
-    /// Asks for a file of settings, and applies it to the picture open.
-    void chooseSettings();
     void onOpened();
     void updateTitle();
     void updateZoom(double zoom);
@@ -80,7 +75,6 @@ private:
     QLabel *m_zoomLabel;
     QLabel *m_renderLabel;
     QAction *m_pickWhite = nullptr;
-    QAction *m_showBefore = nullptr;
     /// The actions with an icon, and the icon's name, drawn again for a new theme.
     std::vector<std::pair<QAction *, QString>> m_themedIcons;
     QLabel *m_beforeLabel;

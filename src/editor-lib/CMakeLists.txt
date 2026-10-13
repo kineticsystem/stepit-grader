@@ -14,8 +14,12 @@ add_library(editor-lib STATIC
     include/editor/RecentFilesMenu.h
     include/editor/SessionProperties.h
     include/editor/Status.h
+    include/editor/ThemeMenu.h
     include/editor/WaitingDialog.h
+    include/editor/actions/BeforeAfterToggleAction.h
+    include/editor/actions/LoadSettingsAction.h
     include/editor/actions/MatchCameraLookAction.h
+    include/editor/actions/OpenAction.h
     include/editor/actions/PickWhiteBalanceAction.h
     include/editor/actions/SaveImageAction.h
     include/editor/viewmodel/CameraLookViewModel.h
@@ -32,10 +36,14 @@ add_library(editor-lib STATIC
     src/PreviewRenderer.cpp
     src/RecentFilesMenu.cpp
     src/Status.cpp
+    src/ThemeMenu.cpp
     src/ThemeUtils.cpp
     src/WaitingDialog.cpp
     src/WhiteBalanceUtils.cpp
+    src/actions/BeforeAfterToggleAction.cpp
+    src/actions/LoadSettingsAction.cpp
     src/actions/MatchCameraLookAction.cpp
+    src/actions/OpenAction.cpp
     src/actions/PickWhiteBalanceAction.cpp
     src/actions/SaveImageAction.cpp
     src/viewmodel/CameraLookViewModel.cpp
