@@ -20,14 +20,14 @@ This review judges how StepIt Grader is built, on 13 October 2026, at commit `1a
 
 - **Read**: every source file of every library and program, about 9,400 lines, the headers of the parts judged, each `CMakeLists.txt`, and the tests, about 3,300 lines.
 - **Counted**: the links of each library, the includes between libraries, the copies of the same code, and the test cases of each folder.
-- **Run**: the whole suite, 148 test cases in 151 runs, passing in about 20 seconds; again built with AddressSanitizer and UndefinedBehaviorSanitizer, passing with no report; and with ThreadSanitizer under `setarch -R`, passing with 85 reports, none with both accesses in our code, see [Implementation Issues](#implementation-issues).
+- **Run**: the whole suite, 149 test cases in 152 runs, passing in about 20 seconds; again built with AddressSanitizer and UndefinedBehaviorSanitizer, passing with no report; and with ThreadSanitizer under `setarch -R`, passing with 85 reports, none with both accesses in our code, see [Implementation Issues](#implementation-issues).
 - **Verified**: two suspicions, each with a throwaway test, removed after. A finding marked *verified* was reproduced; the others are *from reading*.
 
 ## Verdict
 
-**Sound, with one risk to the user's grades.** The layers hold: the engine and the files know no Qt, every dependency points down, and the one idea, *an edit is a set of named values*, runs through the engine, the sidecar, the command line and the camera match alike. The effects, the readers and the store sit behind small interfaces that the tests fake, and the sanitizers find nothing in our code.
+**Sound.** The layers hold: the engine and the files know no Qt, every dependency points down, and the one idea, *an edit is a set of named values*, runs through the engine, the sidecar, the command line and the camera match alike. The effects, the readers and the store sit behind small interfaces that the tests fake, and the sanitizers find nothing in our code.
 
-What needs work is around the user's files, not the pixels: with Revert to Opened gone from the menus, there is no way back to a grade once replaced ([1](#1-no-way-back-to-a-grade-once-replaced)). And `MainWindow`, at 705 lines, has started to hold policy that belongs elsewhere, untested because nothing constructs it.
+What needs work: the TIFF writer can lose the file it replaces when a rename fails ([1](#1-the-tiff-writer-deletes-the-file-it-replaces-before-replacing-it)), an exception in a parallel chunk escapes while other chunks still run ([2](#2-an-exception-in-a-parallel-chunk-escapes-while-other-chunks-still-run)), and `MainWindow`, at 713 lines, has started to hold policy that belongs elsewhere, untested because nothing constructs it.
 
 ## Structure and Boundaries
 
@@ -66,7 +66,7 @@ Only downward, as `CLAUDE.md` asks: `editor-app` → `editor-lib` → `widgets-l
 
 ## Separation of Concerns
 
-**`MainWindow` holds policy.** It should lay the parts out and connect them; [`MainWindow.cpp`](../src/editor-lib/src/MainWindow.cpp), 705 lines, also decides:
+**`MainWindow` holds policy.** It should lay the parts out and connect them; [`MainWindow.cpp`](../src/editor-lib/src/MainWindow.cpp), 713 lines, also decides:
 
 - what a raw file is, `isRawFile()`, from a concrete `imageio::RawReader{}`, to choose which picture `matchCameraLook()` matches;
 - how a matched grade meets the picture's own, merging it into `Document::settings()` in `showCameraLook()`;
@@ -102,8 +102,8 @@ Elsewhere, knowledge sits where it belongs: the document owns the files and thei
 | Folder | Test cases | Untested |
 |---|---|---|
 | `core` | 52 | The look of the effects, by design, see the architecture's manual checks. |
-| `io` | 23 | `TiffWriter` replacing a file when the rename fails, finding [2](#2-the-tiff-writer-deletes-the-file-it-replaces-before-replacing-it). |
-| `editor` | 66 | `MainWindow`: no test constructs it. |
+| `io` | 23 | `TiffWriter` replacing a file when the rename fails, finding [1](#1-the-tiff-writer-deletes-the-file-it-replaces-before-replacing-it). |
+| `editor` | 67 | `MainWindow`: no test constructs it. |
 | `cli` | 7 | |
 
 **The missing seam is `MainWindow`.** Its rules, the raw or TIFF choice of the camera match, the merging of a matched grade, the refusal to save over the picture, the actions enabled once a picture opens, can only be checked by hand. Moved into small classes of their own, each given a `Document` and a renderer, they would be tested as `Document` is.
@@ -114,23 +114,19 @@ Elsewhere, knowledge sits where it belongs: the document owns the files and thei
 
 Ordered by severity. ThreadSanitizer's 85 reports all have Qt on one side: memory allocated by `QtConcurrent::run` on the main thread and read by a pooled thread, or handed between Qt's own image threads, through synchronisation an uninstrumented Qt hides. None has both accesses in our code; `core::parallelFor`, the renderer's generation counter and `core::match` are not among them.
 
-### 1. No way back to a grade once replaced
-
-*From reading.* The document saves a change a second after it, and nothing in the window calls `Document::revertSettings()` now that **Edit > Revert to Opened** is gone. **File > Load Settings…** replaces every slider and **Edit > Reset All** clears them; either, chosen by mistake, loses the grade for good a second later. There is no undo.
-
-### 2. The TIFF writer deletes the file it replaces before replacing it
+### 1. The TIFF writer deletes the file it replaces before replacing it
 
 *From reading.* [`TiffWriter::write()`](../src/io-lib/src/TiffWriter.cpp) calls `std::filesystem::remove(path)` and then `rename()`, on every system, for Windows' sake. If the rename then fails, the code also removes the temporary file: the old TIFF and the new one are both gone, against the architecture's claim that a failure never harms the file it would replace. [`XmpSidecar::save()`](../src/io-lib/src/XmpSidecar.cpp) renames without removing; one of the two is wrong on Windows.
 
-### 3. An exception in a parallel chunk escapes while other chunks still run
+### 2. An exception in a parallel chunk escapes while other chunks still run
 
 *Verified.* A chunk of [`core::parallelFor()`](../src/core-lib/src/Parallel.cpp) that throws on the calling thread leaves `ThreadPool::run()` at once: the probe caught `out of memory` outside `parallelFor`. The chunks still running on other threads then count down a `Group` that lived on the unwound stack. A chunk that throws on a worker ends the program. Only `std::bad_alloc` can throw there today, on a picture too large for the memory.
 
-### 4. The matched grade is fitted with the other sliders at their defaults
+### 3. The matched grade is fitted with the other sliders at their defaults
 
 *From reading.* `core::match::fit()` starts from `Settings{}`, and [`MainWindow::showCameraLook()`](../src/editor-lib/src/MainWindow.cpp) applies the result over the picture's own settings. With the highlights, the HDR compression or the noise reduction already moved, the picture differs from the one whose difference the window reported.
 
-### 5. Smaller
+### 4. Smaller
 
 - `ParameterSlider::show(double)`, private, hides `QWidget::show()`: `slider.show()` does not compile; [`ParameterSlider.h`](../src/widgets-lib/include/widgets/ParameterSlider.h).
 - **Match Camera Look…** on an open raw file reads it again from disk, about 3 seconds, though the document holds it; [`matchCameraLook()`](../src/editor-lib/src/CameraLook.cpp).
@@ -142,10 +138,9 @@ Ordered by value against effort; each is one pull request.
 
 | # | Change | Fixes | Trade-off |
 |---|---|---|---|
-| 1 | An undo of settings in `Document`: a list of `Settings`, `Ctrl+Z` and `Ctrl+Shift+Z`, a slider drag one step. | 1 | About 100 lines and their tests; the list is lost when the picture closes. |
-| 2 | Rename over the old TIFF without removing it first, and remove it only where the rename fails because it exists. | 2 | One more branch, tested on Windows. |
-| 3 | Catch an exception in each chunk of `parallelFor`, keep the first, wait for every chunk, then throw it. | 3 | A few lines in the one place every effect goes through. |
-| 4 | Give `core::match::fit()` the picture's settings to start from. | 4 | A match then depends on the picture's other sliders: say so in its result. |
-| 5 | One sRGB curve, each way, and one sRGB-to-XYZ matrix, in `core::color`. | Duplication | None. |
-| 6 | Move the camera match and the image save out of `MainWindow` into a class each, given the document and the renderer, and test them. Put `readCameraShot()` behind an interface beside `ImageReader`. | Separation, SOLID, testability | Two more classes; `MainWindow` back to layout and connections. |
-| 7 | Keep the sections' order in `AdjustmentsPanel`, and rename `ParameterSlider::show()` to `showValue()`. | 5 and the probe | None. |
+| 1 | Rename over the old TIFF without removing it first, and remove it only where the rename fails because it exists. | 1 | One more branch, tested on Windows. |
+| 2 | Catch an exception in each chunk of `parallelFor`, keep the first, wait for every chunk, then throw it. | 2 | A few lines in the one place every effect goes through. |
+| 3 | Give `core::match::fit()` the picture's settings to start from. | 3 | A match then depends on the picture's other sliders: say so in its result. |
+| 4 | One sRGB curve, each way, and one sRGB-to-XYZ matrix, in `core::color`. | Duplication | None. |
+| 5 | Move the camera match and the image save out of `MainWindow` into a class each, given the document and the renderer, and test them. Put `readCameraShot()` behind an interface beside `ImageReader`. | Separation, SOLID, testability | Two more classes; `MainWindow` back to layout and connections. |
+| 6 | Keep the sections' order in `AdjustmentsPanel`, and rename `ParameterSlider::show()` to `showValue()`. | 4 and the probe | None. |

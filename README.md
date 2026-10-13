@@ -215,9 +215,9 @@ The editor saves the settings by itself, next to the picture: `IMG_0001.xmp` for
 
 The window's title shows `*` while the settings are not written yet: for the second after a change, or until the next change after a save that failed. A failed save is shown in the status bar and tried again at the next change; only when the edit would be lost, on closing the window or opening another picture, does the editor ask whether to go on without it. **File > Save Settings** saves at once.
 
-**File > Load Settings…**, `Ctrl+L`, applies the settings of any sidecar to the picture open: one saved for another picture, or one another raw editor wrote. Every value comes from the file, those it lacks at their defaults. It is a change like any other, saved next to the picture a second later: the settings it replaces are not kept.
+**File > Load Settings…**, `Ctrl+L`, applies the settings of any sidecar to the picture open: one saved for another picture, or one another raw editor wrote. Every value comes from the file, those it lacks at their defaults. It is a change like any other, saved next to the picture a second later; **Edit > Revert to Opened** brings back the settings the picture had when it was opened.
 
-**Edit > Reset All** goes back to a picture with no edit: a change like any other, saved in turn. There is no undo.
+**Edit > Revert to Opened** goes back to the settings the picture had when it was opened, even once a change has been saved over them, and **Edit > Revert to Default** to a picture with no edit, every slider at its default. Both are changes like any other, saved in turn. There is no undo: once the picture is closed, the settings it had when opened are gone.
 
 ### Save the Image
 
@@ -244,7 +244,7 @@ A TIFF is compressed without loss and holds its ICC profile, as those of the com
 | `Ctrl+S` | Save the settings now, rather than 1 second after the last change. |
 | `Ctrl+L` | Load the settings of another sidecar. |
 | `Ctrl+Shift+E` | Save the picture with its grade. |
-| `Ctrl+Shift+R` | Reset all the sliders. |
+| `Ctrl+Shift+R` | Revert every slider to its default. |
 | `W` | Pick the white balance from an area; `Esc` cancels. |
 | `\` | Show the picture before the edit, or after. |
 | `Ctrl++`, `Ctrl+-` | Zoom in, zoom out. |

@@ -277,11 +277,19 @@ void MainWindow::createActions()
     file->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
 
     QMenu *edit = menuBar()->addMenu(tr("&Edit"));
+    // The way back from a change saved a second later, e.g. settings loaded by mistake: the grade
+    // the picture had when it was opened.
+    QAction *revert = edit->addAction(tr("&Revert to Opened"), m_document, &Document::revertSettings);
+    revert->setToolTip(tr("Go back to the settings the picture had when it was opened"));
     QAction *reset = edit->addAction(
-        tr("Reset &All"), QKeySequence{tr("Ctrl+Shift+R")}, m_document, &Document::resetSettings);
+        tr("Revert to &Default"),
+        QKeySequence{tr("Ctrl+Shift+R")},
+        m_document,
+        &Document::resetSettings);
+    reset->setToolTip(tr("Put every slider back to its default: no edit"));
     edit->addSeparator();
-    // Neither in a menu nor on the toolbar: its button opens the Color section. The window holds
-    // it, so its key works anywhere in the window.
+    // Neither in a menu nor on the toolbar: its button is at the top of the Color section. The
+    // window holds it, so its key works anywhere in the window.
     m_pickWhite = new QAction{tr("Pick &White Balance"), this};
     addAction(m_pickWhite);
     setThemedIcon(m_pickWhite, "color-picker");
@@ -340,7 +348,7 @@ void MainWindow::createActions()
     }
 
     for (QAction *action :
-         {save, loadSettings, saveImage, reset, m_pickWhite, m_showBefore, matchLook}) {
+         {save, loadSettings, saveImage, revert, reset, m_pickWhite, m_showBefore, matchLook}) {
         action->setEnabled(false);
         connect(m_document, &Document::opened, action, [action] { action->setEnabled(true); });
     }

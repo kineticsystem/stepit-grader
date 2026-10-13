@@ -415,6 +415,26 @@ TEST_F(DocumentTest, LoadsTheSettingsOfAnotherFileAsAChange)
     EXPECT_EQ(document.settingsNameFilter(), "*.xmp");
 }
 
+TEST_F(DocumentTest, RevertsToTheOpenedGradeAfterAnotherWasLoadedAndSaved)
+{
+    // A picture graded before, then given another file's settings by mistake.
+    store->files["/pictures/a.tif"] = contrast(40);
+    openAndWait("/pictures/a.tif");
+    core::Settings other;
+    other.setValue("Exposure2012", 0.8);
+    store->files["/looks/other.xmp"] = other;
+    ASSERT_TRUE(loadSettingsAndWait("/looks/other.xmp"));
+    ASSERT_TRUE(waitForSaves(1));
+    EXPECT_FALSE(store->files["/pictures/a.tif"].has("Contrast2012"));
+
+    // Saved over the grade, which revertSettings() still brings back, and saves.
+    document.revertSettings();
+    EXPECT_DOUBLE_EQ(document.settings().values().at("Contrast2012"), 40);
+    EXPECT_FALSE(document.settings().has("Exposure2012"));
+    ASSERT_TRUE(waitForSaves(2));
+    EXPECT_DOUBLE_EQ(savedContrast("/pictures/a.tif"), 40);
+}
+
 TEST_F(DocumentTest, ReportsSettingsThatCannotBeLoaded)
 {
     openAndWait("/pictures/a.tif");
