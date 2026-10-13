@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 #include "editor/actions/MatchCameraLookAction.h"
-#include "editor/viewmodel/CameraLookViewModel.h"
+#include "editor/FileUtils.h"
 #include "editor/WaitingDialog.h"
+#include "editor/viewmodel/CameraLookViewModel.h"
 
-#include <QFileDialog>
 #include <QMessageBox>
 
 MatchCameraLookAction::MatchCameraLookAction(CameraLookViewModel *viewModel, QWidget *parent)
@@ -23,11 +23,13 @@ void MatchCameraLookAction::execute()
 {
     QStringList raws{m_viewModel->picture()};
     if (!m_viewModel->matchesOpenPicture()) {
-        raws = QFileDialog::getOpenFileNames(
+        // In the picture's folder each time: the raw files it was made from are usually there.
+        raws = FileUtils::getOpenFiles(
             m_parent,
             tr("Choose the Raw Files This Picture Was Made From"),
-            m_viewModel->folder(),
-            m_viewModel->rawNameFilter());
+            m_viewModel->rawNameFilter(),
+            nullptr,
+            m_viewModel->folder());
     }
     const auto status = m_viewModel->start(raws);
     if (!status) {

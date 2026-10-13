@@ -6,6 +6,7 @@ set(CMAKE_AUTOMOC ON)
 add_library(editor-lib STATIC
     include/editor/CameraLookUtils.h
     include/editor/Document.h
+    include/editor/FileUtils.h
     include/editor/ImageExportUtils.h
     include/editor/MainWindow.h
     include/editor/PreviewRenderer.h
@@ -22,6 +23,7 @@ add_library(editor-lib STATIC
     include/editor/viewmodel/WhiteBalanceViewModel.h
     src/CameraLookUtils.cpp
     src/Document.cpp
+    src/FileUtils.cpp
     src/IconUtils.cpp
     src/ImageConversionUtils.cpp
     src/ImageExportUtils.cpp
