@@ -16,17 +16,16 @@
 
 ## Scope and Method
 
-This review judges how StepIt Grader is built, on 13 October 2026, at commit `a1693b9`. How the code works is in [ARCHITECTURE.md](ARCHITECTURE.md); this document does not repeat it.
+This review judges how StepIt Grader is built, on 13 October 2026, at the commit that holds this document. How the code works is in [ARCHITECTURE.md](ARCHITECTURE.md); this document does not repeat it.
 
-It is a partial refresh of the review made at `1ab77b2`, brought up to date since with `LeavePictureViewModel`, `WhiteBalanceViewModel` and `PickWhiteBalanceAction`, read whole, and `MainWindow` read again. Read again, whole: `editor-lib`, about 2,800 lines, with its new view models and actions; what changed in `io-lib` since, the `CameraShotReader` interface and the XMP sidecar's names and damaged copies; and `core::match`. The parts unchanged since `1ab77b2`, `widgets-lib`, `cli-lib` and the rest of `core-lib` and `io-lib`, keep the judgements of that review.
-
+- **Read**, whole: `editor-lib`, about 3,700 lines, its view models, actions, mediators and utilities; in `io-lib`, the readers' interfaces, `imageio::files` and the XMP sidecar; in `core-lib`, `core::match`, `core::color` and `core::parallelFor`; the tests of each. `widgets-lib`, `cli-lib` and the other parts of `core-lib` and `io-lib` are judged on their code at `1ab77b2`, which is the code they hold.
 - **Counted**: the links of each library, the includes between libraries, and the test cases of each folder.
-- **Run**: the whole suite, 195 test cases in 198 runs, passing in about 10 seconds, the four raw tests skipped without raw-converter's samples; again built with AddressSanitizer and UndefinedBehaviorSanitizer, passing with no report; and with ThreadSanitizer under `setarch -R`, passing with 74 reports, none a race between two threads of our code, see [Implementation Issues](#implementation-issues).
-- **Verified**: one suspicion, with a throwaway test, removed after. A finding marked *verified* was reproduced; the others are *from reading*.
+- **Run**: the whole suite, 197 test cases in 200 runs, passing in about 10 seconds, the four raw tests skipped without raw-converter's samples; again built with AddressSanitizer and UndefinedBehaviorSanitizer, passing with no report; and with ThreadSanitizer under `setarch -R`, passing with 78 reports, none a race between two threads of our code, see [Implementation Issues](#implementation-issues).
+- Every finding is *from reading*: none needed a probe to be told apart from a suspicion.
 
 ## Verdict
 
-**Sound.** The layers hold: the engine and the files know no Qt, every dependency points down, and the one idea, *an edit is a set of named values*, runs through the engine, the sidecar, the command line and the camera match alike. The editor now has the shape the last review asked for: the `Document` is the one model, a view model holds each action's rules and tells the views with signals only, and the actions hold the dialogs. Every rule the window held is now a view model's and tested without a window: saving the image, the camera match end to end with a fake reader, the white balance pick, and the wait for the settings to be written before a picture is left. The matched grade is fitted over the picture's own settings.
+**Sound.** The layers hold: the engine and the files know no Qt, every dependency points down, and the one idea, *an edit is a set of named values*, runs through the engine, the sidecar, the command line and the camera match alike. In the editor, the `Document` is the one model, a view model holds each action's rules and tells the views with signals only, the actions hold the dialogs, and mediators keep the parts in step. Each rule is tested without a window: saving the image, the camera match end to end with a fake reader, the white balance pick, and the wait for the settings to be written before a picture is left. A save never harms the file it replaces, an exception in a parallel chunk reaches its caller, and the sRGB curve and matrix are written once.
 
 What needs work: small things, [1](#1-smaller), and the actions, which hold the dialogs, have no test, by design.
 
@@ -37,7 +36,7 @@ What needs work: small things, [1](#1-smaller), and the actions, which hold the 
 | `core-lib` | Yes | No Qt include, no file access; `core::match` reports through `std::function` callbacks, and is given the settings it fits over in `Options::base`. |
 | `io-lib` | Yes | No Qt include; Little CMS stays private in [`ColourProfiles.h`](../src/io-lib/src/ColourProfiles.h), and no public header names libtiff, LibRaw or pugixml. The sidecar asks `RawReader::canRead()` which pictures are raw, rather than keeping a list of its own. |
 | `widgets-lib` | Yes | `CurveView` and `HistogramView` draw what they are given, no effect; `AdjustmentsPanel` knows parameters, not effects. |
-| `editor-lib` | Yes | The view models hold the rules and the actions the dialogs; `MainWindow`, 358 lines, lays them out and connects them, see [Separation of Concerns](#separation-of-concerns). |
+| `editor-lib` | Yes | The view models hold the rules, the actions the dialogs, the mediators the connections; `MainWindow`, 350 lines, lays them out and makes them, see [Separation of Concerns](#separation-of-concerns). |
 | `cli-lib` | Yes | `Grader` returns results; `main()` prints them. |
 
 ## Dependency Direction
@@ -65,13 +64,13 @@ No view model includes a widget; of the actions, the views, only `PickWhiteBalan
 | `CameraShotReader` | [`CameraShotReader.h`](../src/io-lib/include/imageio/CameraShotReader.h) | Good: one implementation, `RawShotReader`, which defers to `RawReader` and `readCameraShot()`, and a fake, so `CameraLookUtils::matchCameraLook()` is tested without raw files. |
 | `SettingsStore` | [`SettingsStore.h`](../src/io-lib/include/imageio/SettingsStore.h) | Good: one implementation, the XMP sidecar, and a fake; where a sidecar lives is the store's to say, `location()`, so the document and the command line never build its name. |
 | `core::match::Options` | [`CameraMatch.h`](../src/core-lib/include/core/CameraMatch.h) | Good: progress and stop as plain callbacks, and `base`, the settings the grade goes over, so the search runs, and is tested, without Qt. |
-| The view models | [`viewmodel/`](../src/editor-lib/include/editor/viewmodel) | Good: `SaveImageViewModel`, `CameraLookViewModel`, `WhiteBalanceViewModel` and `LeavePictureViewModel` are given the document, the pipeline and what they read or keep with, answer calls and emit signals; no widget. Their tests drive them as the actions do. `CameraLookViewModel` keeps the last grade found after a failed match: *verified*, see [3](#1-smaller). |
+| The view models | [`viewmodel/`](../src/editor-lib/include/editor/viewmodel) | Good: `SaveImageViewModel`, `CameraLookViewModel`, `WhiteBalanceViewModel` and `LeavePictureViewModel` are given the document, the pipeline and what they read or keep with, answer calls and emit signals; no widget. Their tests drive them as the actions do. |
 | `StatusController` | [`Status.h`](../src/editor-lib/include/editor/Status.h) | Adequate: a thread-safe flag and a queued signal. One task at a time, which is all the window needs. |
 | `AdjustmentsPanel` | [`AdjustmentsPanel.h`](../src/widgets-lib/include/widgets/AdjustmentsPanel.h) | Good: `addSectionWidget()`, `addSectionHeaderWidget()` and `addHeading()` let the window add to a section without the panel knowing why. `sectionTitles()` returns the titles in alphabetical order, not the order shown: a `std::map`'s, in `AdjustmentsPanel::sectionTitles()`. |
 
 ## Separation of Concerns
 
-**`MainWindow` lays out and connects.** [`MainWindow.cpp`](../src/editor-lib/src/MainWindow.cpp), 358 lines from 713, builds the menus, the toolbar and the dock, and makes the actions with their view models and the four mediators that keep the parts in step: the document and the panel, the renderer and the views, the status bar, and the dialogs. What it still decides is the window's own: the folders the open dialogs start in, the recent files and the theme, kept in `QSettings`, and which actions are enabled once a picture opens. When a picture may be left, which file may be opened and what a white balance pick changes are `LeavePictureViewModel`'s and `WhiteBalanceViewModel`'s.
+**`MainWindow` lays out and connects.** [`MainWindow.cpp`](../src/editor-lib/src/MainWindow.cpp), 350 lines, builds the menus, the toolbar and the dock, and makes the actions with their view models and the four mediators that keep the parts in step: the document and the panel, the renderer and the views, the status bar, and the dialogs. What it decides is the window's own: the folders the open dialogs start in, the recent files and the theme, kept in `QSettings`, and which actions are enabled once a picture opens. When a picture may be left, which file may be opened and what a white balance pick changes are `LeavePictureViewModel`'s and `WhiteBalanceViewModel`'s.
 
 Elsewhere, knowledge sits where it belongs: the document owns the files and their order, the view models own the rules of the actions, the renderer owns the passes, the engine owns the pixels and the search.
 
@@ -90,7 +89,6 @@ Elsewhere, knowledge sits where it belongs: the document owns the files and thei
 | Kept in step by hand | Weight | Where |
 |---|---|---|
 | The slider ids of the camera match | Low: a test checks each names a slider of the pipeline. | String literals in `standardStages()`, against the `Parameter`s of the effects. |
-| The sliders the camera match sets, told to the user | Low: a stage added to `standardStages()` would go untold. | The Apply question of [`MatchCameraLookAction::showFound()`](../src/editor-lib/src/actions/MatchCameraLookAction.cpp) names "the white balance, the tone, the tone curve and the colour mixer". |
 | The highlights and the shadows | Low, and documented: the same code but for three constants, each computing the area luminance again. | [`HighlightsEffect.cpp`](../src/core-lib/src/effects/HighlightsEffect.cpp), [`ShadowsEffect.cpp`](../src/core-lib/src/effects/ShadowsEffect.cpp). |
 | Two luminances | None: Rec. 2020's for the working space, Rec. 709's for the histogram of the screen's image, each where it belongs. | [`Color.h`](../src/core-lib/include/core/Color.h), [`HistogramView.cpp`](../src/widgets-lib/src/HistogramView.cpp). |
 
@@ -100,20 +98,19 @@ Elsewhere, knowledge sits where it belongs: the document owns the files and thei
 |---|---|---|
 | `core` | 58 | The look of the effects, by design, see the architecture's manual checks. |
 | `io` | 27 | `imageio::files::replace()` setting the old file aside where a system does not rename over a file: Linux always does. |
-| `editor` | 92 | `MainWindow` and the actions: no test constructs them. |
+| `editor` | 105 | `MainWindow` and the actions: no test constructs them. |
 | `cli` | 7 | |
 
-**No seam is missing in the editor.** Each rule the window held has its view model's tests: 7 for `SaveImageViewModel`, 5 for `CameraLookViewModel`, the whole match on a fake reader in about 20 ms each, 9 for `LeavePictureViewModel`, with a failing save from `FakeStore`'s `failSaving`, and 3 for `WhiteBalanceViewModel`. One rule is not tested: a pick measured on a picture since left is dropped, as no test can time a pick against an open without a hook in the view model.
+**No seam is missing in the editor.** Each rule of the actions has its view model's tests: 7 for `SaveImageViewModel`, 7 for `CameraLookViewModel`, the whole match on a fake reader in about 20 ms each, 9 for `LeavePictureViewModel`, with a failing save from `FakeStore`'s `failSaving`, and 3 for `WhiteBalanceViewModel`. One rule is not tested: a pick measured on a picture since left is dropped, as no test can time a pick against an open without a hook in the view model.
 
 The actions are not tested, by design: they hold the dialogs, which a test cannot answer.
 
 ## Implementation Issues
 
-Ordered by severity. ThreadSanitizer's 74 reports are all a value handed to a pooled thread through Qt's thread pool, whose synchronisation an uninstrumented Qt hides: the copies `QtConcurrent::run` makes of a lambda's captures on the main thread, read on the pooled thread, in [`Document.cpp`](../src/editor-lib/src/Document.cpp) at the open and the load of settings, and a test's slot connected without a context, run on the match's thread. None is in a view model or an action, nor in `core::parallelFor`, whose exceptions are now kept and thrown once every chunk has ended, checked with ThreadSanitizer and AddressSanitizer over 20 runs, the renderer's generation counter or `core::match`.
+Ordered by severity. ThreadSanitizer's 78 reports are all a value handed to a pooled thread through Qt's thread pool, whose synchronisation an uninstrumented Qt hides: the copies `QtConcurrent::run` makes of a lambda's captures on the main thread, read on the pooled thread, in [`Document.cpp`](../src/editor-lib/src/Document.cpp) at the open and the load of settings, and a test's slot connected without a context, run on the match's thread. None is in a view model or an action, nor in `core::parallelFor`, `ConcurrentUtils`, the renderer's generation counter or `core::match`.
 
 ### 1. Smaller
 
-- `CameraLookViewModel` keeps the last grade found after a later match failed: `summary()` returns its text and `apply()` merges it, *verified*. The action calls `apply()` only after `finished()`, so the user cannot reach it today; a second view could. [`CameraLookViewModel::start()`](../src/editor-lib/src/viewmodel/CameraLookViewModel.cpp) does not clear `m_result`.
 - `ParameterSlider::show(double)`, private, hides `QWidget::show()`: `slider.show()` does not compile; [`ParameterSlider.h`](../src/widgets-lib/include/widgets/ParameterSlider.h).
 - **Match Camera Look…** on an open raw file reads it again from disk, about 3 seconds, though the document holds it: `CameraLookViewModel` passes the path, not the image.
 - `XmpSidecar::save()` keeps a damaged sidecar as `.damaged`, overwriting the copy of an earlier damage.
@@ -124,5 +121,4 @@ Ordered by value against effort; each is one pull request.
 
 | # | Change | Fixes | Trade-off |
 |---|---|---|---|
-| 1 | Clear `CameraLookViewModel`'s result when a match starts, and build the Apply question's list of sliders from the stages. | 1, coupling | None. |
-| 2 | Keep the sections' order in `AdjustmentsPanel`, and rename `ParameterSlider::show()` to `showValue()`. | 1 and the panel's titles | None. |
+| 1 | Keep the sections' order in `AdjustmentsPanel`, and rename `ParameterSlider::show()` to `showValue()`. | 1 and the panel's titles | None. |

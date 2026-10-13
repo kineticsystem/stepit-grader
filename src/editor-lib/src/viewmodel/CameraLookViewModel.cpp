@@ -9,6 +9,9 @@
 
 #include <QFileInfo>
 
+#include <set>
+#include <string>
+
 CameraLookViewModel::CameraLookViewModel(
     Document *document,
     std::shared_ptr<const core::Pipeline> pipeline,
@@ -52,6 +55,8 @@ std::shared_ptr<StatusController> CameraLookViewModel::start(const QStringList &
         return nullptr;
     }
     m_status = std::make_shared<StatusController>();
+    // A grade found before is not this match's: it is not offered once this one fails.
+    m_result.reset();
     // The picture's settings as the match starts: the grade found goes over them.
     ConcurrentUtils::run(
         this,
@@ -88,6 +93,24 @@ QString CameraLookViewModel::summary() const
         text += "\n\n" + tr("The search was stopped: this is the best grade found by then.");
     }
     return text;
+}
+
+QStringList CameraLookViewModel::sectionsSet() const
+{
+    std::set<std::string> ids;
+    for (const core::match::Stage &stage : core::match::standardStages()) {
+        ids.insert(stage.ids.begin(), stage.ids.end());
+    }
+    QStringList sections;
+    for (const auto &effect : m_pipeline->effects()) {
+        const QString section = QString::fromStdString(effect->section());
+        for (const core::Parameter &parameter : effect->parameters()) {
+            if (ids.contains(parameter.id) && !sections.contains(section)) {
+                sections << section;
+            }
+        }
+    }
+    return sections;
 }
 
 void CameraLookViewModel::apply()

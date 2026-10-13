@@ -150,3 +150,27 @@ TEST_F(CameraLookViewModelTest, StartsOneMatchAtATimeAndNoneWithoutFiles)
     first->stop();
     ASSERT_TRUE(QTest::qWaitFor([&] { return !viewModel.isRunning(); }, WAIT_MS));
 }
+
+TEST_F(CameraLookViewModelTest, AFailedMatchLeavesNoGradeToApply)
+{
+    open("/pictures/a.tif");
+    ASSERT_TRUE(matchAndWait({"/raws/a.cr2"}));
+    ASSERT_FALSE(viewModel.summary().isEmpty());
+
+    shots->shot.cameraJpeg.clear();
+    ASSERT_FALSE(matchAndWait({"/raws/a.cr2"}));
+    EXPECT_TRUE(viewModel.summary().isEmpty());
+    viewModel.apply();
+    EXPECT_TRUE(document.settings().values().empty());
+}
+
+TEST_F(CameraLookViewModelTest, NamesTheSectionsWhoseSlidersAMatchSets)
+{
+    const QStringList sections = viewModel.sectionsSet();
+    for (const char *section : {"Color", "Light", "Tone Curve", "Color Mixer"}) {
+        EXPECT_TRUE(sections.contains(section)) << section;
+    }
+    // The local tools are left alone.
+    EXPECT_FALSE(sections.contains("Effects"));
+    EXPECT_FALSE(sections.contains("HDR"));
+}
