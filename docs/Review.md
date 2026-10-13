@@ -16,18 +16,18 @@
 
 ## Scope and Method
 
-This review judges how StepIt Grader is built, on 13 October 2026, at commit `e05117a` with the changes of the branch `tone-curve-and-color-mixer` on top: the tone curve, the colour mixer, the curve and histogram views, matching a camera's look, saving the image. How the code works is in [ARCHITECTURE.md](ARCHITECTURE.md); this document does not repeat it.
+This review judges how StepIt Grader is built, on 13 October 2026, at commit `1ab77b2`. How the code works is in [ARCHITECTURE.md](ARCHITECTURE.md); this document does not repeat it.
 
 - **Read**: every source file of every library and program, about 9,400 lines, the headers of the parts judged, each `CMakeLists.txt`, and the tests, about 3,300 lines.
 - **Counted**: the links of each library, the includes between libraries, the copies of the same code, and the test cases of each folder.
-- **Run**: the whole suite, 144 test cases in 147 runs, passing in about 20 seconds; again built with AddressSanitizer and UndefinedBehaviorSanitizer, passing with no report; and with ThreadSanitizer under `setarch -R`, passing with 85 reports, none with both accesses in our code, see [Implementation Issues](#implementation-issues).
-- **Verified**: four suspicions, each with a throwaway test, removed after. A finding marked *verified* was reproduced; the others are *from reading*.
+- **Run**: the whole suite, 146 test cases in 149 runs, passing in about 20 seconds; again built with AddressSanitizer and UndefinedBehaviorSanitizer, passing with no report; and with ThreadSanitizer under `setarch -R`, passing with 85 reports, none with both accesses in our code, see [Implementation Issues](#implementation-issues).
+- **Verified**: three suspicions, each with a throwaway test, removed after. A finding marked *verified* was reproduced; the others are *from reading*.
 
 ## Verdict
 
-**Sound, with three risks to the user's grades.** The layers hold: the engine and the files know no Qt, every dependency points down, and the one idea, *an edit is a set of named values*, runs through the engine, the sidecar, the command line and the camera match alike. The effects, the readers and the store sit behind small interfaces that the tests fake, and the sanitizers find nothing in our code.
+**Sound, with two risks to the user's grades.** The layers hold: the engine and the files know no Qt, every dependency points down, and the one idea, *an edit is a set of named values*, runs through the engine, the sidecar, the command line and the camera match alike. The effects, the readers and the store sit behind small interfaces that the tests fake, and the sanitizers find nothing in our code.
 
-What needs work is around the user's files, not the pixels: a raw file and a TIFF of the same name share one sidecar ([1](#1-a-raw-file-and-a-tiff-of-the-same-name-share-one-sidecar)), a damaged sidecar keeps its picture from opening ([2](#2-a-damaged-sidecar-keeps-its-picture-from-opening)), and with Revert to Opened gone from the menus there is no way back to a grade once replaced ([3](#3-no-way-back-to-a-grade-once-replaced)). And `MainWindow`, at 697 lines, has started to hold policy that belongs elsewhere, untested because nothing constructs it.
+What needs work is around the user's files, not the pixels: a raw file and a TIFF of the same name share one sidecar ([1](#1-a-raw-file-and-a-tiff-of-the-same-name-share-one-sidecar)), and with Revert to Opened gone from the menus there is no way back to a grade once replaced ([2](#2-no-way-back-to-a-grade-once-replaced)). And `MainWindow`, at 705 lines, has started to hold policy that belongs elsewhere, untested because nothing constructs it.
 
 ## Structure and Boundaries
 
@@ -66,7 +66,7 @@ Only downward, as `CLAUDE.md` asks: `editor-app` → `editor-lib` → `widgets-l
 
 ## Separation of Concerns
 
-**`MainWindow` holds policy.** It should lay the parts out and connect them; [`MainWindow.cpp`](../src/editor-lib/src/MainWindow.cpp), 697 lines, also decides:
+**`MainWindow` holds policy.** It should lay the parts out and connect them; [`MainWindow.cpp`](../src/editor-lib/src/MainWindow.cpp), 705 lines, also decides:
 
 - what a raw file is, `isRawFile()`, from a concrete `imageio::RawReader{}`, to choose which picture `matchCameraLook()` matches;
 - how a matched grade meets the picture's own, merging it into `Document::settings()` in `showCameraLook()`;
@@ -102,8 +102,8 @@ Elsewhere, knowledge sits where it belongs: the document owns the files and thei
 | Folder | Test cases | Untested |
 |---|---|---|
 | `core` | 52 | The look of the effects, by design, see the architecture's manual checks. |
-| `io` | 20 | `TiffWriter` replacing a file when the rename fails, finding [4](#4-the-tiff-writer-deletes-the-file-it-replaces-before-replacing-it). |
-| `editor` | 65 | `MainWindow`: no test constructs it. |
+| `io` | 21 | `TiffWriter` replacing a file when the rename fails, finding [3](#3-the-tiff-writer-deletes-the-file-it-replaces-before-replacing-it). |
+| `editor` | 66 | `MainWindow`: no test constructs it. |
 | `cli` | 7 | |
 
 **The missing seam is `MainWindow`.** Its rules, the raw or TIFF choice of the camera match, the merging of a matched grade, the refusal to save over the picture, the actions enabled once a picture opens, can only be checked by hand. Moved into small classes of their own, each given a `Document` and a renderer, they would be tested as `Document` is.
@@ -118,27 +118,23 @@ Ordered by severity. ThreadSanitizer's 85 reports all have Qt on one side: memor
 
 *Verified.* [`XmpSidecar::location()`](../src/io-lib/src/XmpSidecar.cpp) replaces the extension: `IMG_0001.CR2` and `IMG_0001.tif` in one folder both read and write `IMG_0001.xmp`. Editing one silently replaces the other's grade. Worse, a TIFF developed or graded from a raw and saved beside it opens with the raw's grade and is graded twice. Raw editors name a raw file's sidecar this way because the raw cannot hold its settings; a TIFF can, or takes its full name, `IMG_0001.tif.xmp`.
 
-### 2. A damaged sidecar keeps its picture from opening
-
-*Verified.* [`Document::open()`](../src/editor-lib/src/Document.cpp) reads the picture and its sidecar in one `try`: a sidecar that is not XML ends with `openFailed("Cannot read …/a.xmp: not an XMP document")`, and the picture cannot be opened until the sidecar is deleted by hand. The command line, [`Grader::grade()`](../src/cli-lib/src/Grader.cpp), fails the picture the same way.
-
-### 3. No way back to a grade once replaced
+### 2. No way back to a grade once replaced
 
 *From reading.* The document saves a change a second after it, and nothing in the window calls `Document::revertSettings()` now that **Edit > Revert to Opened** is gone. **File > Load Settings…** replaces every slider and **Edit > Reset All** clears them; either, chosen by mistake, loses the grade for good a second later. There is no undo.
 
-### 4. The TIFF writer deletes the file it replaces before replacing it
+### 3. The TIFF writer deletes the file it replaces before replacing it
 
 *From reading.* [`TiffWriter::write()`](../src/io-lib/src/TiffWriter.cpp) calls `std::filesystem::remove(path)` and then `rename()`, on every system, for Windows' sake. If the rename then fails, the code also removes the temporary file: the old TIFF and the new one are both gone, against the architecture's claim that a failure never harms the file it would replace. [`XmpSidecar::save()`](../src/io-lib/src/XmpSidecar.cpp) renames without removing; one of the two is wrong on Windows.
 
-### 5. An exception in a parallel chunk escapes while other chunks still run
+### 4. An exception in a parallel chunk escapes while other chunks still run
 
 *Verified.* A chunk of [`core::parallelFor()`](../src/core-lib/src/Parallel.cpp) that throws on the calling thread leaves `ThreadPool::run()` at once: the probe caught `out of memory` outside `parallelFor`. The chunks still running on other threads then count down a `Group` that lived on the unwound stack. A chunk that throws on a worker ends the program. Only `std::bad_alloc` can throw there today, on a picture too large for the memory.
 
-### 6. The matched grade is fitted with the other sliders at their defaults
+### 5. The matched grade is fitted with the other sliders at their defaults
 
 *From reading.* `core::match::fit()` starts from `Settings{}`, and [`MainWindow::showCameraLook()`](../src/editor-lib/src/MainWindow.cpp) applies the result over the picture's own settings. With the highlights, the HDR compression or the noise reduction already moved, the picture differs from the one whose difference the window reported.
 
-### 7. Smaller
+### 6. Smaller
 
 - `ParameterSlider::show(double)`, private, hides `QWidget::show()`: `slider.show()` does not compile; [`ParameterSlider.h`](../src/widgets-lib/include/widgets/ParameterSlider.h).
 - **Match Camera Look…** on an open raw file reads it again from disk, about 3 seconds, though the document holds it; [`matchCameraLook()`](../src/editor-lib/src/CameraLook.cpp).
@@ -150,12 +146,11 @@ Ordered by value against effort; each is one pull request.
 
 | # | Change | Fixes | Trade-off |
 |---|---|---|---|
-| 1 | Open a picture whose sidecar cannot be read with no settings, a warning, and the sidecar left as it is until the first change. | 2 | The first change replaces the damaged file: say so in the warning. |
-| 2 | Name a TIFF's sidecar after the whole file name, `IMG_0001.tif.xmp`, and keep `IMG_0001.xmp` for raw files and DNGs; read the old name once, when the new one is missing. | 1 | Another editor looking for `IMG_0001.xmp` beside a TIFF finds nothing; most keep a TIFF's settings inside it anyway. |
-| 3 | An undo of settings in `Document`: a list of `Settings`, `Ctrl+Z` and `Ctrl+Shift+Z`, a slider drag one step. | 3 | About 100 lines and their tests; the list is lost when the picture closes. |
-| 4 | Rename over the old TIFF without removing it first, and remove it only where the rename fails because it exists. | 4 | One more branch, tested on Windows. |
-| 5 | Catch an exception in each chunk of `parallelFor`, keep the first, wait for every chunk, then throw it. | 5 | A few lines in the one place every effect goes through. |
-| 6 | Give `core::match::fit()` the picture's settings to start from. | 6 | A match then depends on the picture's other sliders: say so in its result. |
-| 7 | One sRGB curve, each way, and one sRGB-to-XYZ matrix, in `core::color`. | Duplication | None. |
-| 8 | Move the camera match and the image save out of `MainWindow` into a class each, given the document and the renderer, and test them. Put `readCameraShot()` behind an interface beside `ImageReader`. | Separation, SOLID, testability | Two more classes; `MainWindow` back to layout and connections. |
-| 9 | Keep the sections' order in `AdjustmentsPanel`, and rename `ParameterSlider::show()` to `showValue()`. | 7 and the probe | None. |
+| 1 | Name a TIFF's sidecar after the whole file name, `IMG_0001.tif.xmp`, and keep `IMG_0001.xmp` for raw files and DNGs; read the old name once, when the new one is missing. | 1 | Another editor looking for `IMG_0001.xmp` beside a TIFF finds nothing; most keep a TIFF's settings inside it anyway. |
+| 2 | An undo of settings in `Document`: a list of `Settings`, `Ctrl+Z` and `Ctrl+Shift+Z`, a slider drag one step. | 2 | About 100 lines and their tests; the list is lost when the picture closes. |
+| 3 | Rename over the old TIFF without removing it first, and remove it only where the rename fails because it exists. | 3 | One more branch, tested on Windows. |
+| 4 | Catch an exception in each chunk of `parallelFor`, keep the first, wait for every chunk, then throw it. | 4 | A few lines in the one place every effect goes through. |
+| 5 | Give `core::match::fit()` the picture's settings to start from. | 5 | A match then depends on the picture's other sliders: say so in its result. |
+| 6 | One sRGB curve, each way, and one sRGB-to-XYZ matrix, in `core::color`. | Duplication | None. |
+| 7 | Move the camera match and the image save out of `MainWindow` into a class each, given the document and the renderer, and test them. Put `readCameraShot()` behind an interface beside `ImageReader`. | Separation, SOLID, testability | Two more classes; `MainWindow` back to layout and connections. |
+| 8 | Keep the sections' order in `AdjustmentsPanel`, and rename `ParameterSlider::show()` to `showValue()`. | 6 and the probe | None. |

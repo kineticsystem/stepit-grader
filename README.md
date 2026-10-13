@@ -385,6 +385,8 @@ Without them, those four tests are skipped.
 
 **The sliders are slow.** Build in `Release`.
 
+**A picture opens with no edit, and a warning says its settings cannot be read.** Its sidecar is damaged, e.g. cut short by a full disk or edited by hand. The first change replaces it with a new one; the damaged one stays beside it, e.g. `IMG_0001.xmp.damaged`, to recover by hand.
+
 ## Licences
 
 StepIt Grader is released under the MIT licence, see [`LICENSE`](LICENSE). The software it uses:

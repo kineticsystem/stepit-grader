@@ -180,6 +180,28 @@ TEST_F(DocumentTest, ReportsAnImageThatCannotBeRead)
     EXPECT_TRUE(failed.first().at(0).toString().contains("a.jpg"));
 }
 
+TEST_F(DocumentTest, OpensAPictureWhoseSettingsCannotBeReadWithNoEdit)
+{
+    store->damaged.insert("/pictures/a.tif");
+    QSignalSpy unreadable{&document, &Document::sidecarUnreadable};
+    QSignalSpy failed{&document, &Document::openFailed};
+    openAndWait("/pictures/a.tif");
+
+    ASSERT_TRUE(document.isOpen());
+    EXPECT_EQ(failed.count(), 0);
+    ASSERT_EQ(unreadable.count(), 1);
+    EXPECT_TRUE(unreadable.first().at(0).toString().contains("a.xmp"));
+    EXPECT_TRUE(document.settings().values().empty());
+    EXPECT_FALSE(document.isModified());
+
+    // The damaged sidecar is left alone until a change, which then writes it.
+    QTest::qWait(SAVE_DELAY.count() * 2);
+    EXPECT_EQ(storeSaves(), 0);
+    document.setSettings(contrast(20));
+    ASSERT_TRUE(waitForSaves(1));
+    EXPECT_DOUBLE_EQ(savedContrast("/pictures/a.tif"), 20);
+}
+
 TEST_F(DocumentTest, TracksChangesNotWrittenYet)
 {
     openAndWait("/pictures/a.tif");

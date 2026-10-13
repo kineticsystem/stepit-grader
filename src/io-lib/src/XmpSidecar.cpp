@@ -110,6 +110,13 @@ void setAttribute(pugi::xml_node node, const std::string &name, const std::strin
 
 } // namespace
 
+std::filesystem::path damagedCopy(const std::filesystem::path &sidecar)
+{
+    std::filesystem::path copy = sidecar;
+    copy += ".damaged";
+    return copy;
+}
+
 namespace xmp {
 
 std::string format(const core::Parameter &parameter, double value)
@@ -237,11 +244,27 @@ void XmpSidecar::save(
 {
     const std::filesystem::path path = location(image);
     std::string text;
+    bool damaged = false;
     try {
         const std::string existing = std::filesystem::exists(path) ? readFile(path) : std::string{};
-        text = xmp::write(existing, settings, parameters);
+        try {
+            text = xmp::write(existing, settings, parameters);
+        } catch (const Error &) {
+            // A sidecar that is not XMP cannot be updated, and would fail every save: it is
+            // replaced by a new one, and kept beside it, for what it may still hold.
+            damaged = true;
+            text = xmp::write({}, settings, parameters);
+        }
     } catch (const Error &e) {
         throw Error{"Cannot update " + path.string() + ": " + e.what()};
+    }
+    if (damaged) {
+        std::error_code error;
+        std::filesystem::copy_file(
+            path, damagedCopy(path), std::filesystem::copy_options::overwrite_existing, error);
+        if (error) {
+            throw Error{"Cannot keep a copy of the damaged " + path.string()};
+        }
     }
 
     // Written whole to a temporary file, then renamed over the sidecar, so a failure never leaves
