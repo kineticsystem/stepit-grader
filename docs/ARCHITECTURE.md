@@ -98,7 +98,7 @@ config:
 flowchart TB
     App["stepit-grader<br/>the editor's main()"]
     Cli["stepit-grader-cli<br/>the command line's main()"]
-    Editor["editor-lib<br/>Document, PreviewRenderer, MainWindow"]
+    Editor["editor-lib<br/>Document, view models, actions,<br/>PreviewRenderer, MainWindow"]
     Widgets["widgets-lib<br/>AdjustmentsPanel, sliders, ImageView"]
     CliLib["cli-lib<br/>Options, Grader"]
     IO["io-lib<br/>readers, TIFF writer, XMP sidecar"]
@@ -109,17 +109,17 @@ flowchart TB
     LibRaw["LibRaw"]
     App --> Editor
     Cli --> CliLib
-    CliLib --> IO
-    CliLib --> Core
     Editor --> Widgets
     Editor --> IO
     Editor --> Qt
-    Widgets --> Core
+    CliLib --> IO
     Widgets --> Qt
-    IO --> Core
     IO --> Raw
     IO --> Libs
     Raw --> LibRaw
+    Widgets --> Core
+    IO --> Core
+    CliLib --> Core
 
     classDef default fill:#3b6fb6,stroke:#2c5590,color:#ffffff
 ```
