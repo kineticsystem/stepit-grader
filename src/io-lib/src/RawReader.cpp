@@ -82,4 +82,19 @@ CameraShot readCameraShot(const std::filesystem::path &path)
     }
 }
 
+std::vector<std::string> RawShotReader::extensions() const
+{
+    return RawReader{}.extensions();
+}
+
+bool RawShotReader::canRead(const std::filesystem::path &path) const
+{
+    return RawReader{}.canRead(path);
+}
+
+CameraShot RawShotReader::read(const std::filesystem::path &path) const
+{
+    return readCameraShot(path);
+}
+
 } // namespace imageio

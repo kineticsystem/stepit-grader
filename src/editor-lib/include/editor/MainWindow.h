@@ -3,20 +3,19 @@
 
 #pragma once
 
-#include "core/CameraMatch.h"
 #include "widgets/AdjustmentsPanel.h"
 
 #include <QMainWindow>
 #include <QString>
-
-#include <expected>
 
 #include <functional>
 #include <utility>
 #include <vector>
 
 struct WhiteBalancePick;
+class CameraLookViewModel;
 class Document;
+class SaveImageViewModel;
 class ImageView;
 class PreviewRenderer;
 class QLabel;
@@ -39,6 +38,8 @@ public:
     MainWindow(
         Document *document,
         PreviewRenderer *renderer,
+        SaveImageViewModel *saveImage,
+        CameraLookViewModel *cameraLook,
         std::vector<AdjustmentsPanel::Section> sections,
         QWidget *parent = nullptr);
 
@@ -73,18 +74,12 @@ private:
     void updateZoom(double zoom);
     /// Measures the white balance in the background, and sets it once measured.
     void pickWhiteBalanceAt(QPointF point, double radius);
-    /**
-     * Finds the grade that makes raw files look like their camera's JPEGs: the picture open, when
-     * it is a raw file; otherwise the raw files the user chooses, e.g. those a TIFF was made from.
-     */
-    void matchCameraLook();
-    /// Matches the raw files in the background, the window following it.
-    void runCameraLook(const QStringList &raws);
-    void showCameraLook(const std::expected<core::match::Result, QString> &result);
     void showWhiteBalancePicked(const WhiteBalancePick &pick);
 
     Document *m_document;
     PreviewRenderer *m_renderer;
+    SaveImageViewModel *m_saveImage;
+    CameraLookViewModel *m_cameraLook;
     ImageView *m_view;
     AdjustmentsPanel *m_panel;
     QLabel *m_fileLabel;

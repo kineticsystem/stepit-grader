@@ -7,6 +7,7 @@
 
 #include "TestImages.h"
 
+#include "imageio/CameraShotReader.h"
 #include "imageio/Error.h"
 #include "imageio/ImageReader.h"
 #include "imageio/SettingsStore.h"
@@ -90,6 +91,22 @@ public:
     /// The thread of the last save or loadFile(), to check it is not the caller's.
     mutable std::thread::id lastThread;
     bool failSaving = false;
+};
+
+/// Gives `shot` for any name ending in .cr2, and fails for the others.
+class FakeShotReader : public imageio::CameraShotReader
+{
+public:
+    std::vector<std::string> extensions() const override { return {"cr2"}; }
+    imageio::CameraShot read(const std::filesystem::path &path) const override
+    {
+        if (imageio::extensionOf(path) != "cr2") {
+            throw imageio::Error{"cannot read " + path.string()};
+        }
+        return shot;
+    }
+
+    imageio::CameraShot shot;
 };
 
 } // namespace testutils

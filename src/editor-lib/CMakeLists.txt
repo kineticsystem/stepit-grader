@@ -7,19 +7,20 @@ add_library(editor-lib STATIC
     include/editor/CameraLook.h
     include/editor/Document.h
     include/editor/ImageExport.h
-    include/editor/ImageExporter.h
     include/editor/MainWindow.h
     include/editor/PreviewRenderer.h
     include/editor/RecentFilesMenu.h
     include/editor/Status.h
     include/editor/WaitingDialog.h
+    include/editor/actions/MatchCameraLookAction.h
     include/editor/actions/SaveImageAction.h
+    include/editor/viewmodel/CameraLookViewModel.h
+    include/editor/viewmodel/SaveImageViewModel.h
     src/CameraLook.cpp
     src/Document.cpp
     src/Icons.cpp
     src/ImageConversion.cpp
     src/ImageExport.cpp
-    src/ImageExporter.cpp
     src/MainWindow.cpp
     src/PreviewRenderer.cpp
     src/RecentFilesMenu.cpp
@@ -27,7 +28,10 @@ add_library(editor-lib STATIC
     src/Theme.cpp
     src/WaitingDialog.cpp
     src/WhiteBalancePicker.cpp
-    src/actions/SaveImageAction.cpp)
+    src/actions/MatchCameraLookAction.cpp
+    src/actions/SaveImageAction.cpp
+    src/viewmodel/CameraLookViewModel.cpp
+    src/viewmodel/SaveImageViewModel.cpp)
 target_include_directories(editor-lib PUBLIC include)
 # The icons, a light and a dark drawing of each, built into the library:
 # nothing to install beside the program.

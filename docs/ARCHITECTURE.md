@@ -20,6 +20,7 @@
   - [The Widgets](#the-widgets)
   - [The Document](#the-document)
   - [The Preview Renderer](#the-preview-renderer)
+  - [Models, View Models and Views](#models-view-models-and-views)
   - [The Main Window and main()](#the-main-window-and-main)
 - [The Engine in Another Program](#the-engine-in-another-program)
 - [A Slider Moves](#a-slider-moves)
@@ -97,7 +98,7 @@ config:
 flowchart TB
     App["stepit-grader<br/>the editor's main()"]
     Cli["stepit-grader-cli<br/>the command line's main()"]
-    Editor["editor-lib<br/>Document, PreviewRenderer, MainWindow"]
+    Editor["editor-lib<br/>Document, view models, actions,<br/>PreviewRenderer, MainWindow"]
     Widgets["widgets-lib<br/>AdjustmentsPanel, sliders, ImageView"]
     CliLib["cli-lib<br/>Options, Grader"]
     IO["io-lib<br/>readers, TIFF writer, XMP sidecar"]
@@ -108,17 +109,17 @@ flowchart TB
     LibRaw["LibRaw"]
     App --> Editor
     Cli --> CliLib
-    CliLib --> IO
-    CliLib --> Core
     Editor --> Widgets
     Editor --> IO
     Editor --> Qt
-    Widgets --> Core
+    CliLib --> IO
     Widgets --> Qt
-    IO --> Core
     IO --> Raw
     IO --> Libs
     Raw --> LibRaw
+    Widgets --> Core
+    IO --> Core
+    CliLib --> Core
 
     classDef default fill:#3b6fb6,stroke:#2c5590,color:#ffffff
 ```
@@ -136,12 +137,12 @@ flowchart TB
 | [`core-lib`](../src/core-lib) | The image in the working space, the `Effect` interface, the `Pipeline`, the seventeen effects, the area sampling, the filters, the colour maths, the threads, the conversion for the screen, and the search that matches a camera's look, `core::match`. | Threads only. | Include Qt, read or write a file, know which effects exist outside `StandardPipeline.cpp`. |
 | [`io-lib`](../src/io-lib) | Reading images into the working space, writing them as TIFFs out of it, and the settings in XMP sidecars. | `core-lib`; privately raw-converter, libtiff, Little CMS, pugixml. | Include Qt, change pixels beyond bringing them into the working space, expose a third-party type in a header. |
 | [`widgets-lib`](../src/widgets-lib) | The reusable widgets: the panel of sliders and its sections, the sliders' style, the image view, the curve and the histogram views, and `sectionsOf()`. | `core-lib`, Qt Widgets. | Know the editor, a file or a document: each is given what it shows and reports with signals. |
-| [`editor-lib`](../src/editor-lib) | The document, the background rendering, the white balance picker, saving the graded picture, matching a camera's look and the window that follows it, the main window, its menu of recent files, its themes and icons. | `core-lib`, `widgets-lib`, `io-lib`, Qt Widgets, Concurrent and Svg. | Change pixels itself: it asks the engine. Create its own reader, store or pipeline: it is given them. Read or write a file, or render, on the main thread. |
+| [`editor-lib`](../src/editor-lib) | The document, the background rendering, the white balance picker, the view models of the actions and the actions, saving the graded picture, matching a camera's look and the window that follows it, the main window, its menu of recent files, its themes and icons. | `core-lib`, `widgets-lib`, `io-lib`, Qt Widgets, Concurrent and Svg. | Change pixels itself: it asks the engine. Create its own reader, store or pipeline: it is given them. Read or write a file, or render, on the main thread. Let a model or a view model call a view. |
 | [`editor-app`](../src/editor-app) | `main()`. | `editor-lib`. | Hold any logic beyond choosing the parts. |
 | [`cli-lib`](../src/cli-lib) | The command line's options and the grading of many pictures. | `core-lib`, `io-lib`. | Include Qt, print: it reports results, `main()` prints them. |
 | [`cli-app`](../src/cli-app) | `main()`. | `cli-lib`. | Hold any logic beyond choosing the parts and printing. |
 
-`core-lib` is about 3,750 lines, `io-lib` 1,200, `widgets-lib` 1,650, `editor-lib` 2,350, `cli-lib` 300 and the tests 3,300.
+`core-lib` is about 3,750 lines, `io-lib` 1,350, `widgets-lib` 1,650, `editor-lib` 2,800, `cli-lib` 300 and the tests 3,750.
 
 `core-lib` is built with `-O2` in a Debug build too, except with MSVC: its loops over every pixel are about ten times slower without the optimiser, too slow to follow a slider while the rest of a program is debugged.
 
@@ -228,7 +229,7 @@ On the 21 megapixels of a Canon 5D Mark II, on a 10-core i9, with every effect b
 
 - **What is compared**: a `Sample` per picture, made by `makeSample()`: the raw in the working space, reduced to 1,000 pixels on its long side by the editor, and the camera's JPEG at up to 100,000 of its pixels, the same ones at every run. The JPEG's clipped pixels, a channel at 98% or more, are left out: they say nothing of the camera's curve.
 - **The difference**: each trial grades the samples with the pipeline, converts them to sRGB clipped to [0, 1], as the screen shows them, and takes the mean CIEDE2000 difference from the JPEGs (Sharma et al., 2005), below 1 invisible.
-- **The search**: a Nelder-Mead simplex, in stages, each stage searching its sliders with the others at their best so far. `standardStages()` searches the tone first, the exposure, the contrast, the blacks, the saturation, the vibrance, the white balance and the tone curve, then the colour mixer's 24 sliders. The exposure starts where the median brightness matches. A slider's range, default and decimals come from its `Parameter`; one step of the search is a fortieth of its range, and a value is rounded to the slider's decimals, so the trials are values the panel can show, and a value tried twice is not graded again.
+- **The search**: a Nelder-Mead simplex, in stages, each stage searching its sliders with the others at their best so far. It goes over `Options::base`, e.g. the picture's own settings: the sliders no stage searches keep their values there through the whole search, so the grade fits the picture as it will be shown, and `Result::settings` holds only the sliders searched. The sliders searched start from their defaults, whatever their values in the base, and `Result::errorBefore` is the difference with the base alone. `standardStages()` searches the tone first, the exposure, the contrast, the blacks, the saturation, the vibrance, the white balance and the tone curve, then the colour mixer's 24 sliders. The exposure starts where the median brightness matches. A slider's range, default and decimals come from its `Parameter`; one step of the search is a fortieth of its range, and a value is rounded to the slider's decimals, so the trials are values the panel can show, and a value tried twice is not graded again.
 - **Progress and stopping**: `Options::progress` is called after every trial with the stage, the trials and the best difference so far; `Options::stopped` is asked before every trial, and once it says yes the search returns its best values so far, with `Result::stopped`.
 
 The local tools, the highlights, the shadows, the structure and the HDR compression, are left out: their result depends on the picture's content, so values fitted on one picture would do something else on the next. On the 21 megapixels of a Canon 5D Mark II, on a 10-core i9, a trial takes about 20 ms, keeping the ten cores busy, and the whole search, about 1,000 trials, 20 seconds, plus about 3 seconds to read each raw file.
@@ -242,7 +243,7 @@ An [`ImageReader`](../src/io-lib/include/imageio/ImageReader.h) reads one kind o
 | Reader | What it reads | How |
 |---|---|---|
 | [`TiffReader`](../src/io-lib/src/TiffReader.cpp) | `.tif`, `.tiff`: RGB or grey, 8 or 16 bits, 32-bit float, contiguous or planar. | libtiff, then Little CMS from the file's ICC profile to linear Rec. 2020, several rows at a time. Without a profile: sRGB, or linear Rec. 2020 in float. |
-| [`RawReader`](../src/io-lib/src/RawReader.cpp) | `.dng` and the camera raw formats LibRaw reads. | raw-converter's `readRawFile()` and `renderImage()` into Rec. 2020: demosaiced, white balanced as shot, nothing else. `readCameraShot()` reads the same with the camera's JPEG, the largest the file holds, as the camera stored it, and the orientation that turns it upright as it turned the picture. |
+| [`RawReader`](../src/io-lib/src/RawReader.cpp) | `.dng` and the camera raw formats LibRaw reads. | raw-converter's `readRawFile()` and `renderImage()` into Rec. 2020: demosaiced, white balanced as shot, nothing else. `readCameraShot()`, and `RawShotReader` behind the [`CameraShotReader`](../src/io-lib/include/imageio/CameraShotReader.h) interface, read the same with the camera's JPEG, the largest the file holds, as the camera stored it, and the orientation that turns it upright as it turned the picture. |
 | [`ImageLoader`](../src/io-lib/include/imageio/ImageLoader.h) | What its readers read. | The first reader that reads the file. `makeStandardImageReader()` gives the TIFF and the raw readers. |
 
 ### The TIFF Writer
@@ -302,6 +303,7 @@ Every read and write of a file runs on `m_files`, a `QThreadPool` of one thread,
 
 - `open()` first asks for a save of what waits to be saved, then reads the image and its sidecar, and ends with `opened()` then `settingsChanged()`, or `openFailed()` with the reader's message. A sidecar that cannot be read does not fail the open: the picture opens with no edit, not modified, and `sidecarUnreadable()` follows `opened()` with the store's message; the sidecar stays as it is until the first change. The sliders stay live while it reads, so `finishOpening()` asks for a save once more before it takes the new picture: a change made meanwhile belongs to the old one.
 - `setSettings()`, `resetSettings()` and `revertSettings()` emit `settingsChanged()` only when a value changes, and `modifiedChanged()` when the settings start or stop differing from what the sidecar holds, or from the defaults without a sidecar. `revertSettings()` goes back to the settings the picture was opened with.
+- `mergeSettings()` sets the values it is given and leaves the others as they are: a grade of some sliders over the picture's own. The camera match and the white balance's eyedropper apply their result with it.
 - Each change that leaves the settings different from the sidecar restarts a single-shot `QTimer`; when it fires, `save()` runs. A slider dragged restarts it at every step, so the file is written once, a second after it stops. A change back to what the sidecar holds stops the timer: nothing is written, and a picture opened and closed without a change gets no sidecar.
 - `save()` asks for a write through the store, if the settings differ from the sidecar, of the path and the settings as they are, and returns; `finishSaving()` ends it with `saved()` or `saveFailed()`. `isSaving()` is true until the last one asked has ended, and a save of the settings a save already writes is not asked twice. The settings stay modified until it ends, and after, if they changed meanwhile: those changes wait for the next save. After a failure the settings stay modified and the timer is not restarted: the next change tries again, rather than a loop writing to a full disk every second.
 - `loadSettings()` applies the settings of another file, read through the store's `loadFile()` in the background: every value of it, the others at their defaults, as a change, so saved and reverted like one. It ends with `settingsLoaded()`, or `settingsLoadFailed()` with the store's message and the settings as they were; with nothing when another picture opened meanwhile, as the settings were not for it. It returns false, at once, without a picture.
@@ -319,19 +321,107 @@ A counter, shared with the passes, goes up with every change. A full pass compar
 
 A change also stops the preview running, at its next effect, so the latest settings start sooner: a slider moved twice renders the second position only. But a slider dragged sends a change every few milliseconds, and stopping every preview would show no picture until it stops. So a preview is stopped **at most once between two pictures shown**, `m_previewStopped`: during a drag, the picture still follows as often as a preview can be made. A new picture, `setSource()`, or settings shown from the pictures kept stop the preview whatever the count, as its result is of no use.
 
+### Models, View Models and Views
+
+The editor's code is in three layers, so a rule can be tested without a window and a dialog changed without touching a rule:
+
+- **The model** is the `Document`, the one every view shares: the picture, its settings, its files.
+- **A view model** holds the rules of one feature, e.g. which file the picture may be saved to, and its work in the background. It is given the document and what else it needs, e.g. the pipeline or a reader, and shows no widget: it answers calls, and tells the views what happened with signals only. Each is in [`viewmodel/`](../src/editor-lib/include/editor/viewmodel).
+- **A view** is a widget or an action. It is given its view model and calls it; it asks the user, with its dialogs, and shows what the view model's signals say. Each menu action with rules of its own is a `QAction` in [`actions/`](../src/editor-lib/include/editor/actions).
+
+A model or a view model never calls a view, nor knows one: a test drives a view model as its action would, with fakes for the document's reader and store, and checks its signals.
+
+```mermaid
+---
+config:
+  theme: base
+  themeCSS: ".edgeLabel p { padding: 4px 10px; }"
+  flowchart:
+    padding: 20
+    nodeSpacing: 40
+    rankSpacing: 50
+  class:
+    padding: 16
+  sequence:
+    boxMargin: 12
+    boxTextMargin: 8
+    noteMargin: 28
+    messageMargin: 40
+    actorMargin: 60
+    labelBoxWidth: 56
+    labelBoxHeight: 28
+  themeVariables:
+    primaryColor: "#3b6fb6"
+    primaryTextColor: "#ffffff"
+    primaryBorderColor: "#2c5590"
+    lineColor: "#8b949e"
+    textColor: "#4d86d6"
+    actorBkg: "#3b6fb6"
+    actorBorder: "#2c5590"
+    actorTextColor: "#ffffff"
+    actorLineColor: "#8b949e"
+    signalColor: "#8b949e"
+    signalTextColor: "#4d86d6"
+    noteBkgColor: "#3b6fb6"
+    noteTextColor: "#ffffff"
+    noteBorderColor: "#2c5590"
+    secondaryColor: "#3b6fb6"
+    tertiaryColor: "#3b6fb6"
+    clusterBkg: "transparent"
+    clusterBorder: "#8b949e"
+    titleColor: "#4d86d6"
+    edgeLabelBackground: "#3b6fb6"
+    classText: "#ffffff"
+    labelBoxBkgColor: "#3b6fb6"
+    labelBoxBorderColor: "#2c5590"
+    labelTextColor: "#ffffff"
+    loopTextColor: "#4d86d6"
+    mainBkg: "#3b6fb6"
+    nodeBorder: "#2c5590"
+    nodeTextColor: "#ffffff"
+    secondaryBorderColor: "#2c5590"
+    secondaryTextColor: "#ffffff"
+    tertiaryBorderColor: "#2c5590"
+    tertiaryTextColor: "#ffffff"
+    errorBkgColor: "#3b6fb6"
+    errorTextColor: "#ffffff"
+---
+flowchart TB
+    Main["main()<br/>makes them all"]
+    Window["MainWindow<br/>lays out and connects"]
+    Action["an action, e.g. SaveImageAction<br/>dialogs only"]
+    ViewModel["a view model, e.g. SaveImageViewModel<br/>the rules, the work in the background"]
+    Document["Document<br/>the model every view shares"]
+    Main -- gives the view models --> Window
+    Window -- makes, given its view model --> Action
+    Action -- calls --> ViewModel
+    ViewModel -- calls --> Document
+    ViewModel -. signals .-> Action
+    Document -. signals .-> Window
+```
+
+[`main()`](../src/editor-app/src/main.cpp) makes the view models, as it makes the document, and gives them to `MainWindow`, which makes each action with its view model, puts it in its menu and enables it once a picture opens. The window also listens to a view model's signals where the status bar shows them.
+
+| Menu | View | View model | Its signals |
+|---|---|---|---|
+| **File > Save Image…**, `Ctrl+Shift+E` | [`SaveImageAction`](../src/editor-lib/include/editor/actions/SaveImageAction.h) | [`SaveImageViewModel`](../src/editor-lib/include/editor/viewmodel/SaveImageViewModel.h) | `saved(path)`, `saveFailed(message)` |
+| **Edit > Match Camera Look…** | [`MatchCameraLookAction`](../src/editor-lib/include/editor/actions/MatchCameraLookAction.h) | [`CameraLookViewModel`](../src/editor-lib/include/editor/viewmodel/CameraLookViewModel.h) | `finished()`, `failed(message)`, and the `StatusController`'s `status` while it runs |
+
+**Save Image…** is a [`SaveImageAction`](../src/editor-lib/include/editor/actions/SaveImageAction.h), which holds the dialogs only: it asks for a file and its type among [`imageFormats()`](../src/editor-lib/include/editor/ImageExport.h), and says why a file is refused or a save failed. The rules are a [`SaveImageViewModel`](../src/editor-lib/include/editor/viewmodel/SaveImageViewModel.h)'s, given the document, the renderer's pipeline and a `QSettings`, so tests reach them: it suggests `<name>-graded.<suffix>` beside the picture, offers first the format used last, kept under `imageFormat`, gives a name without a suffix the format's, refuses the picture's own file, and runs `saveImage()` off the main thread: the document's picture graded at its full size, then written with `imageio::TiffWriter`, 16 bits, deflate, its ICC profile, or as an 8-bit sRGB JPEG of quality 95 by Qt. The window shows its `saved()` in the status bar.
+
+**Match Camera Look…** is a [`MatchCameraLookAction`](../src/editor-lib/include/editor/actions/MatchCameraLookAction.h), which holds the dialogs only, following a [`CameraLookViewModel`](../src/editor-lib/include/editor/viewmodel/CameraLookViewModel.h), given the document, the renderer's pipeline and a `CameraShotReader`, which holds the rules, so tests drive it with a fake reader. It matches the picture open when the reader reads it, a raw file or a DNG, which holds its camera's JPEG, and otherwise the action asks for the raw files the picture was made from, a TIFF holding no JPEG; opening a raw file says so in the status bar. The view model runs [`matchCameraLook()`](../src/editor-lib/include/editor/CameraLook.h) off the main thread, one at a time: it reads each file with the reader, decodes the camera's JPEG with Qt, refuses one of another shape than the picture, reduces both and makes the samples, then calls `core::match::fit()` with the picture's settings as they were when the match started, its `Options::base`: the sliders it does not search keep their values through the search, so the grade found fits the picture as it will be shown, e.g. with its highlights or HDR compression, and the result holds only the sliders searched. It reports a [`Status`](../src/editor-lib/include/editor/Status.h), a message and a value from 0 to 100, through a `StatusController`, whose signal reaches the main thread queued, and reads `isStopped()` between its steps. A [`WaitingDialog`](../src/editor-lib/include/editor/WaitingDialog.h) follows the status with a progress bar, and its Stop button, or its close button, asks the task to stop; it stays until the task ends. The action then shows the view model's `summary()`, the difference as the picture is now and with the grade found, and on a click on Apply the view model merges the grade found into the picture's settings with `Document::mergeSettings()`: the sliders searched change, the others stay. The white balance picked with the eyedropper is merged the same way.
+
+To add an action of this kind, see [How to Extend StepIt Grader](#how-to-extend-stepit-grader).
+
 ### The Main Window and main()
 
-[`MainWindow`](../src/editor-lib/src/MainWindow.cpp) lays the parts out and connects them, which know nothing of each other:
+[`MainWindow`](../src/editor-lib/src/MainWindow.cpp) lays the parts out and connects them, which know nothing of each other. `main()` makes them all and gives them to the window: the document, the one model every view shares, the renderer, and the view models of the actions, `SaveImageViewModel` and `CameraLookViewModel`, in [`viewmodel/`](../src/editor-lib/include/editor/viewmodel). A view is given its model and calls it; a model never calls a view, it tells them with signals.
 
 - **In the middle**, the `ImageView`.
 - **On the right**, a dock without a title: a `HistogramView` at the top, outside the panel's scroll area so it stays in sight, counted again from every image the renderer sends, the picture before the edit included; under it the `AdjustmentsPanel`, every section folded at the start and the sliders disabled until a picture is open.
 - **In the panel**, three widgets of the window's own: the white balance's eyedropper, 28 pixels, first in the Color section, above the temperature and the tint it sets, in no menu nor toolbar, the window holding its action so its key, `W`, works anywhere in it; a `CurveView` above the Tone Curve's sliders, drawn again from `ToneCurveEffect::knots()`, `curve()` and `splits()` at every change of the settings; and the headings Hue, Saturation and Luminance in the colour mixer.
 - **Above**, a fixed toolbar with the actions used most: open, save, before and after, and the zoom.
 - **The menus**: File, Edit, View and Settings, whose Theme is kept in `QSettings` under `theme` and applied by `main()` before the window is made; and the status bar.
-
-**Save Image…**, in the File menu, is a [`SaveImageAction`](../src/editor-lib/include/editor/actions/SaveImageAction.h), which holds the dialogs only: it asks for a file and its type among [`imageFormats()`](../src/editor-lib/include/editor/ImageExport.h), and says why a file is refused or a save failed. The rules are an [`ImageExporter`](../src/editor-lib/include/editor/ImageExporter.h)'s, given the document, the renderer's pipeline and a `QSettings`, so tests reach them: it suggests `<name>-graded.<suffix>` beside the picture, offers first the format used last, kept under `imageFormat`, gives a name without a suffix the format's, refuses the picture's own file, and runs `saveImage()` off the main thread: the document's picture graded at its full size, then written with `imageio::TiffWriter`, 16 bits, deflate, its ICC profile, or as an 8-bit sRGB JPEG of quality 95 by Qt. The window shows its `saved()` in the status bar.
-
-**Match Camera Look…**, in the Edit menu, matches the picture open when it is a raw file or a DNG, which holds its camera's JPEG, and otherwise asks for the raw files the picture was made from, a TIFF holding no JPEG; opening a raw file says so in the status bar. It then runs [`matchCameraLook()`](../src/editor-lib/include/editor/CameraLook.h) off the main thread: it reads each file with `readCameraShot()`, decodes the camera's JPEG with Qt, refuses one of another shape than the picture, reduces both and makes the samples, then calls `core::match::fit()`. It reports a [`Status`](../src/editor-lib/include/editor/Status.h), a message and a value from 0 to 100, through a `StatusController`, whose signal reaches the main thread queued, and reads `isStopped()` between its steps. A [`WaitingDialog`](../src/editor-lib/include/editor/WaitingDialog.h) follows the status with a progress bar, and its Stop button, or its close button, asks the task to stop; it stays until the task ends. The window then shows the difference before and after, and applies the grade found on a click on Apply, over the picture's settings: the sliders searched change, the others stay.
 
 | From | Signal | To |
 |---|---|---|
@@ -353,14 +443,14 @@ A change also stops the preview running, at its next effect, so the latest setti
 | `RecentFilesMenu` | `filesChanged` | `QSettings`, under `recentPictures`, given back with `setFiles()` when the window opens |
 | `Document` | `opened` | `RecentFilesMenu::addFile`: only a picture that opened is listed |
 | **Pick White Balance**, `W`, and its button at the top of the Color section | `toggled` | `ImageView::setPickMode` |
-| `ImageView` | `pointPicked` | `pickWhiteBalance()`, by `QtConcurrent::run`, then `Document::setSettings` with the temperature and the tint picked and the other values as they are by then, unless another picture opened meanwhile; the action unchecked: one pick, then back to dragging |
+| `ImageView` | `pointPicked` | `pickWhiteBalance()`, by `QtConcurrent::run`, then `Document::mergeSettings` with the temperature and the tint picked, the other values as they are by then, unless another picture opened meanwhile; the action unchecked: one pick, then back to dragging |
 | `ImageView` | `pickCancelled` | the action unchecked |
 | **Before and After**, `\\`, and its button in the toolbar | `toggled` | `PreviewRenderer::render`, with no settings for before and the document's for after; **Before** in the status bar |
 | `Document` | `settingsChanged`, while before | the action unchecked, without a signal: a change is seen on the edit |
 
 Before another picture is opened, or the window closed, `whenSaved()` asks for `Document::save()` and keeps what to do next; `continueWhenSaved()`, called at once and on `saved` and `saveFailed`, does it once no save is running and nothing waits to be written. A change made while the save ran is written in turn. It asks only when the last save failed, whether to go on without the edit: there, and only there, the edit would be lost. A close waits the same way: `closeEvent()` ignores the event while settings wait to be written, and closes the window again, from the event loop, once they are.
 
-[`main()`](../src/editor-app/src/main.cpp) is the composition root: it makes the standard pipeline, the standard reader, the XMP sidecar, the document, the renderer and the window, and gives each its parts.
+[`main()`](../src/editor-app/src/main.cpp) is the composition root: it makes the standard pipeline, the standard reader, the XMP sidecar, the document, the renderer, the view models, `SaveImageViewModel` with the application's `QSettings` and `CameraLookViewModel` with a `RawShotReader`, and the window, and gives each its parts.
 
 ## The Engine in Another Program
 
@@ -455,8 +545,8 @@ A slider dragged sends a change for every step: each starts a preview if none is
 | The window, the widgets, the document's state | The main thread. | |
 | Reading a picture and its sidecar | `QtConcurrent::run` on the document's one-thread pool, from `Document::open()`. | `QFutureWatcher::finished`, on the main thread. |
 | Saving a sidecar, loading another file's settings | `QtConcurrent::run` on the same pool, after the reads and writes asked before, from `Document::save()` and `loadSettings()`. | `QMetaObject::invokeMethod` on the document, queued; the destructor waits for the pool. |
-| Saving the image | `QtConcurrent::run`, from `ImageExporter::save()`. | `QFutureWatcher::finished`, on the main thread. |
-| Matching a camera's look | `QtConcurrent::run`, from `MainWindow::matchCameraLook()`; each trial's effects on `core::parallelFor`'s pool. | Its `Status` by the `StatusController`'s signal, queued to the main thread; its result by `QFutureWatcher::finished`. |
+| Saving the image | `QtConcurrent::run`, from `SaveImageViewModel::save()`. | `QFutureWatcher::finished`, on the main thread. |
+| Matching a camera's look | `QtConcurrent::run`, from `CameraLookViewModel::start()`; each trial's effects on `core::parallelFor`'s pool. | Its `Status` by the `StatusController`'s signal, queued to the main thread; its result by `QFutureWatcher::finished`. |
 | Counting the histogram | The main thread, from the image each pass sends: at most 500,000 pixels, a few milliseconds. | |
 | Measuring the white balance picked | `QtConcurrent::run`, from `MainWindow::pickWhiteBalanceAt()`. | `QFutureWatcher::finished`, on the main thread. |
 | Reducing the picture for the preview | The first preview pass, from `PreviewRenderer`. | With the pass's result, kept unless another picture came meanwhile. |
@@ -479,12 +569,12 @@ All the tests are in one program, [`src/tests`](../src/tests), with GoogleTest a
 
 | Folder | Test cases | What they cover |
 |---|---|---|
-| [`core`](../src/tests/core) | 52 | CIEDE2000 against the pairs of its reference; white and black in L*a*b*, brighter than white as white; a sample leaves out the clipped pixels, keeps at most its count, the same ones at every run, and refuses a JPEG of another size; the match finds the grade that made a JPEG, stops when asked with its best so far, reports its progress in order to the end, and its standard stages name sliders of the pipeline; every effect at its defaults changes nothing; the tone curve's splits come in order with room between them, whatever their sliders; the tone curve moves its region and not the others, keeps the colour, leaves white and above alone, never goes down whatever its sliders, even with the splits crossed, and changes nothing with only the splits moved; the colour mixer's bands follow the colour wheel and have the raw editors' ids, a band changes its own colours only, turns the hue, scales the chroma and moves the luminance by a stop, and greys stay grey with every slider at its end; the luminance noise smooths sensor grain to under 40% on both sides of an edge that stays as steep, its detail puts grain back, and a grey stays grey; the colour noise removes the blotches without changing the lightness, and keeps red and blue to their sides of an edge; the guided filter by another plane follows the guide's edges; parameter ids unique, defaults in range; each effect moves the picture the right way, e.g. the highlights change the bright side of a step and leave the dark one; the defringe greys a purple fringe beside an edge, keeps a purple patch away from edges and a green fringe, and finds the same fringe in a preview a third of the size; a warm and a cool grey turned neutral by the white balance found for them, a grey needing none, black giving none, a cast beyond the sliders clamped; the HDR curve untouched below its knee, smooth at it, rising to white, the highlights brought below white with their hue, and local contrast keeping the texture of bright areas; the area sampling's disc and clipped pixels; the box blur, the guided filter's edge without overshoot; Oklab round trip; D65 adapted to D65; middle grey as sRGB 118; downscale and orientation; a cancelled render. |
+| [`core`](../src/tests/core) | 53 | CIEDE2000 against the pairs of its reference; white and black in L*a*b*, brighter than white as white; a sample leaves out the clipped pixels, keeps at most its count, the same ones at every run, and refuses a JPEG of another size; the match finds the grade that made a JPEG, fits it over the settings it is given and returns only the sliders it searched, stops when asked with its best so far, reports its progress in order to the end, and its standard stages name sliders of the pipeline; every effect at its defaults changes nothing; the tone curve's splits come in order with room between them, whatever their sliders; the tone curve moves its region and not the others, keeps the colour, leaves white and above alone, never goes down whatever its sliders, even with the splits crossed, and changes nothing with only the splits moved; the colour mixer's bands follow the colour wheel and have the raw editors' ids, a band changes its own colours only, turns the hue, scales the chroma and moves the luminance by a stop, and greys stay grey with every slider at its end; the luminance noise smooths sensor grain to under 40% on both sides of an edge that stays as steep, its detail puts grain back, and a grey stays grey; the colour noise removes the blotches without changing the lightness, and keeps red and blue to their sides of an edge; the guided filter by another plane follows the guide's edges; parameter ids unique, defaults in range; each effect moves the picture the right way, e.g. the highlights change the bright side of a step and leave the dark one; the defringe greys a purple fringe beside an edge, keeps a purple patch away from edges and a green fringe, and finds the same fringe in a preview a third of the size; a warm and a cool grey turned neutral by the white balance found for them, a grey needing none, black giving none, a cast beyond the sliders clamped; the HDR curve untouched below its knee, smooth at it, rising to white, the highlights brought below white with their hue, and local contrast keeping the texture of bright areas; the area sampling's disc and clipped pixels; the box blur, the guided filter's edge without overshoot; Oklab round trip; D65 adapted to D65; middle grey as sRGB 118; downscale and orientation; a cancelled render. |
 | [`io`](../src/tests/io) | 23 | A raw file and a TIFF of the same name each with its own sidecar; a TIFF reading its former sidecar, unless a raw file of the same name owns it, and saving under its new name; A sidecar that is not XMP replaced on a save, and kept beside it as it was; A camera shot read with its JPEG, when the sample is there; a 16-bit linear Rec. 2020 TIFF read unchanged; an untagged 8-bit TIFF taken for sRGB; orientation; a broken file reported; readers chosen by extension; a Canon CR2 and a DNG, when the samples are there; the sidecar's formatting, another raw editor's sidecar read, elements with another prefix, an update that keeps everything else, a round trip on disk, a sidecar that is not XML, a sidecar of any name loaded; the TIFF writer in each of the four colour spaces read back through its embedded profile, white clipped, a file replaced whole without a temporary file left, a folder that does not exist; the colour spaces' names. |
-| [`editor`](../src/tests/editor) | 67 | The grade a picture opened with brought back after another was loaded and saved over it; A picture whose settings cannot be read opens with no edit, says so, and writes its sidecar only after a change; A slider marks how far it moved from its default, on the side it moved, and nothing at its default; the image saved with its grade, as a TIFF read back with the grade in it and as a JPEG, and a file that cannot be written reported; the formats offered; the camera's JPEG comes upright in linear sRGB, turned as the raw was, a JPEG of another shape is refused and of another size scaled; a raw file is matched and stops when asked, when the sample is there, and a file that is not a raw is reported; the waiting window follows the status, asks to stop with its button and with its close button, and waits for the task; a heading names the group below it and stands apart; a section's title is the same block open or closed; the histogram counts each level, the luminance and the pixels clipped at each end, samples a large image on a grid, and reads any format as the screen shows it; its view lights the triangle of a clipped end only; the curve view draws the curve it is given and leaves the diagonal where the curve has left it; a section's sliders stand at least 8 pixels below its title; a widget added to a section goes above its sliders and folds with them, and a section the panel does not have takes nothing; the slider emits the user's changes only, shows its value as text with no box to type in, and resets on a double click; it is a plain line with an empty circle, grabbed near its edge without moving and moving on a press on the line, and `SliderStyle::apply()` gives a plain `QSlider` the same style; a section folds on a click on its title, and reports the user's clicks only; the panel's sections fold and report it, and still fold and scroll with the sliders disabled; the recent files menu keeps the latest first, without duplicates and up to its maximum, shows numbered names with the paths as tooltips, reports the file chosen with its path, removes and clears; every icon is built in, with a drawing for each theme; the dark theme is Fusion in dark grey, greys disabled icons, and System gives the desktop's style back; the themes' names; the renderer shows settings rendered already at once, from the pictures it keeps, and forgets them for a new picture; the view in pick mode reports the click in pixels of the full image and leaves pick mode with `Esc`; the picker sets the white balance of a warm card and keeps the other values, and explains a clipped or black area; the sections follow the pipeline, or the order given, with the standard order Color, Light, Tone Curve, Color Mixer, Effects first, the white balance alone in Color, the vibrance and the saturation at the end of Light, and the sharpening in Effects; the panel emits every value; the view fits, zooms, and keeps the zoom when the full picture replaces the preview; the document, with a fake reader and store, loads another file's settings as a change, saved and reverted, reports a file it cannot load with the settings unchanged, loads nothing without a picture, opens with the saved settings, reports what it cannot read, tracks the changes not written yet; saves a change after the delay and not before, many quick changes once, nothing without a change, at once on request and before another picture opens; reverts to the settings it was opened with and saves that; reports a failed save and tries again at the next change; saves and loads off the caller's thread, writes the same settings once when asked twice, keeps a change made while saving modified and writes it next, and drops settings asked for a picture left while another opened; the renderer reduces the preview in its first pass, not in `setSource()`, sends a preview then the full picture, and only one full pass for many quick changes; with deliberately slow effects, it stops a preview made old by a change or by a new picture, and still shows pictures while a slider is dragged. |
+| [`editor`](../src/tests/editor) | 80 | The grade a picture opened with brought back after another was loaded and saved over it; A picture whose settings cannot be read opens with no edit, says so, and writes its sidecar only after a change; A slider marks how far it moved from its default, on the side it moved, and nothing at its default; the image saved with its grade, as a TIFF read back with the grade in it and as a JPEG, and a file that cannot be written reported; the formats offered; the save's view model suggests a name beside the picture, offers the format used last, adds the format's suffix, refuses the picture's own file, by its name and without its suffix, and a save without a picture; the camera look's view model, with a fake reader, matches the open picture only when it is a raw file, offers the reader's raw files in either case, finds a grade and applies it over a slider it does not set, reports a raw file without its JPEG, and runs one match at a time; the camera's JPEG comes upright in linear sRGB, turned as the raw was, a JPEG of another shape is refused and of another size scaled; a raw file is matched and stops when asked, when the sample is there, and a file that is not a raw is reported; the waiting window follows the status, asks to stop with its button and with its close button, and waits for the task; a heading names the group below it and stands apart; a section's title is the same block open or closed; the histogram counts each level, the luminance and the pixels clipped at each end, samples a large image on a grid, and reads any format as the screen shows it; its view lights the triangle of a clipped end only; the curve view draws the curve it is given and leaves the diagonal where the curve has left it; a section's sliders stand at least 8 pixels below its title; a widget added to a section goes above its sliders and folds with them, and a section the panel does not have takes nothing; the slider emits the user's changes only, shows its value as text with no box to type in, and resets on a double click; it is a plain line with an empty circle, grabbed near its edge without moving and moving on a press on the line, and `SliderStyle::apply()` gives a plain `QSlider` the same style; a section folds on a click on its title, and reports the user's clicks only; the panel's sections fold and report it, and still fold and scroll with the sliders disabled; the recent files menu keeps the latest first, without duplicates and up to its maximum, shows numbered names with the paths as tooltips, reports the file chosen with its path, removes and clears; every icon is built in, with a drawing for each theme; the dark theme is Fusion in dark grey, greys disabled icons, and System gives the desktop's style back; the themes' names; the renderer shows settings rendered already at once, from the pictures it keeps, and forgets them for a new picture; the view in pick mode reports the click in pixels of the full image and leaves pick mode with `Esc`; the picker sets the white balance of a warm card and keeps the other values, and explains a clipped or black area; the sections follow the pipeline, or the order given, with the standard order Color, Light, Tone Curve, Color Mixer, Effects first, the white balance alone in Color, the vibrance and the saturation at the end of Light, and the sharpening in Effects; the panel emits every value; the view fits, zooms, and keeps the zoom when the full picture replaces the preview; the document, with a fake reader and store, loads another file's settings as a change, saved and reverted, reports a file it cannot load with the settings unchanged, loads nothing without a picture, opens with the saved settings, reports what it cannot read, tracks the changes not written yet, merges some values over its settings; saves a change after the delay and not before, many quick changes once, nothing without a change, at once on request and before another picture opens; reverts to the settings it was opened with and saves that; reports a failed save and tries again at the next change; saves and loads off the caller's thread, writes the same settings once when asked twice, keeps a change made while saving modified and writes it next, and drops settings asked for a picture left while another opened; the renderer reduces the preview in its first pass, not in `setSource()`, sends a preview then the full picture, and only one full pass for many quick changes; with deliberately slow effects, it stops a preview made old by a change or by a new picture, and still shows pictures while a slider is dragged. |
 | [`cli`](../src/tests/cli) | 7 | Every option read, the defaults, what is wrong reported with a message, `--` before a name with a dash; the grader, with a fake reader and store, applies the settings given to every picture, or each picture's own sidecar, or none; never writes over the picture, nor over a TIFF without `--overwrite`; reports a picture that fails and grades the others, and refuses a second picture of the same name. |
 
-The 149 test cases, 152 runs as the TIFF writer's round trip runs once per colour space, take about 20 seconds, most of it reading the raw samples and waiting for the document's saves. The four tests that read the samples, which [`fetch-samples.sh`](https://github.com/kineticsystem/raw-converter/blob/main/bin/fetch-samples.sh) of raw-converter downloads, are skipped without them.
+The 163 test cases, 166 runs as the TIFF writer's round trip runs once per colour space, take about 9 seconds without the raw samples, most of it waiting for the document's saves. The four tests that read the samples, which [`fetch-samples.sh`](https://github.com/kineticsystem/raw-converter/blob/main/bin/fetch-samples.sh) of raw-converter downloads, are skipped without them.
 
 What has no automated test, and how to check it by hand:
 
@@ -508,7 +598,9 @@ What has no automated test, and how to check it by hand:
 | Change the preview's size or delay | The arguments of `PreviewRenderer` in `main()`. |
 | Change the delay before a save | The `saveDelay` argument of `Document` in `main()`. |
 | Add a reusable widget | A header in `include/widgets` and a source in `src` of `widgets-lib`, both in its `CMakeLists.txt`, knowing nothing of the editor; a test in `WidgetsTest.cpp`. A widget of the editor's own, e.g. a menu, goes in `editor-lib`, as `RecentFilesMenu` does. |
-| Add a menu action that does work | The work in `QtConcurrent::run`, or in the document's pool when it touches a file, and its result back with a `QFutureWatcher` or a queued call; the window only connects it. |
+| Add a menu action with rules of its own, e.g. Export a Contact Sheet | A view model in `viewmodel/`, given the document and what else it needs, holding the rules and the work, in `QtConcurrent::run` or in the document's pool when it touches a file, its result back with a `QFutureWatcher`, and telling it with signals; an action in `actions/`, a `QAction` given the view model, holding the dialogs; both in `editor-lib`'s `CMakeLists.txt`. `main()` makes the view model and gives it to `MainWindow`, which makes the action, adds it to a menu and enables it once a picture opens. A test drives the view model with the fakes of `testutils/Fakes.h`. |
+| Add a menu action that only calls the document, e.g. Revert to Opened | A `QAction` in `MainWindow::createActions()`, connected to the document's slot. |
+| Match the camera's look of another kind of file | A class implementing `CameraShotReader`, given to `CameraLookViewModel` in `main()`. |
 
 ## Design Decisions and Trade-offs
 
@@ -517,6 +609,8 @@ What has no automated test, and how to check it by hand:
 **The HDR compression on the brightest channel.** A curve on the luminance would let a bright, saturated colour keep a channel above white, which then clips to another hue. On the brightest channel, every channel ends at or below white with its ratios intact. The price: saturated highlights are compressed more than grey ones of the same luminance.
 
 **A search, not a camera profile, to match the camera's look.** The camera's look is found as values of the sliders the editor has, the tone curve and the colour mixer among them, by trying them against the camera's own JPEG. It needs no camera profile, no file of the camera maker's or of another editor's, and its result is an ordinary grade, which the panel shows and the sidecar keeps. The price: the sliders are not a free curve nor a table of colours, so what they cannot do stays, about 2 in CIEDE2000 on a colour chart; and the search takes about half a minute a picture, which the window follows, and which the user can stop with the best grade so far.
+
+**Each action a view model and a view.** The rules of an action, which file it may write, which files it reads, how its result meets the picture's settings, are in a view model that shows no widget, so a test reaches them without a dialog; the action keeps the dialogs, which only a person can answer. A view model tells the views with signals, never calls them, so it is tested alone and a second view can follow it. The price: two classes for each such action, and the window connects one more pair.
 
 **The names of the `crs` namespace as the parameter ids.** The sidecar needs no table from the editor's names to the file's, and an old sidecar reads the same as long as the ids stay. The price: an id cannot be renamed without breaking old sidecars, and a tool of the editor's own still goes in that namespace.
 

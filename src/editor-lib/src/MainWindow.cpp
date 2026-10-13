@@ -2,17 +2,16 @@
 // SPDX-License-Identifier: MIT
 
 #include "editor/MainWindow.h"
-#include "editor/CameraLook.h"
+#include "editor/viewmodel/CameraLookViewModel.h"
 #include "editor/Document.h"
 #include "editor/Icons.h"
-#include "editor/ImageExporter.h"
+#include "editor/viewmodel/SaveImageViewModel.h"
 #include "editor/PreviewRenderer.h"
 #include "editor/RecentFilesMenu.h"
 #include "editor/Theme.h"
-#include "editor/WaitingDialog.h"
 #include "editor/WhiteBalancePicker.h"
+#include "editor/actions/MatchCameraLookAction.h"
 #include "editor/actions/SaveImageAction.h"
-#include "imageio/RawReader.h"
 #include "widgets/CurveView.h"
 #include "widgets/HistogramView.h"
 #include "widgets/ImageView.h"
@@ -65,14 +64,6 @@ constexpr int SAVE_FAILED_MESSAGE_MS = 15000;
 /// How long the status bar tells that a raw file can be matched to its camera's look.
 constexpr int RAW_HINT_MS = 10000;
 
-/// Whether the file is a camera raw file or a DNG, which holds its camera's JPEG.
-bool isRawFile(const QString &path)
-{
-    const std::string suffix = QFileInfo{path}.suffix().toLower().toStdString();
-    const auto extensions = imageio::RawReader{}.extensions();
-    return std::ranges::find(extensions, suffix) != extensions.end();
-}
-
 /// The points the curve of the Tone Curve section is drawn with: enough for it to look smooth.
 constexpr int CURVE_POINTS = 129;
 
@@ -95,11 +86,15 @@ void showCurve(CurveView &view, const core::Settings &settings)
 MainWindow::MainWindow(
     Document *document,
     PreviewRenderer *renderer,
+    SaveImageViewModel *saveImage,
+    CameraLookViewModel *cameraLook,
     std::vector<AdjustmentsPanel::Section> sections,
     QWidget *parent)
     : QMainWindow{parent}
     , m_document{document}
     , m_renderer{renderer}
+    , m_saveImage{saveImage}
+    , m_cameraLook{cameraLook}
     , m_view{new ImageView{this}}
     , m_panel{new AdjustmentsPanel{std::move(sections)}}
     , m_fileLabel{new QLabel{this}}
@@ -269,17 +264,16 @@ void MainWindow::createActions()
     loadSettings->setToolTip(
         tr("Apply the settings of a sidecar, e.g. one saved for another picture"));
     file->addSeparator();
-    auto *exporter = new ImageExporter{m_document, m_renderer->pipeline(), new QSettings{this}, this};
-    auto *saveImage = new SaveImageAction{exporter, this};
-    connect(saveImage, &SaveImageAction::started, this, [this](const QString &path) {
+    auto *saveImageAction = new SaveImageAction{m_saveImage, this};
+    connect(saveImageAction, &SaveImageAction::started, this, [this](const QString &path) {
         statusBar()->showMessage(tr("Saving %1…").arg(QDir::toNativeSeparators(path)));
     });
-    connect(exporter, &ImageExporter::saved, this, [this](const QString &path) {
+    connect(m_saveImage, &SaveImageViewModel::saved, this, [this](const QString &path) {
         statusBar()
             ->showMessage(tr("Saved %1").arg(QDir::toNativeSeparators(path)), SAVED_MESSAGE_MS);
     });
-    connect(exporter, &ImageExporter::saveFailed, statusBar(), &QStatusBar::clearMessage);
-    file->addAction(saveImage);
+    connect(m_saveImage, &SaveImageViewModel::saveFailed, statusBar(), &QStatusBar::clearMessage);
+    file->addAction(saveImageAction);
     file->addSeparator();
     file->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
 
@@ -304,9 +298,8 @@ void MainWindow::createActions()
     m_pickWhite->setCheckable(true);
     m_pickWhite->setToolTip(tr("Click an area that should be white or grey (W)"));
     connect(m_pickWhite, &QAction::toggled, m_view, &ImageView::setPickMode);
-    QAction *matchLook
-        = edit->addAction(tr("&Match Camera Look…"), this, &MainWindow::matchCameraLook);
-    matchLook->setToolTip(tr("Find the grade that makes raw files look like their camera's JPEGs"));
+    QAction *matchLook = new MatchCameraLookAction{m_cameraLook, this};
+    edit->addAction(matchLook);
 
     QMenu *view = menuBar()->addMenu(tr("&View"));
     m_showBefore = view->addAction(tr("&Before and After"));
@@ -357,7 +350,7 @@ void MainWindow::createActions()
     for (QAction *action :
          {save,
           loadSettings,
-          static_cast<QAction *>(saveImage),
+          static_cast<QAction *>(saveImageAction),
           revert,
           reset,
           m_pickWhite,
@@ -366,80 +359,6 @@ void MainWindow::createActions()
         action->setEnabled(false);
         connect(m_document, &Document::opened, action, [action] { action->setEnabled(true); });
     }
-}
-
-void MainWindow::matchCameraLook()
-{
-    // A raw file holds its camera's JPEG: it is matched itself. A TIFF does not: the raw files it
-    // was made from are.
-    if (isRawFile(m_document->path())) {
-        runCameraLook({m_document->path()});
-        return;
-    }
-    QStringList patterns;
-    for (const std::string &extension : imageio::RawReader{}.extensions()) {
-        const QString suffix = QString::fromStdString(extension);
-        patterns << "*." + suffix << "*." + suffix.toUpper();
-    }
-    const QStringList raws = QFileDialog::getOpenFileNames(
-        this,
-        tr("Choose the Raw Files This Picture Was Made From"),
-        QFileInfo{m_document->path()}.absolutePath(),
-        tr("Camera raw files (%1)").arg(patterns.join(' ')));
-    if (!raws.isEmpty()) {
-        runCameraLook(raws);
-    }
-}
-
-void MainWindow::runCameraLook(const QStringList &raws)
-{
-    auto controller = std::make_shared<StatusController>();
-    auto *dialog = new WaitingDialog{controller, tr("Stop"), this};
-    dialog->setWindowTitle(tr("Matching the Camera's Look"));
-    using Outcome = std::expected<core::match::Result, QString>;
-    auto *watcher = new QFutureWatcher<Outcome>{this};
-    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, dialog] {
-        dialog->accept();
-        dialog->deleteLater();
-        watcher->deleteLater();
-        showCameraLook(watcher->result());
-    });
-    watcher->setFuture(QtConcurrent::run([raws, pipeline = m_renderer->pipeline(), controller] {
-        return ::matchCameraLook(raws, *pipeline, *controller);
-    }));
-    dialog->open();
-}
-
-void MainWindow::showCameraLook(const std::expected<core::match::Result, QString> &result)
-{
-    const QString title = tr("Match Camera Look");
-    if (!result) {
-        QMessageBox::warning(this, title, result.error());
-        return;
-    }
-    QString text = tr("The difference from the camera's JPEG is %1 before any edit, and %2 with "
-                      "the grade found, after %3 trials.")
-                       .arg(result->errorBefore, 0, 'f', 1)
-                       .arg(result->errorAfter, 0, 'f', 1)
-                       .arg(result->trials);
-    if (result->stopped) {
-        text += "\n\n" + tr("The search was stopped: this is the best grade found by then.");
-    }
-    text += "\n\n"
-            + tr(
-                "Apply it to the picture? It sets the white balance, the tone, the tone curve and "
-                "the colour mixer; the other sliders stay as they are. The picture's settings keep "
-                "it, as any grade.");
-    if (QMessageBox::question(
-            this, title, text, QMessageBox::Apply | QMessageBox::Discard, QMessageBox::Apply)
-        != QMessageBox::Apply) {
-        return;
-    }
-    core::Settings settings = m_document->settings();
-    for (const auto &[id, value] : result->settings.values()) {
-        settings.setValue(id, value);
-    }
-    m_document->setSettings(settings);
 }
 
 void MainWindow::chooseFile()
@@ -487,7 +406,7 @@ void MainWindow::onOpened()
     const auto image = m_document->image();
     m_renderer->setSource(image);
     m_panel->setControlsEnabled(true);
-    if (isRawFile(m_document->path())) {
+    if (m_cameraLook->matchesOpenPicture()) {
         statusBar()->showMessage(
             tr("A raw file: Edit > Match Camera Look grades it like its camera's JPEG"),
             RAW_HINT_MS);
@@ -580,12 +499,12 @@ void MainWindow::pickWhiteBalanceAt(QPointF point, double radius)
             return;
         }
         // The settings may have changed meanwhile: only the white balance is the pick's.
-        core::Settings settings = m_document->settings();
+        core::Settings whiteBalance;
         for (const core::Parameter &parameter :
              {core::WhiteBalanceEffect::TEMPERATURE, core::WhiteBalanceEffect::TINT}) {
-            settings.setValue(parameter.id, pick->settings.value(parameter));
+            whiteBalance.setValue(parameter.id, pick->settings.value(parameter));
         }
-        m_document->setSettings(settings);
+        m_document->mergeSettings(whiteBalance);
         showWhiteBalancePicked(*pick);
     });
     watcher->setFuture(QtConcurrent::run([image, settings = m_document->settings(), point, radius] {

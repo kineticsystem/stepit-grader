@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "imageio/ImageReader.h"
+#include "imageio/CameraShotReader.h"
 
 #include <algorithm>
 #include <cctype>
@@ -19,6 +20,11 @@ std::string extensionOf(const std::filesystem::path &path)
 }
 
 bool ImageReader::canRead(const std::filesystem::path &path) const
+{
+    return std::ranges::contains(extensions(), extensionOf(path));
+}
+
+bool CameraShotReader::canRead(const std::filesystem::path &path) const
 {
     return std::ranges::contains(extensions(), extensionOf(path));
 }

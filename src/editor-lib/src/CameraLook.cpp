@@ -4,7 +4,6 @@
 #include "editor/CameraLook.h"
 #include "core/Geometry.h"
 #include "imageio/Error.h"
-#include "imageio/RawReader.h"
 
 #include <QFileInfo>
 
@@ -62,7 +61,11 @@ std::expected<core::Image, QString> cameraJpegImage(
 }
 
 std::expected<core::match::Result, QString> matchCameraLook(
-    const QStringList &raws, const core::Pipeline &pipeline, StatusController &status)
+    const QStringList &raws,
+    const imageio::CameraShotReader &reader,
+    const core::Pipeline &pipeline,
+    const core::Settings &base,
+    StatusController &status)
 {
     std::vector<core::match::Sample> samples;
     for (int i = 0; i < raws.size(); ++i) {
@@ -74,8 +77,7 @@ std::expected<core::match::Result, QString> matchCameraLook(
             QObject::tr("Reading %1 (%2 of %3)…").arg(name).arg(i + 1).arg(raws.size()),
             READING_SHARE * i / static_cast<int>(raws.size())});
         try {
-            imageio::CameraShot shot = imageio::readCameraShot(
-                std::filesystem::path{raws[i].toStdU16String()});
+            imageio::CameraShot shot = reader.read(std::filesystem::path{raws[i].toStdU16String()});
             if (shot.cameraJpeg.empty()) {
                 return std::unexpected(QObject::tr("%1 has no camera JPEG.").arg(name));
             }
@@ -94,6 +96,7 @@ std::expected<core::match::Result, QString> matchCameraLook(
     }
 
     core::match::Options options;
+    options.base = base;
     options.stopped = [&status] { return status.isStopped(); };
     options.progress = [&status](const core::match::Progress &progress) {
         status.setStatus(Status{

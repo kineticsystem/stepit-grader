@@ -7,7 +7,7 @@
 #include "core/StandardPipeline.h"
 #include "editor/Document.h"
 #include "editor/ImageExport.h"
-#include "editor/ImageExporter.h"
+#include "editor/viewmodel/SaveImageViewModel.h"
 
 #include <QSettings>
 #include <QSignalSpy>
@@ -30,7 +30,7 @@ QString pathOf(const std::filesystem::path &path)
     return QString::fromStdU16String(path.u16string());
 }
 
-struct ImageExporterTest : ::testing::Test
+struct SaveImageViewModelTest : ::testing::Test
 {
     std::filesystem::path folder = testutils::outputFolder();
     /// A file of its own, not the user's settings.
@@ -38,7 +38,7 @@ struct ImageExporterTest : ::testing::Test
     std::shared_ptr<const core::Pipeline> pipeline = core::makeStandardPipeline();
     Document document{
         std::make_shared<FakeReader>(), std::make_shared<FakeStore>(), pipeline->parameters()};
-    ImageExporter exporter{&document, pipeline, &settings};
+    SaveImageViewModel viewModel{&document, pipeline, &settings};
 
     void open()
     {
@@ -53,37 +53,37 @@ struct ImageExporterTest : ::testing::Test
 
 } // namespace
 
-TEST_F(ImageExporterTest, SuggestsAFileBesideThePictureWithTheFormatsSuffix)
+TEST_F(SaveImageViewModelTest, SuggestsAFileBesideThePictureWithTheFormatsSuffix)
 {
     open();
-    EXPECT_EQ(exporter.suggestedPath(tiff()), "/pictures/a-graded.tif");
-    EXPECT_EQ(exporter.suggestedPath(jpeg()), "/pictures/a-graded.jpg");
+    EXPECT_EQ(viewModel.suggestedPath(tiff()), "/pictures/a-graded.tif");
+    EXPECT_EQ(viewModel.suggestedPath(jpeg()), "/pictures/a-graded.jpg");
 }
 
-TEST_F(ImageExporterTest, OffersTheFirstFormatUntilOneIsUsed)
+TEST_F(SaveImageViewModelTest, OffersTheFirstFormatUntilOneIsUsed)
 {
-    EXPECT_EQ(exporter.preferredFilter(), tiff());
+    EXPECT_EQ(viewModel.preferredFilter(), tiff());
     settings.setValue("imageFormat", "a format since removed");
-    EXPECT_EQ(exporter.preferredFilter(), tiff());
+    EXPECT_EQ(viewModel.preferredFilter(), tiff());
 }
 
-TEST_F(ImageExporterTest, OffersTheFormatUsedLast)
+TEST_F(SaveImageViewModelTest, OffersTheFormatUsedLast)
 {
     open();
-    QSignalSpy saved{&exporter, &ImageExporter::saved};
-    ASSERT_TRUE(exporter.save(pathOf(folder / "graded.jpg"), jpeg()).has_value());
+    QSignalSpy saved{&viewModel, &SaveImageViewModel::saved};
+    ASSERT_TRUE(viewModel.save(pathOf(folder / "graded.jpg"), jpeg()).has_value());
     ASSERT_TRUE(QTest::qWaitFor([&] { return !saved.isEmpty(); }, 5000));
 
-    const ImageExporter next{&document, pipeline, &settings};
+    const SaveImageViewModel next{&document, pipeline, &settings};
     EXPECT_EQ(next.preferredFilter(), jpeg());
 }
 
-TEST_F(ImageExporterTest, SavesTheGradedPictureGivingANameWithoutSuffixTheFormats)
+TEST_F(SaveImageViewModelTest, SavesTheGradedPictureGivingANameWithoutSuffixTheFormats)
 {
     open();
-    QSignalSpy saved{&exporter, &ImageExporter::saved};
-    QSignalSpy failed{&exporter, &ImageExporter::saveFailed};
-    const auto saving = exporter.save(pathOf(folder / "graded"), jpeg());
+    QSignalSpy saved{&viewModel, &SaveImageViewModel::saved};
+    QSignalSpy failed{&viewModel, &SaveImageViewModel::saveFailed};
+    const auto saving = viewModel.save(pathOf(folder / "graded"), jpeg());
     ASSERT_TRUE(saving.has_value()) << saving.error().toStdString();
     EXPECT_EQ(*saving, pathOf(folder / "graded.jpg"));
 
@@ -93,31 +93,31 @@ TEST_F(ImageExporterTest, SavesTheGradedPictureGivingANameWithoutSuffixTheFormat
     EXPECT_TRUE(std::filesystem::exists(folder / "graded.jpg"));
 }
 
-TEST_F(ImageExporterTest, RefusesToReplaceThePicture)
+TEST_F(SaveImageViewModelTest, RefusesToReplaceThePicture)
 {
     open();
-    QSignalSpy saved{&exporter, &ImageExporter::saved};
-    QSignalSpy failed{&exporter, &ImageExporter::saveFailed};
+    QSignalSpy saved{&viewModel, &SaveImageViewModel::saved};
+    QSignalSpy failed{&viewModel, &SaveImageViewModel::saveFailed};
     // Its own name, and its name without the suffix the format would add.
-    EXPECT_FALSE(exporter.save(PICTURE, tiff()).has_value());
-    EXPECT_FALSE(exporter.save("/pictures/a", tiff()).has_value());
+    EXPECT_FALSE(viewModel.save(PICTURE, tiff()).has_value());
+    EXPECT_FALSE(viewModel.save("/pictures/a", tiff()).has_value());
 
     QTest::qWait(100);
     EXPECT_TRUE(saved.isEmpty());
     EXPECT_TRUE(failed.isEmpty());
 }
 
-TEST_F(ImageExporterTest, RefusesWithNoPictureOpen)
+TEST_F(SaveImageViewModelTest, RefusesWithNoPictureOpen)
 {
-    EXPECT_FALSE(exporter.save(pathOf(folder / "graded.tif"), tiff()).has_value());
+    EXPECT_FALSE(viewModel.save(pathOf(folder / "graded.tif"), tiff()).has_value());
 }
 
-TEST_F(ImageExporterTest, ReportsAFileThatCannotBeWritten)
+TEST_F(SaveImageViewModelTest, ReportsAFileThatCannotBeWritten)
 {
     open();
-    QSignalSpy saved{&exporter, &ImageExporter::saved};
-    QSignalSpy failed{&exporter, &ImageExporter::saveFailed};
-    ASSERT_TRUE(exporter.save("/no/such/folder/graded.tif", tiff()).has_value());
+    QSignalSpy saved{&viewModel, &SaveImageViewModel::saved};
+    QSignalSpy failed{&viewModel, &SaveImageViewModel::saveFailed};
+    ASSERT_TRUE(viewModel.save("/no/such/folder/graded.tif", tiff()).has_value());
 
     ASSERT_TRUE(QTest::qWaitFor([&] { return saved.count() + failed.count() > 0; }, 5000));
     EXPECT_EQ(failed.count(), 1);

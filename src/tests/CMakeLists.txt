@@ -13,9 +13,10 @@ add_executable(stepit-grader-tests
     io/TiffWriterTest.cpp
     io/XmpSidecarTest.cpp
     editor/CameraLookTest.cpp
+    editor/CameraLookViewModelTest.cpp
     editor/DocumentTest.cpp
     editor/ImageExportTest.cpp
-    editor/ImageExporterTest.cpp
+    editor/SaveImageViewModelTest.cpp
     editor/WidgetsTest.cpp
     cli/CliTest.cpp)
 target_link_libraries(stepit-grader-tests PRIVATE

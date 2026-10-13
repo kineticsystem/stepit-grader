@@ -133,6 +133,15 @@ void Document::setSettings(const core::Settings &settings)
     }
 }
 
+void Document::mergeSettings(const core::Settings &values)
+{
+    core::Settings settings = m_settings;
+    for (const auto &[id, value] : values.values()) {
+        settings.setValue(id, value);
+    }
+    setSettings(settings);
+}
+
 void Document::resetSettings()
 {
     setSettings(core::Settings{});

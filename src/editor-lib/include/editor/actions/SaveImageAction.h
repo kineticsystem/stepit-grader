@@ -5,27 +5,27 @@
 
 #include <QAction>
 
-class ImageExporter;
+class SaveImageViewModel;
 
 /**
- * File > Save Image…: asks for a file and its format, and has the exporter save the picture there;
- * tells the user when the exporter refuses the file or the save fails. The dialogs only: what is
- * saved, and where it may be, is the exporter's.
+ * File > Save Image…: asks for a file and its format, and has the view model save the picture there;
+ * tells the user when the view model refuses the file or the save fails. The dialogs only: what is
+ * saved, and where it may be, is the view model's.
  */
 class SaveImageAction : public QAction
 {
     Q_OBJECT
 
 public:
-    SaveImageAction(ImageExporter *exporter, QWidget *parent);
+    SaveImageAction(SaveImageViewModel *viewModel, QWidget *parent);
 
 Q_SIGNALS:
-    /// The exporter took the file, and saves the picture to it in the background.
+    /// The view model took the file, and saves the picture to it in the background.
     void started(const QString &path);
 
 private:
     void execute();
 
-    ImageExporter *m_exporter;
+    SaveImageViewModel *m_viewModel;
     QWidget *m_parent;
 };

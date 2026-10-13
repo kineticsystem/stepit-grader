@@ -197,14 +197,14 @@ Zoom with the wheel, around the cursor, or with the **View** menu; drag the pict
 
 ### Match the Camera's Look
 
-A raw file looks darker and flatter in the editor than on the camera's screen: the camera shows the JPEG it made, with its own look, and the editor shows the raw as it is. **Edit > Match Camera Look…** finds the grade that gives the raw the camera's look: it tries values of the sliders until the raw, graded, looks like the camera's JPEG. What it matches depends on the picture open:
+A raw file looks darker and flatter in the editor than on the camera's screen: the camera shows the JPEG it made, with its own look, and the editor shows the raw as it is. **Edit > Match Camera Look…** finds the grade that gives the raw the camera's look: it tries values of the sliders until the raw, graded, looks like the camera's JPEG. It tries them over the picture's own settings, so a slider it does not set, e.g. the highlights or the HDR compression, counts in what it matches. What it matches depends on the picture open:
 
 | Picture open | What is matched |
 |---|---|
 | A raw file or a DNG | The picture itself, against the JPEG it holds. Nothing to choose. When it opens, the status bar says so. |
 | A TIFF | The raw files it was made from, which the editor asks for, starting in the TIFF's folder: a TIFF holds no camera JPEG, but a TIFF developed from raw files, linear and untouched, e.g. a focus stack merged, has the same tones as they have, so their grade fits it. |
 
-A window shows how far it is: the stage, the trials and the difference so far. It takes about half a minute a picture. **Stop** ends it early, with the best grade found by then. The editor then shows the difference from the camera's JPEG before and after, in CIEDE2000, where below 1 cannot be seen and about 2 is seen side by side only, and asks whether to apply the grade. **Apply** sets the white balance, the tone, the tone curve and the colour mixer of the open picture; the other sliders stay as they are. The picture's sidecar keeps the grade, as any grade: **File > Load Settings…** applies it to another picture, and the command line grades many with it.
+A window shows how far it is: the stage, the trials and the difference so far. It takes about half a minute a picture. **Stop** ends it early, with the best grade found by then. The editor then shows the difference from the camera's JPEG as the picture is now and with the grade found, in CIEDE2000, where below 1 cannot be seen and about 2 is seen side by side only, and asks whether to apply the grade. **Apply** sets the white balance, the tone, the tone curve and the colour mixer of the open picture; the other sliders stay as they are. The picture's sidecar keeps the grade, as any grade: **File > Load Settings…** applies it to another picture, and the command line grades many with it.
 
 > [!IMPORTANT]
 > Turn off the camera's Auto Lighting Optimizer for the raw files you match: it changes each JPEG by its content, so no grade can follow it.
