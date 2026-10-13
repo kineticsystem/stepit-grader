@@ -8,29 +8,26 @@
 #include "editor/RecentFilesMenu.h"
 #include "editor/SessionProperties.h"
 #include "editor/ThemeMenu.h"
-#include "editor/ThemeUtils.h"
 #include "editor/actions/BeforeAfterToggleAction.h"
 #include "editor/actions/LoadSettingsAction.h"
 #include "editor/actions/MatchCameraLookAction.h"
 #include "editor/actions/OpenAction.h"
 #include "editor/actions/PickWhiteBalanceAction.h"
 #include "editor/actions/SaveImageAction.h"
-#include "editor/viewmodel/CameraLookViewModel.h"
+#include "editor/mediators/DialogsMediator.h"
+#include "editor/mediators/DocumentPanelMediator.h"
+#include "editor/mediators/PreviewMediator.h"
+#include "editor/mediators/StatusBarMediator.h"
 #include "editor/viewmodel/LeavePictureViewModel.h"
-#include "editor/viewmodel/SaveImageViewModel.h"
-#include "editor/viewmodel/WhiteBalanceViewModel.h"
 #include "widgets/CurveView.h"
-#include "widgets/HistogramUtils.h"
 #include "widgets/HistogramView.h"
 #include "widgets/ImageView.h"
 
-#include <QApplication>
 #include <QCloseEvent>
 #include <QDir>
 #include <QDockWidget>
 #include <QFileInfo>
 #include <QHBoxLayout>
-#include <QLabel>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QSettings>
@@ -57,35 +54,9 @@ constexpr int HISTOGRAM_TOP = 8;
 constexpr int PICK_BOTTOM_SPACE = 6;
 /// The size of its icon, in pixels: larger than a tool's, as it is the first thing to use.
 constexpr int PICK_ICON_SIZE = 28;
-/// How long the status bar shows that the settings were saved, which happens after every edit.
-constexpr int SAVED_MESSAGE_MS = 3000;
-/// How long it shows a failed save; the title's * stays until a save succeeds.
-constexpr int SAVE_FAILED_MESSAGE_MS = 15000;
 
-/// How long the status bar shows what a pick of the white balance did.
-constexpr int PICK_MESSAGE_MS = 6000;
-/// How long it tells that a picture was not opened, as another was opening.
+/// How long the status bar tells that a picture was not opened, as another was opening.
 constexpr int BUSY_MESSAGE_MS = 5000;
-
-/// How long the status bar tells that a raw file can be matched to its camera's look.
-constexpr int RAW_HINT_MS = 10000;
-
-/// The points the curve of the Tone Curve section is drawn with: enough for it to look smooth.
-constexpr int CURVE_POINTS = 129;
-
-/// Draws the tone curve the settings make, with the borders of its regions.
-void showCurve(CurveView &view, const core::Settings &settings)
-{
-    const auto knots = core::ToneCurveEffect::knots(settings);
-    std::vector<QPointF> points;
-    points.reserve(CURVE_POINTS);
-    for (int i = 0; i < CURVE_POINTS; ++i) {
-        const double tone = static_cast<double>(i) / (CURVE_POINTS - 1);
-        points.emplace_back(tone, core::ToneCurveEffect::curve(knots, tone));
-    }
-    const auto splits = core::ToneCurveEffect::splits(settings);
-    view.setCurve(std::move(points), {splits.begin(), splits.end()});
-}
 
 } // namespace
 
@@ -107,10 +78,7 @@ MainWindow::MainWindow(
     , m_whiteBalance{whiteBalance}
     , m_view{new ImageView{this}}
     , m_panel{new AdjustmentsPanel{std::move(sections)}}
-    , m_fileLabel{new QLabel{this}}
-    , m_zoomLabel{new QLabel{this}}
-    , m_renderLabel{new QLabel{this}}
-    , m_beforeLabel{new QLabel{tr("Before"), this}}
+    , m_status{new StatusBarMediator{statusBar(), this}}
 {
     setCentralWidget(m_view);
 
@@ -137,15 +105,6 @@ MainWindow::MainWindow(
     m_panel->setControlsEnabled(false);
     addDockWidget(Qt::RightDockWidgetArea, dock);
 
-    statusBar()->addWidget(m_fileLabel, 1);
-    statusBar()->addPermanentWidget(m_beforeLabel);
-    statusBar()->addPermanentWidget(m_renderLabel);
-    QFont bold = m_beforeLabel->font();
-    bold.setBold(true);
-    m_beforeLabel->setFont(bold);
-    m_beforeLabel->hide();
-    statusBar()->addPermanentWidget(m_zoomLabel);
-
     createActions();
 
     // Every section starts folded: the user opens the tools they need.
@@ -160,72 +119,22 @@ MainWindow::MainWindow(
 
     // The curve drawn above the sliders that shape it.
     auto *curveView = new CurveView;
-    showCurve(*curveView, core::Settings{});
     m_panel->addSectionWidget(QString::fromStdString(core::ToneCurveEffect{}.section()), curveView);
 
-    connect(m_panel, &AdjustmentsPanel::settingsChanged, m_document, &Document::setSettings);
-    connect(
-        m_document,
-        &Document::settingsChanged,
-        this,
-        [this, curveView](const core::Settings &settings) {
-            m_panel->setSettings(settings);
-            showCurve(*curveView, settings);
-            m_renderLabel->setText(tr("Rendering…"));
-            m_renderer->render(settings);
-        });
+    new DocumentPanelMediator{m_document, m_panel, curveView, m_renderer, this};
+    new PreviewMediator{m_renderer, m_view, histogram, this};
+    // The status bar first: a failed open gives the cursor back before its warning shows.
+    m_status->followDocument(m_document, m_cameraLook);
+    m_status->followRenderer(m_renderer);
+    m_status->followView(m_view);
+    m_status->followSaveImage(m_saveImage);
+    m_status->followWhiteBalance(m_whiteBalance);
+    m_status->followLeavePicture(m_leavePicture);
+    new DialogsMediator{this, m_document, m_leavePicture};
+
     connect(m_document, &Document::opened, this, &MainWindow::onOpened);
-    connect(m_document, &Document::settingsLoaded, this, [this](const QString &file) {
-        statusBar()
-            ->showMessage(tr("Loaded the settings of %1").arg(QDir::toNativeSeparators(file)), 5000);
-    });
-    connect(m_document, &Document::sidecarUnreadable, this, [this](const QString &message) {
-        QMessageBox::warning(
-            this,
-            tr("Cannot Read the Settings"),
-            tr("%1\n\nThe picture opens with no edit. The first change replaces the settings "
-               "file, and keeps the damaged one beside it, with .damaged after its name.")
-                .arg(message));
-    });
-    connect(m_document, &Document::settingsLoadFailed, this, [this](const QString &message) {
-        QMessageBox::warning(this, tr("Cannot Load Settings"), message);
-    });
-    connect(m_document, &Document::openFailed, this, [this](const QString &message) {
-        QApplication::restoreOverrideCursor();
-        QMessageBox::warning(this, tr("Cannot Open"), message);
-    });
     connect(m_document, &Document::modifiedChanged, this, &MainWindow::setWindowModified);
-    connect(m_document, &Document::saved, this, [this](const QString &path) {
-        statusBar()
-            ->showMessage(tr("Saved %1").arg(QDir::toNativeSeparators(path)), SAVED_MESSAGE_MS);
-    });
-    // The document saves by itself and tries again at the next change: a dialog for each failure
-    // would interrupt every slider move.
-    connect(m_document, &Document::saveFailed, this, [this](const QString &message) {
-        statusBar()
-            ->showMessage(tr("Cannot save the settings: %1").arg(message), SAVE_FAILED_MESSAGE_MS);
-    });
-    connect(
-        m_renderer,
-        &PreviewRenderer::rendered,
-        this,
-        [this, histogram](const QImage &image, QSize fullSize, bool full) {
-            m_view->setImage(image, fullSize);
-            histogram->setHistogram(HistogramUtils::histogramOf(image));
-            m_renderLabel->setText(full ? QString{} : tr("Preview"));
-        });
     connect(m_view, &ImageView::fileDropped, this, &MainWindow::openFile);
-    connect(m_view, &ImageView::zoomChanged, this, &MainWindow::updateZoom);
-    connect(m_whiteBalance, &WhiteBalanceViewModel::picked, this, [this](const QString &message) {
-        statusBar()->showMessage(message, PICK_MESSAGE_MS);
-    });
-    connect(m_whiteBalance, &WhiteBalanceViewModel::failed, this, [this](const QString &message) {
-        statusBar()->showMessage(message, PICK_MESSAGE_MS);
-    });
-    connect(m_leavePicture, &LeavePictureViewModel::opening, this, [this](const QString &path) {
-        QApplication::setOverrideCursor(Qt::WaitCursor);
-        m_fileLabel->setText(tr("Opening %1…").arg(QDir::toNativeSeparators(path)));
-    });
     // The window waits for the settings to be written, then closes again, from the event loop.
     connect(
         m_leavePicture,
@@ -233,24 +142,6 @@ MainWindow::MainWindow(
         this,
         &QWidget::close,
         Qt::QueuedConnection);
-    // Only when the edit would be lost is the user asked.
-    connect(
-        m_leavePicture,
-        &LeavePictureViewModel::editWouldBeLost,
-        this,
-        [this](const QString &fileName) {
-            const auto answer = QMessageBox::warning(
-                this,
-                tr("Cannot Save"),
-                tr("The settings of %1 cannot be saved. Leave them unsaved?").arg(fileName),
-                QMessageBox::Discard | QMessageBox::Cancel,
-                QMessageBox::Cancel);
-            if (answer == QMessageBox::Discard) {
-                m_leavePicture->discard();
-            } else {
-                m_leavePicture->stay();
-            }
-        });
 
     // The eyedropper first in the section, above the sliders it sets, larger than a tool's icon:
     // the white balance is the first thing set on a picture. Its tooltip says what it picks.
@@ -298,14 +189,7 @@ void MainWindow::createActions()
     file->addAction(loadSettings);
     file->addSeparator();
     auto *saveImageAction = new SaveImageAction{m_saveImage, this};
-    connect(saveImageAction, &SaveImageAction::started, this, [this](const QString &path) {
-        statusBar()->showMessage(tr("Saving %1…").arg(QDir::toNativeSeparators(path)));
-    });
-    connect(m_saveImage, &SaveImageViewModel::saved, this, [this](const QString &path) {
-        statusBar()
-            ->showMessage(tr("Saved %1").arg(QDir::toNativeSeparators(path)), SAVED_MESSAGE_MS);
-    });
-    connect(m_saveImage, &SaveImageViewModel::saveFailed, statusBar(), &QStatusBar::clearMessage);
+    connect(saveImageAction, &SaveImageAction::started, m_status, &StatusBarMediator::showSaving);
     file->addAction(saveImageAction);
     file->addSeparator();
     file->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
@@ -332,10 +216,9 @@ void MainWindow::createActions()
 
     QMenu *view = menuBar()->addMenu(tr("&View"));
     auto *showBefore = new BeforeAfterToggleAction{m_document, m_renderer, this};
-    connect(showBefore, &QAction::toggled, this, [this] {
-        m_renderLabel->setText(tr("Rendering…"));
-    });
-    connect(showBefore, &BeforeAfterToggleAction::beforeShown, m_beforeLabel, &QWidget::setVisible);
+    connect(showBefore, &QAction::toggled, m_status, &StatusBarMediator::showRendering);
+    connect(
+        showBefore, &BeforeAfterToggleAction::beforeShown, m_status, &StatusBarMediator::showBefore);
     view->addAction(showBefore);
     setThemedIcon(showBefore, "image-v-split");
     view->addSeparator();
@@ -422,22 +305,8 @@ void MainWindow::openFile(const QString &path)
 
 void MainWindow::onOpened()
 {
-    QApplication::restoreOverrideCursor();
     m_recentFiles->addFile(m_document->path());
-    const auto image = m_document->image();
-    m_renderer->setSource(image);
-    m_panel->setControlsEnabled(true);
-    if (m_cameraLook->matchesOpenPicture()) {
-        statusBar()->showMessage(
-            tr("A raw file: Edit > Match Camera Look grades it like its camera's JPEG"),
-            RAW_HINT_MS);
-    }
-    m_fileLabel->setText(tr("%1 — %2 × %3")
-                             .arg(QDir::toNativeSeparators(m_document->path()))
-                             .arg(image->width)
-                             .arg(image->height));
     updateTitle();
-    // The settings are rendered once the document announces them, right after.
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -455,11 +324,6 @@ void MainWindow::updateTitle()
                                               : tr("No Image");
     setWindowTitle(tr("%1[*] — StepIt Grader").arg(name));
     setWindowModified(m_document->isModified());
-}
-
-void MainWindow::updateZoom(double zoom)
-{
-    m_zoomLabel->setText(QString{"%1%"}.arg(qRound(zoom * 100)));
 }
 
 void MainWindow::createSettingsMenu()

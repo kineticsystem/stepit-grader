@@ -20,6 +20,7 @@ add_executable(stepit-grader-tests
     editor/FileUtilsTest.cpp
     editor/ImageExportTest.cpp
     editor/LeavePictureViewModelTest.cpp
+    editor/MediatorsTest.cpp
     editor/SaveImageViewModelTest.cpp
     editor/WhiteBalanceViewModelTest.cpp
     editor/WidgetsTest.cpp
