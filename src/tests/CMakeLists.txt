@@ -15,6 +15,7 @@ add_executable(stepit-grader-tests
     editor/CameraLookTest.cpp
     editor/CameraLookViewModelTest.cpp
     editor/DocumentTest.cpp
+    editor/FileUtilsTest.cpp
     editor/ImageExportTest.cpp
     editor/LeavePictureViewModelTest.cpp
     editor/SaveImageViewModelTest.cpp

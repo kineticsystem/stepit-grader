@@ -3,6 +3,7 @@
 
 #include "editor/MainWindow.h"
 #include "editor/Document.h"
+#include "editor/FileUtils.h"
 #include "editor/IconUtils.h"
 #include "editor/PreviewRenderer.h"
 #include "editor/RecentFilesMenu.h"
@@ -23,8 +24,8 @@
 #include <QActionGroup>
 #include <QApplication>
 #include <QCloseEvent>
+#include <QDir>
 #include <QDockWidget>
-#include <QFileDialog>
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -405,15 +406,12 @@ void MainWindow::createActions()
 
 void MainWindow::chooseFile()
 {
-    QSettings settings;
-    const QString filter = tr("Images (%1)").arg(m_document->nameFilters().join(' '));
-    const QString path = QFileDialog::getOpenFileName(
+    const QString path = FileUtils::getOpenFile(
         this,
         tr("Open Image"),
-        settings.value(SessionProperties::Files::LAST_FOLDER).toString(),
-        filter);
+        tr("Images (%1)").arg(m_document->nameFilters().join(' ')),
+        SessionProperties::Files::LAST_FOLDER);
     if (!path.isEmpty()) {
-        settings.setValue(SessionProperties::Files::LAST_FOLDER, QFileInfo{path}.absolutePath());
         openFile(path);
     }
 }
@@ -538,17 +536,13 @@ void MainWindow::refreshIcons()
 
 void MainWindow::chooseSettings()
 {
-    QSettings settings;
-    const QString folder = settings
-                               .value(
-                                   SessionProperties::Files::LAST_SETTINGS_FOLDER,
-                                   QFileInfo{m_document->path()}.absolutePath())
-                               .toString();
-    const QString filter = tr("Settings (%1)").arg(m_document->settingsNameFilter());
-    const QString path = QFileDialog::getOpenFileName(this, tr("Load Settings"), folder, filter);
+    const QString path = FileUtils::getOpenFile(
+        this,
+        tr("Load Settings"),
+        tr("Settings (%1)").arg(m_document->settingsNameFilter()),
+        SessionProperties::Files::LAST_SETTINGS_FOLDER,
+        QFileInfo{m_document->path()}.absolutePath());
     if (!path.isEmpty()) {
-        settings
-            .setValue(SessionProperties::Files::LAST_SETTINGS_FOLDER, QFileInfo{path}.absolutePath());
         m_document->loadSettings(path);
     }
 }
