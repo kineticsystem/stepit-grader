@@ -37,7 +37,7 @@ What needs work: the TIFF writer can still lose the file it replaces when a rena
 | `core-lib` | Yes | No Qt include, no file access; `core::match` reports through `std::function` callbacks, and is given the settings it fits over in `Options::base`. |
 | `io-lib` | Yes | No Qt include; Little CMS stays private in [`ColourProfiles.h`](../src/io-lib/src/ColourProfiles.h), and no public header names libtiff, LibRaw or pugixml. The sidecar asks `RawReader::canRead()` which pictures are raw, rather than keeping a list of its own. |
 | `widgets-lib` | Yes | `CurveView` and `HistogramView` draw what they are given, no effect; `AdjustmentsPanel` knows parameters, not effects. |
-| `editor-lib` | Yes | The view models hold the rules and the actions the dialogs; `MainWindow`, 550 lines, lays them out and connects them, see [Separation of Concerns](#separation-of-concerns). |
+| `editor-lib` | Yes | The view models hold the rules and the actions the dialogs; `MainWindow`, 358 lines, lays them out and connects them, see [Separation of Concerns](#separation-of-concerns). |
 | `cli-lib` | Yes | `Grader` returns results; `main()` prints them. |
 
 ## Dependency Direction
@@ -71,7 +71,7 @@ No view model includes a widget; of the actions, the views, only `PickWhiteBalan
 
 ## Separation of Concerns
 
-**`MainWindow` lays out and connects.** [`MainWindow.cpp`](../src/editor-lib/src/MainWindow.cpp), 550 lines from 713, builds the menus, the dock and the status bar, makes the actions with their view models, and shows the view models' signals. What it still decides is the window's own: the folders the open dialogs start in, the recent files and the theme, kept in `QSettings`, and which actions are enabled once a picture opens. When a picture may be left, which file may be opened and what a white balance pick changes are `LeavePictureViewModel`'s and `WhiteBalanceViewModel`'s.
+**`MainWindow` lays out and connects.** [`MainWindow.cpp`](../src/editor-lib/src/MainWindow.cpp), 358 lines from 713, builds the menus, the toolbar and the dock, and makes the actions with their view models and the four mediators that keep the parts in step: the document and the panel, the renderer and the views, the status bar, and the dialogs. What it still decides is the window's own: the folders the open dialogs start in, the recent files and the theme, kept in `QSettings`, and which actions are enabled once a picture opens. When a picture may be left, which file may be opened and what a white balance pick changes are `LeavePictureViewModel`'s and `WhiteBalanceViewModel`'s.
 
 Elsewhere, knowledge sits where it belongs: the document owns the files and their order, the view models own the rules of the actions, the renderer owns the passes, the engine owns the pixels and the search.
 

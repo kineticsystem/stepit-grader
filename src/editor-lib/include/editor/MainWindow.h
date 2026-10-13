@@ -17,7 +17,7 @@ class LeavePictureViewModel;
 class SaveImageViewModel;
 class ImageView;
 class PreviewRenderer;
-class QLabel;
+class StatusBarMediator;
 class RecentFilesMenu;
 class WhiteBalanceViewModel;
 
@@ -61,7 +61,6 @@ private:
     void refreshIcons();
     void onOpened();
     void updateTitle();
-    void updateZoom(double zoom);
 
     Document *m_document;
     PreviewRenderer *m_renderer;
@@ -71,12 +70,9 @@ private:
     WhiteBalanceViewModel *m_whiteBalance;
     ImageView *m_view;
     AdjustmentsPanel *m_panel;
-    QLabel *m_fileLabel;
-    QLabel *m_zoomLabel;
-    QLabel *m_renderLabel;
     QAction *m_pickWhite = nullptr;
     /// The actions with an icon, and the icon's name, drawn again for a new theme.
     std::vector<std::pair<QAction *, QString>> m_themedIcons;
-    QLabel *m_beforeLabel;
     RecentFilesMenu *m_recentFiles = nullptr;
+    StatusBarMediator *m_status;
 };

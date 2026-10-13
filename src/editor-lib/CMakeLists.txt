@@ -22,6 +22,10 @@ add_library(editor-lib STATIC
     include/editor/actions/OpenAction.h
     include/editor/actions/PickWhiteBalanceAction.h
     include/editor/actions/SaveImageAction.h
+    include/editor/mediators/DialogsMediator.h
+    include/editor/mediators/DocumentPanelMediator.h
+    include/editor/mediators/PreviewMediator.h
+    include/editor/mediators/StatusBarMediator.h
     include/editor/viewmodel/CameraLookViewModel.h
     include/editor/viewmodel/LeavePictureViewModel.h
     include/editor/viewmodel/SaveImageViewModel.h
@@ -46,6 +50,10 @@ add_library(editor-lib STATIC
     src/actions/OpenAction.cpp
     src/actions/PickWhiteBalanceAction.cpp
     src/actions/SaveImageAction.cpp
+    src/mediators/DialogsMediator.cpp
+    src/mediators/DocumentPanelMediator.cpp
+    src/mediators/PreviewMediator.cpp
+    src/mediators/StatusBarMediator.cpp
     src/viewmodel/CameraLookViewModel.cpp
     src/viewmodel/LeavePictureViewModel.cpp
     src/viewmodel/SaveImageViewModel.cpp
