@@ -49,6 +49,7 @@ public:
      */
     void setControlsEnabled(bool enabled);
 
+    /// The sections' titles, in the order the panel shows them.
     QStringList sectionTitles() const;
     bool isSectionExpanded(const QString &title) const;
     /// Opens or closes the section, without emitting sectionExpandedChanged().
@@ -72,6 +73,8 @@ Q_SIGNALS:
 
 private:
     std::map<QString, CollapsibleSection *> m_sections;
+    /// The sections' titles in the order shown: the map's is alphabetical.
+    QStringList m_titles;
     std::map<std::string, ParameterSlider *> m_sliders;
     std::vector<core::Parameter> m_parameters;
     core::Settings m_settings;

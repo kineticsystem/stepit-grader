@@ -20,7 +20,7 @@ This review judges how StepIt Grader is built, on 13 October 2026, at the commit
 
 - **Read**, whole: `editor-lib`, about 3,700 lines, its view models, actions, mediators and utilities; in `io-lib`, the readers' interfaces, `imageio::files` and the XMP sidecar; in `core-lib`, `core::match`, `core::color` and `core::parallelFor`; the tests of each. `widgets-lib`, `cli-lib` and the other parts of `core-lib` and `io-lib` are judged on their code at `1ab77b2`, which is the code they hold.
 - **Counted**: the links of each library, the includes between libraries, and the test cases of each folder.
-- **Run**: the whole suite, 197 test cases in 200 runs, passing in about 10 seconds, the four raw tests skipped without raw-converter's samples; again built with AddressSanitizer and UndefinedBehaviorSanitizer, passing with no report; and with ThreadSanitizer under `setarch -R`, passing with 78 reports, none a race between two threads of our code, see [Implementation Issues](#implementation-issues).
+- **Run**: the whole suite, 199 test cases in 202 runs, passing in about 10 seconds, the four raw tests skipped without raw-converter's samples; again built with AddressSanitizer and UndefinedBehaviorSanitizer, passing with no report; and with ThreadSanitizer under `setarch -R`, passing with 78 reports, none a race between two threads of our code, see [Implementation Issues](#implementation-issues).
 - Every finding is *from reading*: none needed a probe to be told apart from a suspicion.
 
 ## Verdict
@@ -66,7 +66,7 @@ No view model includes a widget; of the actions, the views, only `PickWhiteBalan
 | `core::match::Options` | [`CameraMatch.h`](../src/core-lib/include/core/CameraMatch.h) | Good: progress and stop as plain callbacks, and `base`, the settings the grade goes over, so the search runs, and is tested, without Qt. |
 | The view models | [`viewmodel/`](../src/editor-lib/include/editor/viewmodel) | Good: `SaveImageViewModel`, `CameraLookViewModel`, `WhiteBalanceViewModel` and `LeavePictureViewModel` are given the document, the pipeline and what they read or keep with, answer calls and emit signals; no widget. Their tests drive them as the actions do. |
 | `StatusController` | [`Status.h`](../src/editor-lib/include/editor/Status.h) | Adequate: a thread-safe flag and a queued signal. One task at a time, which is all the window needs. |
-| `AdjustmentsPanel` | [`AdjustmentsPanel.h`](../src/widgets-lib/include/widgets/AdjustmentsPanel.h) | Good: `addSectionWidget()`, `addSectionHeaderWidget()` and `addHeading()` let the window add to a section without the panel knowing why. `sectionTitles()` returns the titles in alphabetical order, not the order shown: a `std::map`'s, in `AdjustmentsPanel::sectionTitles()`. |
+| `AdjustmentsPanel` | [`AdjustmentsPanel.h`](../src/widgets-lib/include/widgets/AdjustmentsPanel.h) | Good: `addSectionWidget()`, `addSectionHeaderWidget()` and `addHeading()` let the window add to a section without the panel knowing why. `sectionTitles()` gives the titles in the order shown. |
 
 ## Separation of Concerns
 
@@ -98,7 +98,7 @@ Elsewhere, knowledge sits where it belongs: the document owns the files and thei
 |---|---|---|
 | `core` | 58 | The look of the effects, by design, see the architecture's manual checks. |
 | `io` | 27 | `imageio::files::replace()` setting the old file aside where a system does not rename over a file: Linux always does. |
-| `editor` | 105 | `MainWindow` and the actions: no test constructs them. |
+| `editor` | 107 | `MainWindow` and the actions: no test constructs them. |
 | `cli` | 7 | |
 
 **No seam is missing in the editor.** Each rule of the actions has its view model's tests: 7 for `SaveImageViewModel`, 7 for `CameraLookViewModel`, the whole match on a fake reader in about 20 ms each, 9 for `LeavePictureViewModel`, with a failing save from `FakeStore`'s `failSaving`, and 3 for `WhiteBalanceViewModel`. One rule is not tested: a pick measured on a picture since left is dropped, as no test can time a pick against an open without a hook in the view model.
@@ -111,7 +111,6 @@ Ordered by severity. ThreadSanitizer's 78 reports are all a value handed to a po
 
 ### 1. Smaller
 
-- `ParameterSlider::show(double)`, private, hides `QWidget::show()`: `slider.show()` does not compile; [`ParameterSlider.h`](../src/widgets-lib/include/widgets/ParameterSlider.h).
 - **Match Camera Look…** on an open raw file reads it again from disk, about 3 seconds, though the document holds it: `CameraLookViewModel` passes the path, not the image.
 - `XmpSidecar::save()` keeps a damaged sidecar as `.damaged`, overwriting the copy of an earlier damage.
 
@@ -121,4 +120,5 @@ Ordered by value against effort; each is one pull request.
 
 | # | Change | Fixes | Trade-off |
 |---|---|---|---|
-| 1 | Keep the sections' order in `AdjustmentsPanel`, and rename `ParameterSlider::show()` to `showValue()`. | 1 and the panel's titles | None. |
+| 1 | Give the camera match the document's picture when the picture open is the raw file matched, and read only its camera JPEG from the file. | 1, the raw file read again | `CameraShotReader` reads the JPEG alone too: one more function to fake. |
+| 2 | Name each damaged copy of a sidecar apart, e.g. `IMG_0001.xmp.damaged.2`, or keep the first. | 1, the damaged copy overwritten | A folder may gather copies; the first is the one most worth keeping. |

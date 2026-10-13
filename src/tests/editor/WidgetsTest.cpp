@@ -81,6 +81,13 @@ TEST(ParameterSliderTest, ShowsTheValueAsTextNotToEdit)
     EXPECT_EQ(shownValue(whole, "Contrast"), "-35");
 }
 
+TEST(ParameterSliderTest, ShowsAsAnyWidget)
+{
+    ParameterSlider slider{"Contrast", -100, 100, 0, 0};
+    slider.show();
+    EXPECT_TRUE(slider.isVisible());
+}
+
 TEST(ParameterSliderTest, DoubleClickResets)
 {
     ParameterSlider slider{"Contrast", -100, 100, 0, 0};
@@ -277,6 +284,19 @@ TEST(CollapsibleSectionTest, ClickingTheTitleFoldsTheContent)
     section.setExpanded(true);
     EXPECT_TRUE(content->isVisible());
     EXPECT_EQ(spy.count(), 0);
+}
+
+TEST(AdjustmentsPanelTest, GivesTheSectionsTitlesInTheOrderShown)
+{
+    const auto sections
+        = SectionUtils::sectionsOf(*core::makeStandardPipeline(), core::standardSectionOrder());
+    AdjustmentsPanel panel{sections};
+    QStringList shown;
+    for (const AdjustmentsPanel::Section &section : sections) {
+        shown << section.title;
+    }
+    EXPECT_EQ(panel.sectionTitles(), shown);
+    EXPECT_EQ(panel.sectionTitles().front(), "Color");
 }
 
 TEST(AdjustmentsPanelTest, SectionsFoldAndReportIt)
