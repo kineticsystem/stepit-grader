@@ -30,9 +30,6 @@ enum class Theme {
  */
 void applyTheme(Theme theme);
 
-/// The key the theme's name is kept under in QSettings.
-inline constexpr const char *THEME_SETTING = "theme";
-
 /// The name the theme is saved under, e.g. "dark".
 QString nameOf(Theme theme);
 /// The theme of a saved name, or nothing.

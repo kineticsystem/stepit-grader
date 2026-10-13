@@ -10,6 +10,7 @@ add_library(editor-lib STATIC
     include/editor/MainWindow.h
     include/editor/PreviewRenderer.h
     include/editor/RecentFilesMenu.h
+    include/editor/SessionProperties.h
     include/editor/Status.h
     include/editor/WaitingDialog.h
     include/editor/actions/MatchCameraLookAction.h

@@ -4,6 +4,7 @@
 #include "editor/Document.h"
 #include "editor/MainWindow.h"
 #include "editor/PreviewRenderer.h"
+#include "editor/SessionProperties.h"
 #include "editor/ThemeUtils.h"
 #include "editor/viewmodel/CameraLookViewModel.h"
 #include "editor/viewmodel/LeavePictureViewModel.h"
@@ -54,7 +55,7 @@ int main(int argc, char *argv[])
 
     // The theme chosen in Settings > Theme, before the window and its icons are made.
     ThemeUtils::applyTheme(
-        ThemeUtils::themeNamed(QSettings{}.value(ThemeUtils::THEME_SETTING).toString())
+        ThemeUtils::themeNamed(QSettings{}.value(SessionProperties::Options::THEME).toString())
             .value_or(ThemeUtils::Theme::System));
 #ifdef Q_OS_MACOS
     // macOS's menu bar stays light whatever the theme, where the icons of a dark

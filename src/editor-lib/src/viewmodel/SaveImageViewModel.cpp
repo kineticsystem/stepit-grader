@@ -4,6 +4,7 @@
 #include "editor/viewmodel/SaveImageViewModel.h"
 #include "editor/Document.h"
 #include "editor/ImageExportUtils.h"
+#include "editor/SessionProperties.h"
 
 #include <QFileInfo>
 #include <QFutureWatcher>
@@ -13,9 +14,6 @@
 #include <algorithm>
 
 namespace {
-
-/// The format the picture was last saved as, by its filter: the next save offers it first.
-constexpr const char *IMAGE_FORMAT_KEY = "imageFormat";
 
 /// The format of `filter`, or the first for a filter that names none.
 const ImageExportUtils::ImageFormat &formatOf(const QString &filter)
@@ -49,7 +47,7 @@ QStringList SaveImageViewModel::filters() const
 
 QString SaveImageViewModel::preferredFilter() const
 {
-    return formatOf(m_settings->value(IMAGE_FORMAT_KEY).toString()).filter;
+    return formatOf(m_settings->value(SessionProperties::Options::IMAGE_FORMAT).toString()).filter;
 }
 
 QString SaveImageViewModel::suggestedPath(const QString &filter) const
@@ -64,7 +62,7 @@ std::expected<QString, QString> SaveImageViewModel::save(QString path, const QSt
         return std::unexpected(tr("No picture is open."));
     }
     const ImageExportUtils::ImageFormat format = formatOf(filter);
-    m_settings->setValue(IMAGE_FORMAT_KEY, format.filter);
+    m_settings->setValue(SessionProperties::Options::IMAGE_FORMAT, format.filter);
     if (QFileInfo{path}.suffix().isEmpty()) {
         path += "." + format.suffix;
     }

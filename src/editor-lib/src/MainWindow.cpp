@@ -6,6 +6,7 @@
 #include "editor/IconUtils.h"
 #include "editor/PreviewRenderer.h"
 #include "editor/RecentFilesMenu.h"
+#include "editor/SessionProperties.h"
 #include "editor/ThemeUtils.h"
 #include "editor/actions/MatchCameraLookAction.h"
 #include "editor/actions/PickWhiteBalanceAction.h"
@@ -42,10 +43,6 @@
 
 namespace {
 
-constexpr const char *LAST_FOLDER_KEY = "lastFolder";
-/// Where settings were last loaded from: often not where the pictures are.
-constexpr const char *LAST_SETTINGS_FOLDER_KEY = "lastSettingsFolder";
-constexpr const char *RECENT_FILES_KEY = "recentPictures";
 /// The pictures listed in File > Open Recent.
 constexpr int RECENT_FILES = 10;
 constexpr int PANEL_WIDTH = 300;
@@ -288,10 +285,11 @@ void MainWindow::createActions()
     file->addAction(tr("&Open…"), QKeySequence::Open, this, &MainWindow::chooseFile);
 
     m_recentFiles = new RecentFilesMenu{tr("Open &Recent"), RECENT_FILES, this};
-    m_recentFiles->setFiles(QSettings{}.value(RECENT_FILES_KEY).toStringList());
+    m_recentFiles->setFiles(
+        QSettings{}.value(SessionProperties::Files::RECENT_FILES).toStringList());
     connect(m_recentFiles, &RecentFilesMenu::fileSelected, this, &MainWindow::openFile);
     connect(m_recentFiles, &RecentFilesMenu::filesChanged, this, [](const QStringList &files) {
-        QSettings{}.setValue(RECENT_FILES_KEY, files);
+        QSettings{}.setValue(SessionProperties::Files::RECENT_FILES, files);
     });
     file->addMenu(m_recentFiles);
     QAction *open = file->actions().constFirst();
@@ -410,9 +408,12 @@ void MainWindow::chooseFile()
     QSettings settings;
     const QString filter = tr("Images (%1)").arg(m_document->nameFilters().join(' '));
     const QString path = QFileDialog::getOpenFileName(
-        this, tr("Open Image"), settings.value(LAST_FOLDER_KEY).toString(), filter);
+        this,
+        tr("Open Image"),
+        settings.value(SessionProperties::Files::LAST_FOLDER).toString(),
+        filter);
     if (!path.isEmpty()) {
-        settings.setValue(LAST_FOLDER_KEY, QFileInfo{path}.absolutePath());
+        settings.setValue(SessionProperties::Files::LAST_FOLDER, QFileInfo{path}.absolutePath());
         openFile(path);
     }
 }
@@ -501,9 +502,9 @@ void MainWindow::createSettingsMenu()
     QMenu *settings = menuBar()->addMenu(tr("&Settings"));
     QMenu *themes = settings->addMenu(tr("&Theme"));
     auto *group = new QActionGroup{themes};
-    const ThemeUtils::Theme current = ThemeUtils::themeNamed(
-                                          QSettings{}.value(ThemeUtils::THEME_SETTING).toString())
-                                          .value_or(ThemeUtils::Theme::System);
+    const ThemeUtils::Theme current
+        = ThemeUtils::themeNamed(QSettings{}.value(SessionProperties::Options::THEME).toString())
+              .value_or(ThemeUtils::Theme::System);
     const std::pair<ThemeUtils::Theme, QString> choices[]
         = {{ThemeUtils::Theme::System, tr("&System")},
            {ThemeUtils::Theme::Light, tr("&Light")},
@@ -515,7 +516,7 @@ void MainWindow::createSettingsMenu()
         group->addAction(action);
         connect(action, &QAction::triggered, this, [this, theme] {
             ThemeUtils::applyTheme(theme);
-            QSettings{}.setValue(ThemeUtils::THEME_SETTING, ThemeUtils::nameOf(theme));
+            QSettings{}.setValue(SessionProperties::Options::THEME, ThemeUtils::nameOf(theme));
             refreshIcons();
         });
     }
@@ -538,13 +539,16 @@ void MainWindow::refreshIcons()
 void MainWindow::chooseSettings()
 {
     QSettings settings;
-    const QString folder
-        = settings.value(LAST_SETTINGS_FOLDER_KEY, QFileInfo{m_document->path()}.absolutePath())
-              .toString();
+    const QString folder = settings
+                               .value(
+                                   SessionProperties::Files::LAST_SETTINGS_FOLDER,
+                                   QFileInfo{m_document->path()}.absolutePath())
+                               .toString();
     const QString filter = tr("Settings (%1)").arg(m_document->settingsNameFilter());
     const QString path = QFileDialog::getOpenFileName(this, tr("Load Settings"), folder, filter);
     if (!path.isEmpty()) {
-        settings.setValue(LAST_SETTINGS_FOLDER_KEY, QFileInfo{path}.absolutePath());
+        settings
+            .setValue(SessionProperties::Files::LAST_SETTINGS_FOLDER, QFileInfo{path}.absolutePath());
         m_document->loadSettings(path);
     }
 }
