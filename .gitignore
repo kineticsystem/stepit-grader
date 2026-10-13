@@ -2,8 +2,9 @@
 build/
 deps/
 
-# Editors.
+# Editors, and clangd's index of the code, which it rebuilds.
 .vscode/
+.cache/
 .qtcreator/
 *.user
 
