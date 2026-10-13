@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-StepIt Grader is a C++23/Qt 6 desktop application that edits the tones and colours of one picture (TIFF, DNG, camera raw) with the usual sliders of a raw editor, an eyedropper for the white balance and an HDR compression, live, and saves the edit by itself, a second after the last change, as an XMP sidecar next to the picture. It must build on Linux, macOS and Windows (MSYS2). How it is built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); keep it true with the `architect` skill, and review the design with the `reviewer` skill, which keeps [docs/Review.md](docs/Review.md), both in `.claude/skills/`.
+StepIt Grader is a C++23/Qt 6 desktop application that edits the tones and colours of one picture (TIFF, DNG, camera raw) with the usual sliders of a raw editor, an eyedropper for the white balance and an HDR compression, live, and saves the edit by itself, a second after the last change, as an XMP sidecar next to the picture. It must build on Linux, macOS and Windows (MSYS2). How it is built: [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md); keep it true with the `architect` skill, and review the design with the `reviewer` skill, which keeps [docs/Review.md](../docs/Review.md), both in `.claude/skills/`.
 
 ## Build Commands
 
