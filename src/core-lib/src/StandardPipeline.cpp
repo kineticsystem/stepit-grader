@@ -3,6 +3,7 @@
 
 #include "core/StandardPipeline.h"
 #include "core/effects/BlacksEffect.h"
+#include "core/effects/ColorMixerEffect.h"
 #include "core/effects/ColorNoiseEffect.h"
 #include "core/effects/ContrastEffect.h"
 #include "core/effects/DefringeEffect.h"
@@ -15,6 +16,7 @@
 #include "core/effects/SharpnessEffect.h"
 #include "core/effects/StructureEffect.h"
 #include "core/effects/ToneCompressionEffect.h"
+#include "core/effects/ToneCurveEffect.h"
 #include "core/effects/VibranceEffect.h"
 #include "core/effects/WhiteBalanceEffect.h"
 
@@ -32,10 +34,12 @@ std::shared_ptr<const Pipeline> makeStandardPipeline()
         std::make_shared<HighlightsEffect>(),
         std::make_shared<ShadowsEffect>(),
         std::make_shared<BlacksEffect>(),
+        std::make_shared<ToneCurveEffect>(),
         std::make_shared<DetailEffect>(),
         std::make_shared<StructureEffect>(),
         std::make_shared<VibranceEffect>(),
         std::make_shared<SaturationEffect>(),
+        std::make_shared<ColorMixerEffect>(),
         std::make_shared<ToneCompressionEffect>(),
         std::make_shared<SharpnessEffect>(),
     });
@@ -43,7 +47,15 @@ std::shared_ptr<const Pipeline> makeStandardPipeline()
 
 std::vector<std::string> standardSectionOrder()
 {
-    return {"Light", "Color", "Effects", "Noise Reduction", "Chromatic Aberration", "HDR"};
+    return {
+        "Color",
+        "Light",
+        "Tone Curve",
+        "Color Mixer",
+        "Effects",
+        "Noise Reduction",
+        "Chromatic Aberration",
+        "HDR"};
 }
 
 } // namespace core

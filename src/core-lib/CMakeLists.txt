@@ -1,6 +1,7 @@
 # The image engine: the effects and what they share. Standard C++ only, no Qt,
 # so that a command line tool can grade images with it.
 add_library(core-lib STATIC
+    src/CameraMatch.cpp
     src/Color.cpp
     src/Display.cpp
     src/Effect.cpp
@@ -13,6 +14,7 @@ add_library(core-lib STATIC
     src/Settings.cpp
     src/StandardPipeline.cpp
     src/effects/BlacksEffect.cpp
+    src/effects/ColorMixerEffect.cpp
     src/effects/ColorNoiseEffect.cpp
     src/effects/ContrastEffect.cpp
     src/effects/DefringeEffect.cpp
@@ -25,6 +27,7 @@ add_library(core-lib STATIC
     src/effects/SharpnessEffect.cpp
     src/effects/StructureEffect.cpp
     src/effects/ToneCompressionEffect.cpp
+    src/effects/ToneCurveEffect.cpp
     src/effects/VibranceEffect.cpp
     src/effects/WhiteBalanceEffect.cpp)
 add_library(stepit-grader::core ALIAS core-lib)

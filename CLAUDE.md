@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-StepIt Grader is a C++23/Qt 6 desktop application that edits the tones and colours of one picture (TIFF, DNG, camera raw) with the usual sliders of a raw editor, an eyedropper for the white balance and an HDR compression, live, and saves the edit by itself, a second after the last change, as an XMP sidecar next to the picture. It must build on Linux, macOS and Windows (MSYS2). How it is built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); keep it true with the `architect` skill, and review the design with the `reviewer` skill, both in `.claude/skills/`.
+StepIt Grader is a C++23/Qt 6 desktop application that edits the tones and colours of one picture (TIFF, DNG, camera raw) with the usual sliders of a raw editor, an eyedropper for the white balance and an HDR compression, live, and saves the edit by itself, a second after the last change, as an XMP sidecar next to the picture. It must build on Linux, macOS and Windows (MSYS2). How it is built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); keep it true with the `architect` skill, and review the design with the `reviewer` skill, which keeps [docs/Review.md](docs/Review.md), both in `.claude/skills/`.
 
 ## Build Commands
 
@@ -24,10 +24,10 @@ LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/<library>`, 
 
 ## Architecture
 
-- `src/core-lib` (namespace `core`): the engine. Standard C++ only, no Qt, no files. `Image` is linear Rec. 2020 float. Each effect is one header in `include/core/effects` and one source in `src/effects`, implementing `Effect`; `makeStandardPipeline()` is the only place that lists them.
+- `src/core-lib` (namespace `core`): the engine. Standard C++ only, no Qt, no files. `Image` is linear Rec. 2020 float. Each effect is one header in `include/core/effects` and one source in `src/effects`, implementing `Effect`; `makeStandardPipeline()` is the only place that lists them. `core::match` fits the sliders to a camera's JPEGs.
 - `src/io-lib` (namespace `imageio`): `ImageReader` (TIFF with ICC via libtiff and Little CMS, raw and DNG via the raw-converter submodule) and `SettingsStore` (`XmpSidecar`, pugixml). No Qt.
-- `src/widgets-lib`: Qt Widgets and `core-lib` only. The reusable widgets, included as `widgets/...` (`ImageView`, `ParameterSlider`, `CollapsibleSection`, `AdjustmentsPanel`, `sectionsOf()`, `SliderStyle`, whose `apply()` gives any slider the panel's look), that know nothing of their clients and report with signals. Only what another program needs to grade: a widget of the editor's own, e.g. `RecentFilesMenu`, is in `editor-lib`.
-- `src/editor-lib`: Qt. `Document`, which reads and writes every file in turn on a one-thread pool and saves the settings by itself after a delay it is given; `PreviewRenderer`; `RecentFilesMenu`; `MainWindow`, which only connects the parts.
+- `src/widgets-lib`: Qt Widgets and `core-lib` only. The reusable widgets, included as `widgets/...` (`ImageView`, `ParameterSlider`, `CollapsibleSection`, `AdjustmentsPanel`, `CurveView`, `HistogramView`, `sectionsOf()`, `SliderStyle`, whose `apply()` gives any slider the panel's look), that know nothing of their clients and report with signals. Only what another program needs to grade: a widget of the editor's own, e.g. `RecentFilesMenu`, is in `editor-lib`.
+- `src/editor-lib`: Qt. `Document`, which reads and writes every file in turn on a one-thread pool and saves the settings by itself after a delay it is given; `PreviewRenderer`; `RecentFilesMenu`; `matchCameraLook()`, which runs `core::match::fit()` on raw files and their camera JPEGs, following it with a `StatusController` and a `WaitingDialog`, from Lentigram's status classes; `MainWindow`, which only connects the parts.
 - `src/editor-app`: `main()`, the composition root.
 - `src/cli-lib` (namespace `cli`): `parseOptions()` and `Grader`, which grades pictures with saved settings into 16-bit TIFFs (`imageio::TiffWriter`). No Qt.
 - `src/cli-app`: `stepit-grader-cli`'s `main()`.

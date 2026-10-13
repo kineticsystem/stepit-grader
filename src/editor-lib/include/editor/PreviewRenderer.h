@@ -52,6 +52,9 @@ public:
 public Q_SLOTS:
     void render(const core::Settings &settings);
 
+    /// The pipeline it renders with, for other work that must grade as the preview does.
+    std::shared_ptr<const core::Pipeline> pipeline() const { return m_pipeline; }
+
 Q_SIGNALS:
     /// A pass is done: `image` stands for the whole picture, of `fullSize`; `full` when it is.
     void rendered(const QImage &image, QSize fullSize, bool full);

@@ -4,17 +4,25 @@
 set(CMAKE_AUTOMOC ON)
 
 add_library(editor-lib STATIC
+    include/editor/CameraLook.h
     include/editor/Document.h
+    include/editor/ImageExport.h
     include/editor/MainWindow.h
     include/editor/PreviewRenderer.h
     include/editor/RecentFilesMenu.h
+    include/editor/Status.h
+    include/editor/WaitingDialog.h
+    src/CameraLook.cpp
     src/Document.cpp
     src/Icons.cpp
     src/ImageConversion.cpp
+    src/ImageExport.cpp
     src/MainWindow.cpp
     src/PreviewRenderer.cpp
     src/RecentFilesMenu.cpp
+    src/Status.cpp
     src/Theme.cpp
+    src/WaitingDialog.cpp
     src/WhiteBalancePicker.cpp)
 target_include_directories(editor-lib PUBLIC include)
 # The icons, a light and a dark drawing of each, built into the library:

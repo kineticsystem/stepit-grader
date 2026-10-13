@@ -6,8 +6,18 @@
 #include "widgets/ParameterSlider.h"
 
 #include <QFrame>
+#include <QLabel>
 #include <QScrollArea>
 #include <QVBoxLayout>
+
+namespace {
+
+/// The space above a heading that follows other sliders, in pixels, so its group stands apart.
+constexpr int HEADING_SPACE = 12;
+/// The space between a heading and the first slider of its group, in pixels.
+constexpr int HEADING_GAP = 4;
+
+} // namespace
 
 AdjustmentsPanel::AdjustmentsPanel(std::vector<Section> sections, QWidget *parent)
     : QWidget{parent}
@@ -105,9 +115,41 @@ void AdjustmentsPanel::addSectionHeaderWidget(const QString &title, QWidget *wid
     }
 }
 
+void AdjustmentsPanel::addSectionWidget(const QString &title, QWidget *widget)
+{
+    const auto it = m_sections.find(title);
+    if (it != m_sections.end()) {
+        it->second->addWidgetFirst(widget);
+    }
+}
+
 void AdjustmentsPanel::setControlsEnabled(bool enabled)
 {
     for (const auto &[id, slider] : m_sliders) {
         slider->setEnabled(enabled);
     }
+}
+
+void AdjustmentsPanel::addHeading(const std::string &id, const QString &text)
+{
+    const auto slider = m_sliders.find(id);
+    if (slider == m_sliders.end()) {
+        return;
+    }
+    auto *heading = new QLabel{text};
+    QFont font = heading->font();
+    font.setBold(true);
+    heading->setFont(font);
+    auto *box = new QWidget;
+    auto *layout = new QVBoxLayout{box};
+    // The first slider of a section has the title's space above it already.
+    const bool first = slider->second->parentWidget()->layout()->indexOf(slider->second) == 0;
+    layout->setContentsMargins(0, first ? 0 : HEADING_SPACE, 0, HEADING_GAP);
+    layout->addWidget(heading);
+    for (const auto &[title, section] : m_sections) {
+        if (section->addWidgetBefore(slider->second, box)) {
+            return;
+        }
+    }
+    delete box;
 }

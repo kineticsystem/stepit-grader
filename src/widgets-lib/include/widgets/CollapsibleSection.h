@@ -24,6 +24,10 @@ public:
 
     /// Adds a widget below the title, after those added before.
     void addWidget(QWidget *widget);
+    /// Adds a widget below the title, before those added already.
+    void addWidgetFirst(QWidget *widget);
+    /// Adds a widget just above `existing`, if the section holds it; says whether it does.
+    bool addWidgetBefore(QWidget *existing, QWidget *widget);
     /// Adds a widget, e.g. a small button, on the right of the title, always shown.
     void addHeaderWidget(QWidget *widget);
 
@@ -43,5 +47,6 @@ private:
     QToolButton *m_header;
     QHBoxLayout *m_headerLayout;
     QWidget *m_content;
+    bool m_expanded = true;
     QVBoxLayout *m_contentLayout;
 };

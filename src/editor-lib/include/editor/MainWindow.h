@@ -3,9 +3,13 @@
 
 #pragma once
 
+#include "core/CameraMatch.h"
 #include "widgets/AdjustmentsPanel.h"
 
 #include <QMainWindow>
+#include <QString>
+
+#include <expected>
 
 #include <functional>
 #include <utility>
@@ -57,6 +61,8 @@ private:
     void chooseFile();
     /// Asks for a file of settings, and applies it to the picture open.
     void chooseSettings();
+    /// Asks for a file, and saves the picture with its grade in it, in the background.
+    void chooseImageFile();
     /**
      * Runs `then` once the settings that wait to be saved are written, in the background; when
      * they cannot be, asks whether to go on without them, and forgets `then` if the user stays.
@@ -69,6 +75,14 @@ private:
     void updateZoom(double zoom);
     /// Measures the white balance in the background, and sets it once measured.
     void pickWhiteBalanceAt(QPointF point, double radius);
+    /**
+     * Finds the grade that makes raw files look like their camera's JPEGs: the picture open, when
+     * it is a raw file; otherwise the raw files the user chooses, e.g. those a TIFF was made from.
+     */
+    void matchCameraLook();
+    /// Matches the raw files in the background, the window following it.
+    void runCameraLook(const QStringList &raws);
+    void showCameraLook(const std::expected<core::match::Result, QString> &result);
     void showWhiteBalancePicked(const WhiteBalancePick &pick);
 
     Document *m_document;

@@ -7,12 +7,16 @@ set(CMAKE_AUTOMOC ON)
 add_library(widgets-lib STATIC
     include/widgets/AdjustmentsPanel.h
     include/widgets/CollapsibleSection.h
+    include/widgets/CurveView.h
+    include/widgets/HistogramView.h
     include/widgets/ImageView.h
     include/widgets/ParameterSlider.h
     include/widgets/Sections.h
     include/widgets/SliderStyle.h
     src/AdjustmentsPanel.cpp
     src/CollapsibleSection.cpp
+    src/CurveView.cpp
+    src/HistogramView.cpp
     src/ImageView.cpp
     src/ParameterSlider.cpp
     src/Sections.cpp

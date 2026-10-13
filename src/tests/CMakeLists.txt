@@ -6,12 +6,15 @@ set(CMAKE_AUTOMOC ON)
 add_executable(stepit-grader-tests
     Main.cpp
     testutils/TestImages.cpp
+    core/CameraMatchTest.cpp
     core/EffectsTest.cpp
     core/EngineTest.cpp
     io/ReadersTest.cpp
     io/TiffWriterTest.cpp
     io/XmpSidecarTest.cpp
+    editor/CameraLookTest.cpp
     editor/DocumentTest.cpp
+    editor/ImageExportTest.cpp
     editor/WidgetsTest.cpp
     cli/CliTest.cpp)
 target_link_libraries(stepit-grader-tests PRIVATE

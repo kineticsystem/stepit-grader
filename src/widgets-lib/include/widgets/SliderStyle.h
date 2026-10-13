@@ -13,7 +13,8 @@ class QSlider;
  * the application's style, which draws everything else.
  *
  * It also says where the circle is, so Qt grabs it anywhere inside, and the line runs the whole
- * width: the circle's centre reaches both ends.
+ * width: the circle's centre reaches both ends. Given its default, it marks on the line how far the
+ * slider moved from it.
  *
  * `ParameterSlider` uses it; `apply()` gives the same look to any other slider of a program.
  */
@@ -27,6 +28,13 @@ public:
 
     /// Draws the slider with this style, and lights its circle up under the mouse.
     static void apply(QSlider *slider);
+
+    /**
+     * Marks the slider's default, in its own steps: the line is then drawn in the highlight
+     * colour from the default to the circle, to show how far the slider moved. Without one, the
+     * line is plain.
+     */
+    static void setDefaultValue(QSlider *slider, int value);
 
     int pixelMetric(
         PixelMetric metric, const QStyleOption *option, const QWidget *widget) const override;
