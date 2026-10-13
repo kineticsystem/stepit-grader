@@ -61,8 +61,6 @@ private:
     void chooseFile();
     /// Asks for a file of settings, and applies it to the picture open.
     void chooseSettings();
-    /// Asks for a file, and saves the picture with its grade in it, in the background.
-    void chooseImageFile();
     /**
      * Runs `then` once the settings that wait to be saved are written, in the background; when
      * they cannot be, asks whether to go on without them, and forgets `then` if the user stays.

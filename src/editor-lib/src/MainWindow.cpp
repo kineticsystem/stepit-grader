@@ -5,12 +5,13 @@
 #include "editor/CameraLook.h"
 #include "editor/Document.h"
 #include "editor/Icons.h"
-#include "editor/ImageExport.h"
+#include "editor/ImageExporter.h"
 #include "editor/PreviewRenderer.h"
 #include "editor/RecentFilesMenu.h"
 #include "editor/Theme.h"
 #include "editor/WaitingDialog.h"
 #include "editor/WhiteBalancePicker.h"
+#include "editor/actions/SaveImageAction.h"
 #include "imageio/RawReader.h"
 #include "widgets/CurveView.h"
 #include "widgets/HistogramView.h"
@@ -60,8 +61,6 @@ constexpr int PICK_ICON_SIZE = 28;
 constexpr int SAVED_MESSAGE_MS = 3000;
 /// How long it shows a failed save; the title's * stays until a save succeeds.
 constexpr int SAVE_FAILED_MESSAGE_MS = 15000;
-/// The format the picture was last saved as, by its filter: the next save offers it first.
-constexpr const char *IMAGE_FORMAT_KEY = "imageFormat";
 
 /// How long the status bar tells that a raw file can be matched to its camera's look.
 constexpr int RAW_HINT_MS = 10000;
@@ -270,9 +269,17 @@ void MainWindow::createActions()
     loadSettings->setToolTip(
         tr("Apply the settings of a sidecar, e.g. one saved for another picture"));
     file->addSeparator();
-    QAction *saveImage = file->addAction(
-        tr("Save &Image…"), QKeySequence{tr("Ctrl+Shift+E")}, this, &MainWindow::chooseImageFile);
-    saveImage->setToolTip(tr("Save the picture with its grade, at its full size"));
+    auto *exporter = new ImageExporter{m_document, m_renderer->pipeline(), new QSettings{this}, this};
+    auto *saveImage = new SaveImageAction{exporter, this};
+    connect(saveImage, &SaveImageAction::started, this, [this](const QString &path) {
+        statusBar()->showMessage(tr("Saving %1…").arg(QDir::toNativeSeparators(path)));
+    });
+    connect(exporter, &ImageExporter::saved, this, [this](const QString &path) {
+        statusBar()
+            ->showMessage(tr("Saved %1").arg(QDir::toNativeSeparators(path)), SAVED_MESSAGE_MS);
+    });
+    connect(exporter, &ImageExporter::saveFailed, statusBar(), &QStatusBar::clearMessage);
+    file->addAction(saveImage);
     file->addSeparator();
     file->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
 
@@ -348,69 +355,17 @@ void MainWindow::createActions()
     }
 
     for (QAction *action :
-         {save, loadSettings, saveImage, revert, reset, m_pickWhite, m_showBefore, matchLook}) {
+         {save,
+          loadSettings,
+          static_cast<QAction *>(saveImage),
+          revert,
+          reset,
+          m_pickWhite,
+          m_showBefore,
+          matchLook}) {
         action->setEnabled(false);
         connect(m_document, &Document::opened, action, [action] { action->setEnabled(true); });
     }
-}
-
-void MainWindow::chooseImageFile()
-{
-    const auto &formats = imageFormats();
-    QStringList filters;
-    for (const ImageFormat &format : formats) {
-        filters << format.filter;
-    }
-    QString selected = QSettings{}.value(IMAGE_FORMAT_KEY).toString();
-    if (!filters.contains(selected)) {
-        selected = filters.front();
-    }
-    const auto formatOf = [&formats](const QString &filter) {
-        return *std::ranges::find(formats, filter, &ImageFormat::filter);
-    };
-    const QFileInfo picture{m_document->path()};
-    QString path = QFileDialog::getSaveFileName(
-        this,
-        tr("Save Image"),
-        picture.dir().filePath(picture.completeBaseName() + "-graded." + formatOf(selected).suffix),
-        filters.join(";;"),
-        &selected);
-    if (path.isEmpty()) {
-        return;
-    }
-    const ImageFormat format = formatOf(filters.contains(selected) ? selected : filters.front());
-    QSettings{}.setValue(IMAGE_FORMAT_KEY, format.filter);
-    if (QFileInfo{path}.suffix().isEmpty()) {
-        path += "." + format.suffix;
-    }
-    if (QFileInfo{path}.absoluteFilePath() == picture.absoluteFilePath()) {
-        QMessageBox::warning(
-            this,
-            tr("Save Image"),
-            tr("The picture would replace the one it was made from: choose another name."));
-        return;
-    }
-
-    statusBar()->showMessage(tr("Saving %1…").arg(QDir::toNativeSeparators(path)));
-    using Outcome = std::expected<void, QString>;
-    auto *watcher = new QFutureWatcher<Outcome>{this};
-    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, path] {
-        watcher->deleteLater();
-        const Outcome outcome = watcher->result();
-        if (outcome) {
-            statusBar()
-                ->showMessage(tr("Saved %1").arg(QDir::toNativeSeparators(path)), SAVED_MESSAGE_MS);
-        } else {
-            statusBar()->clearMessage();
-            QMessageBox::warning(this, tr("Cannot Save the Image"), outcome.error());
-        }
-    });
-    watcher->setFuture(QtConcurrent::run(
-        [image = m_document->image(),
-         settings = m_document->settings(),
-         pipeline = m_renderer->pipeline(),
-         path,
-         format] { return saveImage(*image, settings, *pipeline, path, format); }));
 }
 
 void MainWindow::matchCameraLook()
