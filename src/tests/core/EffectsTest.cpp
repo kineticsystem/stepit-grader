@@ -7,6 +7,7 @@
 #include "core/Sampling.h"
 #include "core/StandardPipeline.h"
 #include "core/effects/BlacksEffect.h"
+#include "core/effects/ColorMixerEffect.h"
 #include "core/effects/ColorNoiseEffect.h"
 #include "core/effects/ContrastEffect.h"
 #include "core/effects/DefringeEffect.h"
@@ -19,6 +20,7 @@
 #include "core/effects/SharpnessEffect.h"
 #include "core/effects/StructureEffect.h"
 #include "core/effects/ToneCompressionEffect.h"
+#include "core/effects/ToneCurveEffect.h"
 #include "core/effects/VibranceEffect.h"
 #include "core/effects/WhiteBalanceEffect.h"
 
@@ -78,7 +80,7 @@ TEST(EffectsTest, ParametersHaveUniqueIdsAndDefaultsInRange)
         EXPECT_LE(parameter.minimum, parameter.defaultValue);
         EXPECT_GE(parameter.maximum, parameter.defaultValue);
     }
-    EXPECT_EQ(ids.size(), 21u);
+    EXPECT_EQ(ids.size(), 52u);
 }
 
 TEST(EffectsTest, ExposureOfOneStopDoublesTheLight)
@@ -517,4 +519,149 @@ TEST(EffectsTest, ColorNoiseKeepsColoursToTheirSideOfAnEdge)
     color::rec2020ToOklab(image.pixel(51, 20), blueBefore);
     EXPECT_NEAR(red[1], redBefore[1], 0.02f);
     EXPECT_NEAR(blue[2], blueBefore[2], 0.02f);
+}
+
+namespace {
+
+/// The linear sRGB colour, at `level`, as linear Rec. 2020: e.g. a pure sRGB red.
+Image fromSrgb(float r, float g, float b)
+{
+    const Matrix3 toRec2020 = inverse(color::rec2020ToSrgb());
+    Image image{4, 4};
+    for (std::size_t i = 0; i < image.pixelCount(); ++i) {
+        for (int row = 0; row < 3; ++row) {
+            image.data[i * 3 + row] = static_cast<float>(
+                toRec2020[row * 3] * r + toRec2020[row * 3 + 1] * g + toRec2020[row * 3 + 2] * b);
+        }
+    }
+    return image;
+}
+
+std::array<float, 3> oklchOf(const Image &image)
+{
+    float lab[3];
+    color::rec2020ToOklab(image.pixel(0, 0), lab);
+    const float hue = std::atan2(lab[2], lab[1]) * 180 / 3.14159265f;
+    return {lab[0], std::hypot(lab[1], lab[2]), hue < 0 ? hue + 360 : hue};
+}
+
+} // namespace
+
+TEST(EffectsTest, ToneCurveMovesItsRegionAndLeavesTheOthers)
+{
+    // A dark grey, about a tenth up the tones, and a light one, about four fifths up.
+    const Image dark = testutils::uniform(4, 4, 0.012f, 0.012f, 0.012f);
+    const Image light = testutils::uniform(4, 4, 0.6f, 0.6f, 0.6f);
+    const auto id = ToneCurveEffect::SHADOWS.id;
+    EXPECT_GT(applied(ToneCurveEffect{}, dark, id, 100).pixel(0, 0)[1], 0.02f);
+    EXPECT_LT(applied(ToneCurveEffect{}, dark, id, -100).pixel(0, 0)[1], 0.008f);
+    EXPECT_NEAR(applied(ToneCurveEffect{}, light, id, 100).pixel(0, 0)[1], 0.6f, 0.01f);
+
+    const auto highlights = ToneCurveEffect::HIGHLIGHTS.id;
+    EXPECT_GT(applied(ToneCurveEffect{}, light, highlights, 100).pixel(0, 0)[1], 0.65f);
+    EXPECT_NEAR(applied(ToneCurveEffect{}, dark, highlights, 100).pixel(0, 0)[1], 0.012f, 1e-3f);
+}
+
+TEST(EffectsTest, ToneCurveKeepsTheColourAndLeavesWhiteAndAbove)
+{
+    const Image orange = testutils::uniform(4, 4, 0.3f, 0.15f, 0.05f);
+    const Image darker = applied(ToneCurveEffect{}, orange, ToneCurveEffect::DARKS.id, -100);
+    const float *p = darker.pixel(0, 0);
+    EXPECT_LT(p[1], 0.15f);
+    EXPECT_NEAR(p[0] / p[1], 2.0f, 1e-4f);
+    EXPECT_NEAR(p[2] / p[1], 1.0f / 3, 1e-4f);
+
+    const Image bright = testutils::uniform(4, 4, 2.0f, 1.5f, 1.2f);
+    const Image same = applied(ToneCurveEffect{}, bright, ToneCurveEffect::LIGHTS.id, 100);
+    EXPECT_EQ(testutils::maxDifference(same, bright), 0.0f);
+}
+
+TEST(EffectsTest, ToneCurveNeverGoesDownWhateverItsSliders)
+{
+    Settings settings;
+    settings.setValue(ToneCurveEffect::SHADOWS.id, -100);
+    settings.setValue(ToneCurveEffect::DARKS.id, 100);
+    settings.setValue(ToneCurveEffect::LIGHTS.id, -100);
+    settings.setValue(ToneCurveEffect::HIGHLIGHTS.id, 100);
+    // The splits crossed: the midtones split below the shadows split.
+    settings.setValue(ToneCurveEffect::SHADOW_SPLIT.id, 45);
+    settings.setValue(ToneCurveEffect::MIDTONE_SPLIT.id, 25);
+    settings.setValue(ToneCurveEffect::HIGHLIGHT_SPLIT.id, 55);
+    const auto knots = ToneCurveEffect::knots(settings);
+    EXPECT_DOUBLE_EQ(ToneCurveEffect::curve(knots, 0), 0);
+    EXPECT_DOUBLE_EQ(ToneCurveEffect::curve(knots, 1), 1);
+    double previous = 0;
+    for (int i = 1; i <= 1000; ++i) {
+        const double value = ToneCurveEffect::curve(knots, i / 1000.0);
+        EXPECT_GE(value, previous) << i;
+        previous = value;
+    }
+}
+
+TEST(EffectsTest, ToneCurveSplitsComeInOrderWithRoomBetween)
+{
+    EXPECT_EQ(ToneCurveEffect::splits(Settings{}), (std::array<double, 3>{0.25, 0.5, 0.75}));
+    Settings crossed;
+    crossed.setValue(ToneCurveEffect::SHADOW_SPLIT.id, 45);
+    crossed.setValue(ToneCurveEffect::MIDTONE_SPLIT.id, 25);
+    crossed.setValue(ToneCurveEffect::HIGHLIGHT_SPLIT.id, 55);
+    const auto splits = ToneCurveEffect::splits(crossed);
+    EXPECT_GT(splits[1], splits[0]);
+    EXPECT_GT(splits[2], splits[1]);
+    EXPECT_LT(splits[2], 1.0);
+}
+
+TEST(EffectsTest, ToneCurveSplitsAloneChangeNothing)
+{
+    Settings settings;
+    settings.setValue(ToneCurveEffect::SHADOW_SPLIT.id, 10);
+    settings.setValue(ToneCurveEffect::HIGHLIGHT_SPLIT.id, 90);
+    EXPECT_TRUE(ToneCurveEffect{}.isIdentity(settings));
+    Image image = colourful();
+    ToneCurveEffect{}.apply(image, settings, RenderContext{});
+    EXPECT_LT(testutils::maxDifference(image, colourful()), 1e-5f);
+}
+
+TEST(EffectsTest, ColorMixerBandsFollowTheColourWheel)
+{
+    const auto &middles = ColorMixerEffect::bandHues();
+    // From red round to magenta, each band further round the wheel than the one before.
+    for (int band = 1; band < ColorMixerEffect::BANDS; ++band) {
+        EXPECT_GT(middles[band], middles[band - 1]) << ColorMixerEffect::BAND_NAMES[band];
+    }
+    EXPECT_EQ(ColorMixerEffect{}.parameters().size(), 3u * ColorMixerEffect::BANDS);
+    EXPECT_EQ(ColorMixerEffect::hues()[0].id, "HueAdjustmentRed");
+    EXPECT_EQ(ColorMixerEffect::saturations()[5].id, "SaturationAdjustmentBlue");
+    EXPECT_EQ(ColorMixerEffect::luminances()[7].id, "LuminanceAdjustmentMagenta");
+}
+
+TEST(EffectsTest, ColorMixerChangesItsBandOnly)
+{
+    const Image red = fromSrgb(0.3f, 0.0f, 0.0f);
+    const Image blue = fromSrgb(0.0f, 0.0f, 0.3f);
+    const auto redSaturation = ColorMixerEffect::saturations()[0].id;
+    EXPECT_LT(oklchOf(applied(ColorMixerEffect{}, red, redSaturation, -100))[1], 1e-3f);
+    EXPECT_GT(oklchOf(applied(ColorMixerEffect{}, red, redSaturation, 50))[1], 1.4f * oklchOf(red)[1]);
+    EXPECT_LT(
+        testutils::maxDifference(applied(ColorMixerEffect{}, blue, redSaturation, -100), blue),
+        1e-5f);
+
+    // The red's hue turned toward orange, the blue's luminance down a stop.
+    const auto redHue = ColorMixerEffect::hues()[0].id;
+    EXPECT_GT(oklchOf(applied(ColorMixerEffect{}, red, redHue, 100))[2], oklchOf(red)[2] + 20);
+    const auto blueLuminance = ColorMixerEffect::luminances()[5].id;
+    const Image darker = applied(ColorMixerEffect{}, blue, blueLuminance, -100);
+    EXPECT_NEAR(color::luminance(darker.pixel(0, 0)), color::luminance(blue.pixel(0, 0)) / 2, 1e-4f);
+}
+
+TEST(EffectsTest, ColorMixerLeavesGreysAlone)
+{
+    const Image grey = testutils::uniform(4, 4, 0.18f, 0.18f, 0.18f);
+    Settings settings;
+    for (const Parameter &parameter : ColorMixerEffect{}.parameters()) {
+        settings.setValue(parameter.id, 100);
+    }
+    Image image = grey;
+    ColorMixerEffect{}.apply(image, settings, RenderContext{});
+    EXPECT_LT(testutils::maxDifference(image, grey), 1e-5f);
 }

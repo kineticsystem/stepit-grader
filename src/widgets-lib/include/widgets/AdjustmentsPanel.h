@@ -55,6 +55,14 @@ public:
     void setSectionExpanded(const QString &title, bool expanded);
     /// Adds a widget, e.g. a tool's button, on the right of the section's title.
     void addSectionHeaderWidget(const QString &title, QWidget *widget);
+    /// Adds a widget above the section's sliders, e.g. a drawing of what they set.
+    void addSectionWidget(const QString &title, QWidget *widget);
+    /**
+     * Adds a heading just above the parameter's slider, to name the group of sliders it starts,
+     * e.g. "Hue" above the hues of the colour mixer. A heading after other sliders stands apart
+     * from them.
+     */
+    void addHeading(const std::string &id, const QString &text);
 
 Q_SIGNALS:
     /// The user changed a value; `settings` has every value.

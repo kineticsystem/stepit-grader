@@ -120,6 +120,23 @@ TEST(RawReaderTest, ReadsACanonRawFile)
     EXPECT_LT(green, 1.0);
 }
 
+TEST(RawReaderTest, ReadsACameraShotWithItsJpeg)
+{
+    const fs::path file = samples() / "Canon_EOS_5D_Mark_II_1.CR2";
+    if (!fs::exists(file)) {
+        GTEST_SKIP() << "No " << file << ": run modules/raw-converter/bin/fetch-samples.sh";
+    }
+    const imageio::CameraShot shot = imageio::readCameraShot(file);
+    EXPECT_EQ(shot.image.width, imageio::RawReader{}.read(file).width);
+    ASSERT_GT(shot.cameraJpeg.size(), 2u);
+    // A JPEG starts with its marker, FF D8.
+    EXPECT_EQ(shot.cameraJpeg[0], 0xFF);
+    EXPECT_EQ(shot.cameraJpeg[1], 0xD8);
+    EXPECT_GE(shot.orientation, 1);
+    EXPECT_LE(shot.orientation, 8);
+    EXPECT_THROW(imageio::readCameraShot("no-such-file.CR2"), imageio::Error);
+}
+
 TEST(RawReaderTest, ReadsADng)
 {
     const fs::path file = samples() / "adobe" / "Canon_EOS_5D_Mark_III.dng";

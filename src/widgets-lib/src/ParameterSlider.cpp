@@ -36,6 +36,7 @@ ParameterSlider::ParameterSlider(
     m_slider->setPageStep(std::max(1, (toSteps(maximum) - toSteps(minimum)) / 20));
     // A line with a circle to drag, whatever the application's style.
     SliderStyle::apply(m_slider);
+    SliderStyle::setDefaultValue(m_slider, toSteps(defaultValue));
     for (QWidget *resets : std::initializer_list<QWidget *>{m_slider, m_label, m_valueLabel}) {
         resets->setToolTip(tr("Double click to reset"));
     }

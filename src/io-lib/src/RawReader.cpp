@@ -42,20 +42,41 @@ bool RawReader::canRead(const std::filesystem::path &path) const
     return ImageReader::canRead(path) || rawconv::isRawFileName(path);
 }
 
+namespace {
+
+/// The rendered raw in the working space, upright.
+core::Image toImage(const rawconv::RenderedImage &rendered)
+{
+    core::Image image{static_cast<int>(rendered.width), static_cast<int>(rendered.height)};
+    core::parallelFor(0, image.height, [&](int begin, int end) {
+        const std::size_t from = static_cast<std::size_t>(begin) * image.width * 3;
+        const std::size_t to = static_cast<std::size_t>(end) * image.width * 3;
+        for (std::size_t i = from; i < to; ++i) {
+            image.data[i] = rendered.data[i] / 65535.0f;
+        }
+    });
+    return core::geometry::orient(image, rendered.orientation);
+}
+
+} // namespace
+
 core::Image RawReader::read(const std::filesystem::path &path) const
 {
     try {
+        return toImage(
+            rawconv::renderImage(rawconv::readRawFile(path), rawconv::ColorSpace::REC2020));
+    } catch (const rawconv::Error &e) {
+        throw Error{"Cannot read " + path.string() + ": " + e.what()};
+    }
+}
+
+CameraShot readCameraShot(const std::filesystem::path &path)
+{
+    try {
+        const rawconv::RawImage raw = rawconv::readRawFile(path);
         const rawconv::RenderedImage rendered
-            = rawconv::renderImage(rawconv::readRawFile(path), rawconv::ColorSpace::REC2020);
-        core::Image image{static_cast<int>(rendered.width), static_cast<int>(rendered.height)};
-        core::parallelFor(0, image.height, [&](int begin, int end) {
-            const std::size_t from = static_cast<std::size_t>(begin) * image.width * 3;
-            const std::size_t to = static_cast<std::size_t>(end) * image.width * 3;
-            for (std::size_t i = from; i < to; ++i) {
-                image.data[i] = rendered.data[i] / 65535.0f;
-            }
-        });
-        return core::geometry::orient(image, rendered.orientation);
+            = rawconv::renderImage(raw, rawconv::ColorSpace::REC2020);
+        return CameraShot{toImage(rendered), raw.preview_jpeg, rendered.orientation};
     } catch (const rawconv::Error &e) {
         throw Error{"Cannot read " + path.string() + ": " + e.what()};
     }

@@ -9,6 +9,8 @@
 #include <QSlider>
 #include <QStyleOptionSlider>
 
+#include <cmath>
+
 namespace {
 
 /// The circle to drag, in pixels: large enough to grab at once.
@@ -20,6 +22,10 @@ constexpr qreal LINE_WIDTH = 2.0;
 /// ring stands out, in a light theme as in a dark one.
 constexpr int LINE_ALPHA = 90;
 constexpr int RING_ALPHA = 210;
+/// The part of the line from the default to the circle, in pixels: a little wider than the line.
+constexpr qreal MOVED_WIDTH = 3.0;
+/// The property of a slider that holds its default, in its steps.
+constexpr const char *DEFAULT_PROPERTY = "sliderStyleDefault";
 /// A disabled slider fades to this share of its colours.
 constexpr qreal DISABLED_OPACITY = 0.4;
 
@@ -53,6 +59,12 @@ void SliderStyle::apply(QSlider *slider)
     slider->setStyle(instance());
     // The ring takes the highlight under the mouse, which needs hover events.
     slider->setAttribute(Qt::WA_Hover);
+}
+
+void SliderStyle::setDefaultValue(QSlider *slider, int value)
+{
+    slider->setProperty(DEFAULT_PROPERTY, value);
+    slider->update();
 }
 
 int SliderStyle::pixelMetric(
@@ -131,6 +143,27 @@ void SliderStyle::drawComplexControl(
     const qreal inset = HANDLE_DIAMETER / 2.0;
     painter->setPen(QPen{withAlpha(text, LINE_ALPHA), LINE_WIDTH, Qt::SolidLine, Qt::RoundCap});
     painter->drawLine(QPointF{groove.left() + inset, y}, QPointF{groove.right() - inset, y});
+
+    // How far the slider moved: from its default to the circle's centre, under the circle.
+    const QVariant defaultValue = widget ? widget->property(DEFAULT_PROPERTY) : QVariant{};
+    if (defaultValue.isValid() && defaultValue.toInt() != slider->sliderPosition) {
+        const auto centreOf = [&](int value) {
+            return groove.left() + inset
+                   + QStyle::sliderPositionFromValue(
+                       slider->minimum,
+                       slider->maximum,
+                       value,
+                       static_cast<int>(groove.width()) - HANDLE_DIAMETER,
+                       slider->upsideDown);
+        };
+        painter->setPen(
+            QPen{palette.color(QPalette::Highlight), MOVED_WIDTH, Qt::SolidLine, Qt::FlatCap});
+        // On the middle of a row of pixels, so a line of odd width is crisp.
+        const qreal row = std::floor(y) + 0.5;
+        painter->drawLine(
+            QPointF{centreOf(defaultValue.toInt()), row},
+            QPointF{centreOf(slider->sliderPosition), row});
+    }
 
     // The circle: empty, in the window's colour, so the line does not run through it; its ring
     // takes the highlight while it is held or under the mouse.

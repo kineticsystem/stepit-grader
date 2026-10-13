@@ -10,6 +10,8 @@
 #include "editor/WhiteBalancePicker.h"
 #include "widgets/AdjustmentsPanel.h"
 #include "widgets/CollapsibleSection.h"
+#include "widgets/CurveView.h"
+#include "widgets/HistogramView.h"
 #include "widgets/ImageView.h"
 #include "widgets/ParameterSlider.h"
 #include "widgets/Sections.h"
@@ -138,15 +140,19 @@ TEST(AdjustmentsPanelTest, SectionsFollowThePipeline)
 {
     // Without an order, the sections come as the effects run, each with its parameters in order.
     const auto sections = sectionsOf(*core::makeStandardPipeline());
-    ASSERT_EQ(sections.size(), 6u);
+    ASSERT_EQ(sections.size(), 8u);
     EXPECT_EQ(sections[0].title, "Color");
     EXPECT_EQ(sections[1].title, "Noise Reduction");
     EXPECT_EQ(sections[1].parameters.size(), 3u);
     EXPECT_EQ(sections[2].title, "Chromatic Aberration");
     EXPECT_EQ(sections[3].title, "Light");
     EXPECT_EQ(sections[3].parameters.front().id, "Exposure2012");
-    EXPECT_EQ(sections[4].title, "Effects");
-    EXPECT_EQ(sections[5].title, "HDR");
+    EXPECT_EQ(sections[4].title, "Tone Curve");
+    EXPECT_EQ(sections[4].parameters.size(), 7u);
+    EXPECT_EQ(sections[5].title, "Effects");
+    EXPECT_EQ(sections[6].title, "Color Mixer");
+    EXPECT_EQ(sections[6].parameters.size(), 24u);
+    EXPECT_EQ(sections[7].title, "HDR");
 }
 
 TEST(AdjustmentsPanelTest, SectionsFollowTheOrderGiven)
@@ -158,17 +164,39 @@ TEST(AdjustmentsPanelTest, SectionsFollowTheOrderGiven)
     }
     EXPECT_EQ(
         titles,
-        (QStringList{"Light", "Color", "Effects", "Noise Reduction", "Chromatic Aberration", "HDR"}));
-    // The colour gathers the white balance, which runs first, and the colours, which run later.
+        (QStringList{
+            "Color",
+            "Light",
+            "Tone Curve",
+            "Color Mixer",
+            "Effects",
+            "Noise Reduction",
+            "Chromatic Aberration",
+            "HDR"}));
+    // The colour, first, holds the white balance, which runs first too.
     QStringList color;
-    for (const auto &parameter : sections[1].parameters) {
+    for (const auto &parameter : sections[0].parameters) {
         color << QString::fromStdString(parameter.id);
     }
+    EXPECT_EQ(color, (QStringList{"IncrementalTemperature", "IncrementalTint"}));
+    // The light gathers the tones, then the vibrance and the saturation, which run after them.
+    QStringList light;
+    for (const auto &parameter : sections[1].parameters) {
+        light << QString::fromStdString(parameter.id);
+    }
     EXPECT_EQ(
-        color, (QStringList{"IncrementalTemperature", "IncrementalTint", "Vibrance", "Saturation"}));
+        light,
+        (QStringList{
+            "Exposure2012",
+            "Contrast2012",
+            "Highlights2012",
+            "Shadows2012",
+            "Blacks2012",
+            "Vibrance",
+            "Saturation"}));
     // The effects gather the texture, the clarity and the sharpening, which runs last.
     QStringList effects;
-    for (const auto &parameter : sections[2].parameters) {
+    for (const auto &parameter : sections[4].parameters) {
         effects << QString::fromStdString(parameter.id);
     }
     EXPECT_EQ(effects, (QStringList{"Texture", "Clarity2012", "Sharpness"}));
@@ -254,7 +282,7 @@ TEST(AdjustmentsPanelTest, SectionsFoldAndReportIt)
     AdjustmentsPanel panel{sectionsOf(*core::makeStandardPipeline())};
     panel.show();
     QSignalSpy spy{&panel, &AdjustmentsPanel::sectionExpandedChanged};
-    EXPECT_EQ(panel.sectionTitles().size(), 6);
+    EXPECT_EQ(panel.sectionTitles().size(), 8);
     EXPECT_TRUE(panel.isSectionExpanded("Chromatic Aberration"));
 
     panel.setSectionExpanded("Chromatic Aberration", false);
@@ -271,6 +299,222 @@ TEST(AdjustmentsPanelTest, SectionsFoldAndReportIt)
     ASSERT_EQ(spy.count(), 1);
     EXPECT_EQ(spy.first().at(0).toString(), "Light");
     EXPECT_FALSE(spy.first().at(1).toBool());
+}
+
+TEST(ParameterSliderTest, MarksHowFarItMovedFromItsDefault)
+{
+    ParameterSlider slider{"Contrast", -100, 100, 0, 0};
+    slider.resize(300, 50);
+    slider.QWidget::show();
+    ASSERT_TRUE(QTest::qWaitForWindowExposed(&slider));
+    QSlider *line = slider.findChild<QSlider *>();
+    const QColor highlight = slider.palette().color(QPalette::Highlight);
+    // Highlighted pixels along the line, between two x of the line.
+    const auto highlighted = [&](int from, int to) {
+        const QImage drawn = line->grab().toImage();
+        int count = 0;
+        for (int x = from; x < to; ++x) {
+            // The rows around the line's middle.
+            for (int y = line->height() / 2 - 3; y <= line->height() / 2 + 3; ++y) {
+                const QColor c = drawn.pixelColor(x, y);
+                if (std::abs(c.red() - highlight.red()) + std::abs(c.green() - highlight.green())
+                        + std::abs(c.blue() - highlight.blue())
+                    < 40) {
+                    ++count;
+                    break;
+                }
+            }
+        }
+        return count;
+    };
+    const int middle = line->width() / 2;
+    EXPECT_EQ(highlighted(0, line->width()), 0); // At its default: a plain line.
+
+    slider.setValue(-60);
+    line->grab().save("/tmp/claude-1000/-home-robot-repo-lentigram/"
+                      "b6a69ca5-33e2-4955-bcbd-2fb3203c0f07/scratchpad/moved.png");
+    // From the circle, a fifth of the way from the left, to the middle, where the default is.
+    EXPECT_GT(highlighted(line->width() / 4, middle - 4), line->width() / 5);
+    EXPECT_EQ(highlighted(middle + 4, line->width()), 0);
+
+    slider.setValue(0);
+    EXPECT_EQ(highlighted(0, line->width()), 0);
+}
+
+TEST(AdjustmentsPanelTest, ASectionWidgetGoesAboveTheSlidersAndFoldsWithThem)
+{
+    AdjustmentsPanel panel{sectionsOf(*core::makeStandardPipeline())};
+    auto *drawing = new QLabel{"curve"};
+    panel.addSectionWidget("Tone Curve", drawing);
+    // A section the panel does not have takes nothing, and keeps nothing.
+    auto *stray = new QLabel{"stray"};
+    panel.addSectionWidget("No Such Section", stray);
+    delete stray;
+    panel.resize(300, 2000);
+    panel.show();
+    ASSERT_TRUE(QTest::qWaitForWindowExposed(&panel));
+
+    const auto *first = panel.slider("ParametricShadows");
+    EXPECT_LT(drawing->mapTo(&panel, QPoint{0, 0}).y(), first->mapTo(&panel, QPoint{0, 0}).y());
+    panel.setSectionExpanded("Tone Curve", false);
+    EXPECT_FALSE(drawing->isVisible());
+}
+
+TEST(AdjustmentsPanelTest, TheTitleIsTheSameBlockOpenOrClosed)
+{
+    CollapsibleSection section{"Light"};
+    section.addWidget(new QLabel{"slider"});
+    section.resize(300, 120);
+    section.show();
+    ASSERT_TRUE(QTest::qWaitForWindowExposed(&section));
+    auto *title = section.findChild<QToolButton *>();
+    // Right of the text, where only the block is drawn.
+    const QPoint inside{title->width() - 20, title->height() / 2};
+    const QColor open = title->grab().toImage().pixelColor(inside);
+
+    QTest::mouseClick(title, Qt::LeftButton);
+    EXPECT_FALSE(section.isExpanded());
+    EXPECT_TRUE(title->isChecked());
+    EXPECT_EQ(title->grab().toImage().pixelColor(inside), open);
+    QTest::mouseClick(title, Qt::LeftButton);
+    EXPECT_TRUE(section.isExpanded());
+    section.setExpanded(false);
+    EXPECT_EQ(title->grab().toImage().pixelColor(inside), open);
+}
+
+TEST(AdjustmentsPanelTest, AHeadingNamesTheGroupBelowItAndStandsApart)
+{
+    AdjustmentsPanel panel{sectionsOf(*core::makeStandardPipeline())};
+    panel.addHeading("HueAdjustmentRed", "Hue");
+    panel.addHeading("SaturationAdjustmentRed", "Saturation");
+    panel.addHeading("NoSuchSlider", "Nothing");
+    panel.resize(300, 3000);
+    panel.show();
+    ASSERT_TRUE(QTest::qWaitForWindowExposed(&panel));
+
+    const auto labels = panel.findChildren<QLabel *>();
+    const auto named = [&labels](const QString &text) {
+        // A heading, not the name of a slider, e.g. the Saturation of the Light section.
+        const auto it = std::ranges::find_if(labels, [&](QLabel *l) {
+            return l->text() == text && !qobject_cast<ParameterSlider *>(l->parentWidget());
+        });
+        return it == labels.end() ? nullptr : *it;
+    };
+    ASSERT_NE(named("Hue"), nullptr);
+    ASSERT_NE(named("Saturation"), nullptr);
+    EXPECT_EQ(named("Nothing"), nullptr);
+    const auto top = [&panel](const QWidget *w) { return w->mapTo(&panel, QPoint{0, 0}).y(); };
+    const auto bottom = [&](const QWidget *w) { return top(w) + w->height(); };
+    // Each heading is just above the first slider of its group.
+    EXPECT_LT(top(named("Saturation")), top(panel.slider("SaturationAdjustmentRed")));
+    EXPECT_GT(top(named("Saturation")), bottom(panel.slider("HueAdjustmentMagenta")));
+    // And stands apart from the group before it.
+    EXPECT_GE(top(named("Saturation")) - bottom(panel.slider("HueAdjustmentMagenta")), 12);
+}
+
+TEST(AdjustmentsPanelTest, TheSlidersStandApartFromTheirTitle)
+{
+    CollapsibleSection section{"Light"};
+    auto *content = new QLabel{"slider"};
+    section.addWidget(content);
+    section.show();
+    ASSERT_TRUE(QTest::qWaitForWindowExposed(&section));
+    const auto *title = section.findChild<QToolButton *>();
+    const int gap = content->mapTo(&section, QPoint{0, 0}).y()
+                    - (title->mapTo(&section, QPoint{0, 0}).y() + title->height());
+    EXPECT_GE(gap, 8);
+}
+
+TEST(CurveViewTest, DrawsTheCurveItIsGiven)
+{
+    CurveView view;
+    EXPECT_EQ(view.points().size(), 2u); // The diagonal, before any curve.
+    // A curve that lifts the dark tones: at a quarter of the way along, it is halfway up.
+    view.setCurve({{0, 0}, {0.25, 0.5}, {1, 1}}, {0.25, 0.5, 0.75});
+    EXPECT_EQ(view.borders().size(), 3u);
+    view.resize(200, view.heightForWidth(200));
+    EXPECT_GE(view.height(), 160);
+    const QImage image = view.grab().toImage();
+
+    const QColor curve = view.palette().color(QPalette::Highlight);
+    const auto near = [&](QPointF tone) {
+        const QPoint at = view.toWidget(tone).toPoint();
+        for (int dy = -2; dy <= 2; ++dy) {
+            for (int dx = -2; dx <= 2; ++dx) {
+                const QColor c = image.pixelColor(at + QPoint{dx, dy});
+                if (std::abs(c.red() - curve.red()) + std::abs(c.green() - curve.green())
+                        + std::abs(c.blue() - curve.blue())
+                    < 60) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+    EXPECT_TRUE(near({0.25, 0.5}));
+    // Along the straight part after it, from (0.25, 0.5) to white.
+    EXPECT_TRUE(near({0.6, 0.5 + (0.6 - 0.25) / 0.75 * 0.5}));
+    // Not on the diagonal where the curve has left it.
+    EXPECT_FALSE(near({0.25, 0.25}));
+}
+
+TEST(HistogramTest, CountsEachLevelAndTheClippedPixels)
+{
+    QImage image{100, 100, QImage::Format_RGB888};
+    image.fill(QColor{128, 128, 128});
+    Histogram histogram = histogramOf(image);
+    EXPECT_EQ(histogram.pixels, 10000);
+    EXPECT_EQ(histogram.counts[Histogram::RED][128], 10000);
+    EXPECT_EQ(histogram.counts[Histogram::LUMINANCE][128], 10000);
+    EXPECT_EQ(histogram.clippedBlack, 0);
+    EXPECT_EQ(histogram.clippedWhite, 0);
+
+    // The top half white in red only, the bottom row black in blue only: each clips one end.
+    for (int y = 0; y < 50; ++y) {
+        for (int x = 0; x < 100; ++x) {
+            image.setPixelColor(x, y, QColor{255, 128, 128});
+        }
+    }
+    for (int x = 0; x < 100; ++x) {
+        image.setPixelColor(x, 99, QColor{128, 128, 0});
+    }
+    histogram = histogramOf(image);
+    EXPECT_EQ(histogram.clippedWhite, 5000);
+    EXPECT_EQ(histogram.clippedBlack, 100);
+    EXPECT_EQ(histogramOf(QImage{}).pixels, 0);
+}
+
+TEST(HistogramTest, SamplesALargeImageOnAGrid)
+{
+    QImage image{4000, 3000, QImage::Format_RGB888};
+    image.fill(QColor{10, 200, 90});
+    const Histogram histogram = histogramOf(image, 500'000);
+    EXPECT_LE(histogram.pixels, 500'000);
+    EXPECT_GT(histogram.pixels, 250'000);
+    EXPECT_EQ(histogram.counts[Histogram::GREEN][200], histogram.pixels);
+    // Another format is read as the screen shows it.
+    QImage argb = image.convertToFormat(QImage::Format_ARGB32);
+    EXPECT_EQ(histogramOf(argb, 500'000).counts[Histogram::BLUE][90], histogram.pixels);
+}
+
+TEST(HistogramViewTest, LightsTheTriangleOfAClippedEndOnly)
+{
+    HistogramView view;
+    view.resize(260, 110);
+    QImage image{100, 100, QImage::Format_RGB888};
+    image.fill(QColor{255, 255, 255});
+    view.setHistogram(histogramOf(image));
+    const QImage drawn = view.grab().toImage();
+    const QColor lit = view.palette().color(QPalette::Highlight);
+    const auto isLit = [&](QPoint at) {
+        const QColor c = drawn.pixelColor(at);
+        return std::abs(c.red() - lit.red()) + std::abs(c.green() - lit.green())
+                   + std::abs(c.blue() - lit.blue())
+               < 30;
+    };
+    // Inside each triangle, near its corner at the top.
+    EXPECT_TRUE(isLit({260 - 2 - 4 - 2, 2 + 4 + 2}));
+    EXPECT_FALSE(isLit({2 + 4 + 2, 2 + 4 + 2}));
 }
 
 TEST(ImageViewTest, PickModeReportsTheClickInPixelsOfTheFullImage)
