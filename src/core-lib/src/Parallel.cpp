@@ -4,8 +4,10 @@
 #include "core/Parallel.h"
 
 #include <algorithm>
+#include <atomic>
 #include <condition_variable>
 #include <deque>
+#include <exception>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -52,7 +54,20 @@ public:
             const std::lock_guard lock{m_mutex};
             for (auto &chunk : chunks) {
                 m_queue.push_back([&group, chunk = std::move(chunk)] {
-                    chunk();
+                    // A chunk that throws must not leave the others counting down a group the
+                    // submitter has left: the first exception is kept, and thrown once all are
+                    // done; the chunks not started yet are skipped, as their work is lost anyway.
+                    if (!group.failed) {
+                        try {
+                            chunk();
+                        } catch (...) {
+                            const std::lock_guard errorLock{group.mutex};
+                            if (!group.error) {
+                                group.error = std::current_exception();
+                            }
+                            group.failed = true;
+                        }
+                    }
                     // Counted and signalled under the group's lock: the submitter returns, and
                     // the group on its stack goes, only once it holds that lock after the last
                     // chunk has let it go.
@@ -69,12 +84,18 @@ public:
         }
         std::unique_lock lock{group.mutex};
         group.done.wait(lock, [&group] { return group.remaining == 0; });
+        if (group.error) {
+            std::rethrow_exception(group.error);
+        }
     }
 
 private:
     struct Group
     {
         int remaining = 0;
+        /// The first exception a chunk threw, thrown by run() once every chunk is done.
+        std::exception_ptr error;
+        std::atomic<bool> failed{false};
         std::mutex mutex;
         std::condition_variable done;
     };

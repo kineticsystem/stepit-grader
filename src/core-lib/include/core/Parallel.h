@@ -11,6 +11,8 @@ namespace core {
 /**
  * Calls body(begin, end) on consecutive ranges that cover [begin, end), one range per thread,
  * and returns once every range is done. Small ranges run on the calling thread.
+ * An exception thrown by `body` is thrown here, once every range has ended; the ranges not started
+ * by then are skipped.
  */
 void parallelFor(int begin, int end, const std::function<void(int, int)> &body);
 
