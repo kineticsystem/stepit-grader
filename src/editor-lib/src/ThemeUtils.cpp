@@ -1,13 +1,15 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/Theme.h"
+#include "editor/ThemeUtils.h"
 
 #include <QApplication>
 #include <QPalette>
 #include <QProxyStyle>
 #include <QStyle>
 #include <QStyleFactory>
+
+namespace ThemeUtils {
 
 namespace {
 
@@ -129,3 +131,5 @@ std::optional<Theme> themeNamed(const QString &name)
     }
     return std::nullopt;
 }
+
+} // namespace ThemeUtils

@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: MIT
 
 #include "editor/Document.h"
-#include "editor/viewmodel/SaveImageViewModel.h"
 #include "editor/MainWindow.h"
 #include "editor/PreviewRenderer.h"
-#include "editor/Theme.h"
+#include "editor/ThemeUtils.h"
 #include "editor/viewmodel/CameraLookViewModel.h"
-#include "widgets/Sections.h"
+#include "editor/viewmodel/LeavePictureViewModel.h"
+#include "editor/viewmodel/SaveImageViewModel.h"
+#include "editor/viewmodel/WhiteBalanceViewModel.h"
+#include "widgets/SectionUtils.h"
 
 #include "core/StandardPipeline.h"
 #include "imageio/ImageLoader.h"
@@ -51,7 +53,9 @@ int main(int argc, char *argv[])
     parser.process(app);
 
     // The theme chosen in Settings > Theme, before the window and its icons are made.
-    applyTheme(themeNamed(QSettings{}.value(THEME_SETTING).toString()).value_or(Theme::System));
+    ThemeUtils::applyTheme(
+        ThemeUtils::themeNamed(QSettings{}.value(ThemeUtils::THEME_SETTING).toString())
+            .value_or(ThemeUtils::Theme::System));
 #ifdef Q_OS_MACOS
     // macOS's menu bar stays light whatever the theme, where the icons of a dark
     // theme would hardly show. The menus go without icons; the toolbar keeps them.
@@ -67,12 +71,16 @@ int main(int argc, char *argv[])
     QSettings settings;
     SaveImageViewModel saveImage{&document, pipeline, &settings};
     CameraLookViewModel cameraLook{&document, pipeline, std::make_shared<imageio::RawShotReader>()};
+    LeavePictureViewModel leavePicture{&document};
+    WhiteBalanceViewModel whiteBalance{&document};
     MainWindow window{
         &document,
         &renderer,
         &saveImage,
         &cameraLook,
-        sectionsOf(*pipeline, core::standardSectionOrder())};
+        &leavePicture,
+        &whiteBalance,
+        SectionUtils::sectionsOf(*pipeline, core::standardSectionOrder())};
     window.show();
 
     if (!parser.positionalArguments().isEmpty()) {

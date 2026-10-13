@@ -1,9 +1,11 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "widgets/Sections.h"
+#include "widgets/SectionUtils.h"
 
 #include <algorithm>
+
+namespace SectionUtils {
 
 std::vector<AdjustmentsPanel::Section> sectionsOf(
     const core::Pipeline &pipeline, const std::vector<std::string> &order)
@@ -28,3 +30,5 @@ std::vector<AdjustmentsPanel::Section> sectionsOf(
     std::ranges::stable_sort(sections, {}, rank);
     return sections;
 }
+
+} // namespace SectionUtils

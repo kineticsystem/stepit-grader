@@ -1,13 +1,15 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/CameraLook.h"
+#include "editor/CameraLookUtils.h"
 #include "core/Geometry.h"
 #include "imageio/Error.h"
 
 #include <QFileInfo>
 
 #include <cmath>
+
+namespace CameraLookUtils {
 
 namespace {
 
@@ -116,3 +118,5 @@ std::expected<core::match::Result, QString> matchCameraLook(
         result.stopped ? Status::State::Stopped : Status::State::Finished});
     return result;
 }
+
+} // namespace CameraLookUtils

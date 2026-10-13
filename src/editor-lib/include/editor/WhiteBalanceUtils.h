@@ -11,6 +11,13 @@
 
 #include <expected>
 
+/**
+ * Measuring the white balance of an area of the picture: the temperature and the tint that make
+ * it neutral. Runs on any thread; `WhiteBalanceViewModel` runs it in the background and merges its
+ * result into the picture's settings.
+ */
+namespace WhiteBalanceUtils {
+
 /// What a pick of the white balance gives.
 struct WhiteBalancePick
 {
@@ -29,3 +36,5 @@ struct WhiteBalancePick
  */
 std::expected<WhiteBalancePick, QString> pickWhiteBalance(
     const core::Image &image, const core::Settings &settings, QPointF point, double radius);
+
+} // namespace WhiteBalanceUtils

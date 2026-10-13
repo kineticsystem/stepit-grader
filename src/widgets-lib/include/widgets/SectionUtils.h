@@ -10,9 +10,17 @@
 #include <vector>
 
 /**
+ * The sections of the tools panel, made from a pipeline: which parameters each holds, and in
+ * which order they come, so `AdjustmentsPanel` is given its sections and needs no pipeline.
+ */
+namespace SectionUtils {
+
+/**
  * The sections of the tools panel: one per section of the effects, each with its parameters in the
  * order of the pipeline. The sections named in `order` come first, in that order; the others
  * follow, in the order of the pipeline.
  */
 std::vector<AdjustmentsPanel::Section> sectionsOf(
     const core::Pipeline &pipeline, const std::vector<std::string> &order = {});
+
+} // namespace SectionUtils

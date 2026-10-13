@@ -1,13 +1,15 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/ImageExport.h"
-#include "editor/ImageConversion.h"
+#include "editor/ImageExportUtils.h"
+#include "editor/ImageConversionUtils.h"
 #include "imageio/Error.h"
 #include "imageio/TiffWriter.h"
 
 #include <QColorSpace>
 #include <QImageWriter>
+
+namespace ImageExportUtils {
 
 namespace {
 
@@ -45,7 +47,7 @@ std::expected<void, QString> saveImage(
         return std::unexpected(QObject::tr("The picture could not be graded."));
     }
     if (format.jpeg) {
-        QImage image = toQImage(*graded);
+        QImage image = ImageConversionUtils::toQImage(*graded);
         image.setColorSpace(QColorSpace::SRgb);
         QImageWriter writer{path, "JPEG"};
         writer.setQuality(JPEG_QUALITY);
@@ -63,3 +65,5 @@ std::expected<void, QString> saveImage(
     }
     return {};
 }
+
+} // namespace ImageExportUtils

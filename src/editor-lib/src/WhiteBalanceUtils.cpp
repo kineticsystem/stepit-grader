@@ -1,12 +1,14 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/WhiteBalancePicker.h"
+#include "editor/WhiteBalanceUtils.h"
 
 #include "core/Sampling.h"
 #include "core/effects/WhiteBalanceEffect.h"
 
 #include <QCoreApplication>
+
+namespace WhiteBalanceUtils {
 
 std::expected<WhiteBalancePick, QString> pickWhiteBalance(
     const core::Image &image, const core::Settings &settings, QPointF point, double radius)
@@ -30,3 +32,5 @@ std::expected<WhiteBalancePick, QString> pickWhiteBalance(
     pick.settings.setValue(core::WhiteBalanceEffect::TINT.id, neutral->tint);
     return pick;
 }
+
+} // namespace WhiteBalanceUtils

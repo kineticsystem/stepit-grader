@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "editor/viewmodel/CameraLookViewModel.h"
-#include "editor/CameraLook.h"
+#include "editor/CameraLookUtils.h"
 #include "editor/Document.h"
 #include "imageio/CameraShotReader.h"
 
@@ -67,12 +67,14 @@ std::shared_ptr<StatusController> CameraLookViewModel::start(const QStringList &
         Q_EMIT finished();
     });
     // The picture's settings as the match starts: the grade found goes over them.
-    watcher->setFuture(QtConcurrent::run(
-        [raws,
-         reader = m_reader,
-         pipeline = m_pipeline,
-         base = m_document->settings(),
-         status = m_status] { return matchCameraLook(raws, *reader, *pipeline, base, *status); }));
+    watcher->setFuture(
+        QtConcurrent::run([raws,
+                           reader = m_reader,
+                           pipeline = m_pipeline,
+                           base = m_document->settings(),
+                           status = m_status] {
+            return CameraLookUtils::matchCameraLook(raws, *reader, *pipeline, base, *status);
+        }));
     return m_status;
 }
 

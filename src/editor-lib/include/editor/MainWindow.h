@@ -8,18 +8,18 @@
 #include <QMainWindow>
 #include <QString>
 
-#include <functional>
 #include <utility>
 #include <vector>
 
-struct WhiteBalancePick;
 class CameraLookViewModel;
 class Document;
+class LeavePictureViewModel;
 class SaveImageViewModel;
 class ImageView;
 class PreviewRenderer;
 class QLabel;
 class RecentFilesMenu;
+class WhiteBalanceViewModel;
 
 /**
  * The editor's window: the picture in the middle, the tools on the right, and the menus. It
@@ -40,11 +40,13 @@ public:
         PreviewRenderer *renderer,
         SaveImageViewModel *saveImage,
         CameraLookViewModel *cameraLook,
+        LeavePictureViewModel *leavePicture,
+        WhiteBalanceViewModel *whiteBalance,
         std::vector<AdjustmentsPanel::Section> sections,
         QWidget *parent = nullptr);
 
 public Q_SLOTS:
-    /// Opens the file, after saving the settings of the picture open that wait to be.
+    /// Opens the file, after saving the settings of the picture open that wait to be; says why not.
     void openFile(const QString &path);
 
 protected:
@@ -62,24 +64,16 @@ private:
     void chooseFile();
     /// Asks for a file of settings, and applies it to the picture open.
     void chooseSettings();
-    /**
-     * Runs `then` once the settings that wait to be saved are written, in the background; when
-     * they cannot be, asks whether to go on without them, and forgets `then` if the user stays.
-     */
-    void whenSaved(std::function<void()> then);
-    /// Goes on with the action waiting for a save, if the save asked has ended.
-    void continueWhenSaved(bool failed);
     void onOpened();
     void updateTitle();
     void updateZoom(double zoom);
-    /// Measures the white balance in the background, and sets it once measured.
-    void pickWhiteBalanceAt(QPointF point, double radius);
-    void showWhiteBalancePicked(const WhiteBalancePick &pick);
 
     Document *m_document;
     PreviewRenderer *m_renderer;
     SaveImageViewModel *m_saveImage;
     CameraLookViewModel *m_cameraLook;
+    LeavePictureViewModel *m_leavePicture;
+    WhiteBalanceViewModel *m_whiteBalance;
     ImageView *m_view;
     AdjustmentsPanel *m_panel;
     QLabel *m_fileLabel;
@@ -91,8 +85,4 @@ private:
     std::vector<std::pair<QAction *, QString>> m_themedIcons;
     QLabel *m_beforeLabel;
     RecentFilesMenu *m_recentFiles = nullptr;
-    /// The action waiting for the settings to be written, e.g. opening another picture.
-    std::function<void()> m_whenSaved;
-    /// The window closes: its settings are written, or the user chose to leave them.
-    bool m_closing = false;
 };

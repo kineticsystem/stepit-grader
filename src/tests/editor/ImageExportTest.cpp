@@ -1,9 +1,9 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/ImageExport.h"
 #include "../testutils/TestImages.h"
 #include "core/StandardPipeline.h"
+#include "editor/ImageExportUtils.h"
 #include "imageio/TiffReader.h"
 
 #include <QImage>
@@ -30,7 +30,7 @@ QString pathOf(const std::filesystem::path &path)
 
 TEST(ImageExportTest, TheFormatsAreTiffsInEachColourSpaceAndAJpeg)
 {
-    const auto &formats = imageFormats();
+    const auto &formats = ImageExportUtils::imageFormats();
     ASSERT_EQ(formats.size(), 4u);
     EXPECT_EQ(formats.front().colourSpace, imageio::ColourSpace::Srgb);
     EXPECT_FALSE(formats.front().jpeg);
@@ -43,8 +43,12 @@ TEST(ImageExportTest, SavesTheGradedPictureAsATiff)
     const core::Image picture = testutils::uniform(32, 24, 0.1f, 0.1f, 0.1f);
     const auto path = testutils::outputFolder() / "graded.tif";
     std::filesystem::remove(path);
-    const auto saved = saveImage(
-        picture, oneStopBrighter(), *core::makeStandardPipeline(), pathOf(path), imageFormats()[0]);
+    const auto saved = ImageExportUtils::saveImage(
+        picture,
+        oneStopBrighter(),
+        *core::makeStandardPipeline(),
+        pathOf(path),
+        ImageExportUtils::imageFormats()[0]);
     ASSERT_TRUE(saved.has_value()) << saved.error().toStdString();
 
     // Read back into the working space: the grade is in it, twice the light.
@@ -59,8 +63,12 @@ TEST(ImageExportTest, SavesTheGradedPictureAsAJpeg)
     const core::Image picture = testutils::uniform(32, 24, 0.1f, 0.1f, 0.1f);
     const auto path = testutils::outputFolder() / "graded.jpg";
     std::filesystem::remove(path);
-    const auto saved = saveImage(
-        picture, oneStopBrighter(), *core::makeStandardPipeline(), pathOf(path), imageFormats()[3]);
+    const auto saved = ImageExportUtils::saveImage(
+        picture,
+        oneStopBrighter(),
+        *core::makeStandardPipeline(),
+        pathOf(path),
+        ImageExportUtils::imageFormats()[3]);
     ASSERT_TRUE(saved.has_value()) << saved.error().toStdString();
 
     const QImage read{pathOf(path)};
@@ -73,8 +81,9 @@ TEST(ImageExportTest, SavesTheGradedPictureAsAJpeg)
 TEST(ImageExportTest, ReportsAFileThatCannotBeWritten)
 {
     const core::Image picture = testutils::uniform(8, 8, 0.1f, 0.1f, 0.1f);
-    for (const ImageFormat &format : {imageFormats()[0], imageFormats()[3]}) {
-        const auto saved = saveImage(
+    for (const ImageExportUtils::ImageFormat &format :
+         {ImageExportUtils::imageFormats()[0], ImageExportUtils::imageFormats()[3]}) {
+        const auto saved = ImageExportUtils::saveImage(
             picture,
             core::Settings{},
             *core::makeStandardPipeline(),

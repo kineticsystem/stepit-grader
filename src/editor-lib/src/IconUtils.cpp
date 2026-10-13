@@ -1,13 +1,15 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/Icons.h"
+#include "editor/IconUtils.h"
 
 #include <QApplication>
 #include <QPainter>
 #include <QPalette>
 #include <QPixmap>
 #include <QSvgRenderer>
+
+namespace IconUtils {
 
 namespace {
 
@@ -41,3 +43,5 @@ QIcon themedIcon(const QString &name)
     }
     return icon;
 }
+
+} // namespace IconUtils
