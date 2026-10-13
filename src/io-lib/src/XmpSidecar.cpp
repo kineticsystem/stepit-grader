@@ -3,6 +3,7 @@
 
 #include "imageio/XmpSidecar.h"
 #include "imageio/Error.h"
+#include "imageio/Files.h"
 #include "imageio/RawReader.h"
 
 #include <pugixml.hpp>
@@ -304,21 +305,18 @@ void XmpSidecar::save(
 
     // Written whole to a temporary file, then renamed over the sidecar, so a failure never leaves
     // half a file.
-    std::filesystem::path temporary = path;
-    temporary += ".tmp";
+    const std::filesystem::path temporary = files::temporaryFor(path);
     {
         std::ofstream out{temporary, std::ios::binary | std::ios::trunc};
         out << text;
         if (!out) {
+            out.close();
+            std::error_code ignored;
+            std::filesystem::remove(temporary, ignored);
             throw Error{"Cannot write " + temporary.string()};
         }
     }
-    std::error_code error;
-    std::filesystem::rename(temporary, path, error);
-    if (error) {
-        std::filesystem::remove(temporary, error);
-        throw Error{"Cannot write " + path.string()};
-    }
+    files::replace(temporary, path);
 }
 
 } // namespace imageio

@@ -9,6 +9,7 @@ add_executable(stepit-grader-tests
     core/CameraMatchTest.cpp
     core/EffectsTest.cpp
     core/EngineTest.cpp
+    io/FilesTest.cpp
     io/ReadersTest.cpp
     io/TiffWriterTest.cpp
     io/XmpSidecarTest.cpp

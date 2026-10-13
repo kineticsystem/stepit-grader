@@ -2,6 +2,7 @@
 # DNG files, and XMP sidecars. No Qt.
 add_library(io-lib STATIC
     src/ColourProfiles.cpp
+    src/Files.cpp
     src/ImageLoader.cpp
     src/ImageReader.cpp
     src/RawReader.cpp
