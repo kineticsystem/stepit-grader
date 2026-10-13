@@ -45,7 +45,8 @@ protected:
 
 private:
     void changeTo(double value);
-    void show(double value);
+    /// Shows `value` on the slider and as text, without a signal.
+    void showValue(double value);
     int toSteps(double value) const;
 
     QLabel *m_label;

@@ -30,6 +30,7 @@ AdjustmentsPanel::AdjustmentsPanel(std::vector<Section> sections, QWidget *paren
         auto *group = new CollapsibleSection{section.title};
         column->addWidget(group);
         m_sections[section.title] = group;
+        m_titles << section.title;
         connect(
             group,
             &CollapsibleSection::expandedChanged,
@@ -86,11 +87,7 @@ ParameterSlider *AdjustmentsPanel::slider(const std::string &id) const
 
 QStringList AdjustmentsPanel::sectionTitles() const
 {
-    QStringList titles;
-    for (const auto &[title, section] : m_sections) {
-        titles << title;
-    }
-    return titles;
+    return m_titles;
 }
 
 bool AdjustmentsPanel::isSectionExpanded(const QString &title) const

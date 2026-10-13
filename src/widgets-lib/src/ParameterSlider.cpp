@@ -41,7 +41,7 @@ ParameterSlider::ParameterSlider(
         resets->setToolTip(tr("Double click to reset"));
     }
     m_valueLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    show(defaultValue);
+    showValue(defaultValue);
 
     auto *layout = new QGridLayout{this};
     layout->setContentsMargins(0, 2, 0, 2);
@@ -62,12 +62,12 @@ ParameterSlider::ParameterSlider(
 void ParameterSlider::setValue(double value)
 {
     m_value = value;
-    show(value);
+    showValue(value);
 }
 
 void ParameterSlider::reset()
 {
-    show(m_default);
+    showValue(m_default);
     changeTo(m_default);
 }
 
@@ -87,11 +87,11 @@ void ParameterSlider::changeTo(double value)
         return;
     }
     m_value = value;
-    show(value);
+    showValue(value);
     Q_EMIT valueChanged(value);
 }
 
-void ParameterSlider::show(double value)
+void ParameterSlider::showValue(double value)
 {
     const QSignalBlocker blockSlider{m_slider};
     m_slider->setValue(toSteps(value));
