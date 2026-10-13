@@ -21,14 +21,14 @@ This review judges how StepIt Grader is built, on 13 October 2026, at commit `a1
 It is a partial refresh of the review made at `1ab77b2`, brought up to date since with `LeavePictureViewModel`, `WhiteBalanceViewModel` and `PickWhiteBalanceAction`, read whole, and `MainWindow` read again. Read again, whole: `editor-lib`, about 2,800 lines, with its new view models and actions; what changed in `io-lib` since, the `CameraShotReader` interface and the XMP sidecar's names and damaged copies; and `core::match`. The parts unchanged since `1ab77b2`, `widgets-lib`, `cli-lib` and the rest of `core-lib` and `io-lib`, keep the judgements of that review.
 
 - **Counted**: the links of each library, the includes between libraries, and the test cases of each folder.
-- **Run**: the whole suite, 190 test cases in 193 runs, passing in about 10 seconds, the four raw tests skipped without raw-converter's samples; again built with AddressSanitizer and UndefinedBehaviorSanitizer, passing with no report; and with ThreadSanitizer under `setarch -R`, passing with 74 reports, none a race between two threads of our code, see [Implementation Issues](#implementation-issues).
+- **Run**: the whole suite, 193 test cases in 196 runs, passing in about 10 seconds, the four raw tests skipped without raw-converter's samples; again built with AddressSanitizer and UndefinedBehaviorSanitizer, passing with no report; and with ThreadSanitizer under `setarch -R`, passing with 74 reports, none a race between two threads of our code, see [Implementation Issues](#implementation-issues).
 - **Verified**: one suspicion, with a throwaway test, removed after. A finding marked *verified* was reproduced; the others are *from reading*.
 
 ## Verdict
 
 **Sound.** The layers hold: the engine and the files know no Qt, every dependency points down, and the one idea, *an edit is a set of named values*, runs through the engine, the sidecar, the command line and the camera match alike. The editor now has the shape the last review asked for: the `Document` is the one model, a view model holds each action's rules and tells the views with signals only, and the actions hold the dialogs. Every rule the window held is now a view model's and tested without a window: saving the image, the camera match end to end with a fake reader, the white balance pick, and the wait for the settings to be written before a picture is left. The matched grade is fitted over the picture's own settings.
 
-What needs work: an exception in a parallel chunk escapes while other chunks still run ([1](#1-an-exception-in-a-parallel-chunk-escapes-while-other-chunks-still-run)), and the actions, which hold the dialogs, have no test, by design.
+What needs work: small things, [1](#1-smaller), and the actions, which hold the dialogs, have no test, by design.
 
 ## Structure and Boundaries
 
@@ -65,7 +65,7 @@ No view model includes a widget; of the actions, the views, only `PickWhiteBalan
 | `CameraShotReader` | [`CameraShotReader.h`](../src/io-lib/include/imageio/CameraShotReader.h) | Good: one implementation, `RawShotReader`, which defers to `RawReader` and `readCameraShot()`, and a fake, so `CameraLookUtils::matchCameraLook()` is tested without raw files. |
 | `SettingsStore` | [`SettingsStore.h`](../src/io-lib/include/imageio/SettingsStore.h) | Good: one implementation, the XMP sidecar, and a fake; where a sidecar lives is the store's to say, `location()`, so the document and the command line never build its name. |
 | `core::match::Options` | [`CameraMatch.h`](../src/core-lib/include/core/CameraMatch.h) | Good: progress and stop as plain callbacks, and `base`, the settings the grade goes over, so the search runs, and is tested, without Qt. |
-| The view models | [`viewmodel/`](../src/editor-lib/include/editor/viewmodel) | Good: `SaveImageViewModel`, `CameraLookViewModel`, `WhiteBalanceViewModel` and `LeavePictureViewModel` are given the document, the pipeline and what they read or keep with, answer calls and emit signals; no widget. Their tests drive them as the actions do. `CameraLookViewModel` keeps the last grade found after a failed match: *verified*, see [3](#2-smaller). |
+| The view models | [`viewmodel/`](../src/editor-lib/include/editor/viewmodel) | Good: `SaveImageViewModel`, `CameraLookViewModel`, `WhiteBalanceViewModel` and `LeavePictureViewModel` are given the document, the pipeline and what they read or keep with, answer calls and emit signals; no widget. Their tests drive them as the actions do. `CameraLookViewModel` keeps the last grade found after a failed match: *verified*, see [3](#1-smaller). |
 | `StatusController` | [`Status.h`](../src/editor-lib/include/editor/Status.h) | Adequate: a thread-safe flag and a queued signal. One task at a time, which is all the window needs. |
 | `AdjustmentsPanel` | [`AdjustmentsPanel.h`](../src/widgets-lib/include/widgets/AdjustmentsPanel.h) | Good: `addSectionWidget()`, `addSectionHeaderWidget()` and `addHeading()` let the window add to a section without the panel knowing why. `sectionTitles()` returns the titles in alphabetical order, not the order shown: a `std::map`'s, in `AdjustmentsPanel::sectionTitles()`. |
 
@@ -100,7 +100,7 @@ Elsewhere, knowledge sits where it belongs: the document owns the files and thei
 
 | Folder | Test cases | Untested |
 |---|---|---|
-| `core` | 53 | The look of the effects, by design, see the architecture's manual checks. |
+| `core` | 56 | The look of the effects, by design, see the architecture's manual checks. |
 | `io` | 27 | `imageio::files::replace()` setting the old file aside where a system does not rename over a file: Linux always does. |
 | `editor` | 92 | `MainWindow` and the actions: no test constructs them. |
 | `cli` | 7 | |
@@ -111,13 +111,9 @@ The actions are not tested, by design: they hold the dialogs, which a test canno
 
 ## Implementation Issues
 
-Ordered by severity. ThreadSanitizer's 74 reports are all a value handed to a pooled thread through Qt's thread pool, whose synchronisation an uninstrumented Qt hides: the copies `QtConcurrent::run` makes of a lambda's captures on the main thread, read on the pooled thread, in [`Document.cpp`](../src/editor-lib/src/Document.cpp) at the open and the load of settings, and a test's slot connected without a context, run on the match's thread. None is in a view model or an action, nor in `core::parallelFor`, the renderer's generation counter or `core::match`.
+Ordered by severity. ThreadSanitizer's 74 reports are all a value handed to a pooled thread through Qt's thread pool, whose synchronisation an uninstrumented Qt hides: the copies `QtConcurrent::run` makes of a lambda's captures on the main thread, read on the pooled thread, in [`Document.cpp`](../src/editor-lib/src/Document.cpp) at the open and the load of settings, and a test's slot connected without a context, run on the match's thread. None is in a view model or an action, nor in `core::parallelFor`, whose exceptions are now kept and thrown once every chunk has ended, checked with ThreadSanitizer and AddressSanitizer over 20 runs, the renderer's generation counter or `core::match`.
 
-### 1. An exception in a parallel chunk escapes while other chunks still run
-
-*Verified at `1ab77b2`; the code is unchanged.* A chunk of [`core::parallelFor()`](../src/core-lib/src/Parallel.cpp) that throws on the calling thread leaves `ThreadPool::run()` at once. The chunks still running on other threads then count down a `Group` that lived on the unwound stack. A chunk that throws on a worker ends the program. Only `std::bad_alloc` can throw there today, on a picture too large for the memory.
-
-### 2. Smaller
+### 1. Smaller
 
 - `CameraLookViewModel` keeps the last grade found after a later match failed: `summary()` returns its text and `apply()` merges it, *verified*. The action calls `apply()` only after `finished()`, so the user cannot reach it today; a second view could. [`CameraLookViewModel::start()`](../src/editor-lib/src/viewmodel/CameraLookViewModel.cpp) does not clear `m_result`.
 - `ParameterSlider::show(double)`, private, hides `QWidget::show()`: `slider.show()` does not compile; [`ParameterSlider.h`](../src/widgets-lib/include/widgets/ParameterSlider.h).
@@ -130,7 +126,6 @@ Ordered by value against effort; each is one pull request.
 
 | # | Change | Fixes | Trade-off |
 |---|---|---|---|
-| 1 | Catch an exception in each chunk of `parallelFor`, keep the first, wait for every chunk, then throw it. | 1 | A few lines in the one place every effect goes through. |
-| 2 | One sRGB curve, each way, and one sRGB-to-XYZ matrix, in `core::color`. | Duplication | None. |
-| 3 | Clear `CameraLookViewModel`'s result when a match starts, and build the Apply question's list of sliders from the stages. | 2, coupling | None. |
-| 4 | Keep the sections' order in `AdjustmentsPanel`, and rename `ParameterSlider::show()` to `showValue()`. | 2 and the panel's titles | None. |
+| 1 | One sRGB curve, each way, and one sRGB-to-XYZ matrix, in `core::color`. | Duplication | None. |
+| 2 | Clear `CameraLookViewModel`'s result when a match starts, and build the Apply question's list of sliders from the stages. | 1, coupling | None. |
+| 3 | Keep the sections' order in `AdjustmentsPanel`, and rename `ParameterSlider::show()` to `showValue()`. | 1 and the panel's titles | None. |
