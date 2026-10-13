@@ -3,6 +3,7 @@
 
 #include "imageio/TiffWriter.h"
 #include "imageio/Error.h"
+#include "imageio/Files.h"
 
 #include "ColourProfiles.h"
 
@@ -70,8 +71,7 @@ void TiffWriter::write(const core::Image &image, const std::filesystem::path &pa
     });
     const std::vector<std::uint8_t> icc = iccBytes(output.get());
 
-    std::filesystem::path temporary = path;
-    temporary.replace_filename("." + path.filename().string() + ".part");
+    const std::filesystem::path temporary = files::temporaryFor(path);
     TIFF *tif = open(temporary);
     if (!tif) {
         throw Error{"Cannot write " + temporary.string()};
@@ -100,16 +100,12 @@ void TiffWriter::write(const core::Image &image, const std::filesystem::path &pa
     }
     TIFFClose(tif);
 
-    std::error_code error;
-    if (written) {
-        // Windows does not rename over an existing file.
-        std::filesystem::remove(path, error);
-        std::filesystem::rename(temporary, path, error);
-    }
-    if (!written || error) {
-        std::filesystem::remove(temporary, error);
+    if (!written) {
+        std::error_code ignored;
+        std::filesystem::remove(temporary, ignored);
         throw Error{"Cannot write " + name};
     }
+    files::replace(temporary, path);
 }
 
 } // namespace imageio

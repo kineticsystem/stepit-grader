@@ -4,6 +4,7 @@
 #include "editor/ImageExportUtils.h"
 #include "editor/ImageConversionUtils.h"
 #include "imageio/Error.h"
+#include "imageio/Files.h"
 #include "imageio/TiffWriter.h"
 
 #include <QColorSpace>
@@ -49,11 +50,24 @@ std::expected<void, QString> saveImage(
     if (format.jpeg) {
         QImage image = ImageConversionUtils::toQImage(*graded);
         image.setColorSpace(QColorSpace::SRgb);
-        QImageWriter writer{path, "JPEG"};
+        // Written whole beside it first, as a TIFF is, so a failure never harms the file it
+        // would replace.
+        const std::filesystem::path target{path.toStdU16String()};
+        const std::filesystem::path temporary = imageio::files::temporaryFor(target);
+        QImageWriter writer{QString::fromStdU16String(temporary.u16string()), "JPEG"};
         writer.setQuality(JPEG_QUALITY);
         if (!writer.write(image)) {
-            return std::unexpected(
-                QObject::tr("Cannot write %1: %2").arg(path, writer.errorString()));
+            const QString message = writer.errorString();
+            writer.setFileName({});
+            std::error_code ignored;
+            std::filesystem::remove(temporary, ignored);
+            return std::unexpected(QObject::tr("Cannot write %1: %2").arg(path, message));
+        }
+        writer.setFileName({});
+        try {
+            imageio::files::replace(temporary, target);
+        } catch (const imageio::Error &e) {
+            return std::unexpected(QString::fromStdString(e.what()));
         }
         return {};
     }
