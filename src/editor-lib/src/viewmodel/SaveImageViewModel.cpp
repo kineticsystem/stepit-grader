@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 #include "editor/viewmodel/SaveImageViewModel.h"
+#include "editor/ConcurrentUtils.h"
 #include "editor/Document.h"
 #include "editor/ImageExportUtils.h"
 #include "editor/SessionProperties.h"
 
 #include <QFileInfo>
-#include <QFutureWatcher>
 #include <QSettings>
-#include <QtConcurrent>
 
 #include <algorithm>
 
@@ -71,24 +70,19 @@ std::expected<QString, QString> SaveImageViewModel::save(QString path, const QSt
             tr("The picture would replace the one it was made from: choose another name."));
     }
 
-    using Outcome = std::expected<void, QString>;
-    auto *watcher = new QFutureWatcher<Outcome>{this};
-    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, path] {
-        watcher->deleteLater();
-        const Outcome outcome = watcher->result();
-        if (outcome) {
-            Q_EMIT saved(path);
-        } else {
-            Q_EMIT saveFailed(outcome.error());
-        }
-    });
-    watcher->setFuture(
-        QtConcurrent::run([image = m_document->image(),
-                           settings = m_document->settings(),
-                           pipeline = m_pipeline,
-                           path,
-                           format] {
-            return ImageExportUtils::saveImage(*image, settings, *pipeline, path, format);
-        }));
+    ConcurrentUtils::run(
+        this,
+        [image = m_document->image(),
+         settings = m_document->settings(),
+         pipeline = m_pipeline,
+         path,
+         format] { return ImageExportUtils::saveImage(*image, settings, *pipeline, path, format); },
+        [this, path](const std::expected<void, QString> &outcome) {
+            if (outcome) {
+                Q_EMIT saved(path);
+            } else {
+                Q_EMIT saveFailed(outcome.error());
+            }
+        });
     return path;
 }
