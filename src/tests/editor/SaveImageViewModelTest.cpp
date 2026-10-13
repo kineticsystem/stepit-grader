@@ -6,7 +6,7 @@
 
 #include "core/StandardPipeline.h"
 #include "editor/Document.h"
-#include "editor/ImageExport.h"
+#include "editor/ImageExportUtils.h"
 #include "editor/viewmodel/SaveImageViewModel.h"
 
 #include <QSettings>
@@ -47,8 +47,8 @@ struct SaveImageViewModelTest : ::testing::Test
         ASSERT_TRUE(QTest::qWaitFor([&] { return !opened.isEmpty(); }, 5000));
     }
 
-    const QString &tiff() const { return imageFormats().front().filter; }
-    const QString &jpeg() const { return imageFormats().back().filter; }
+    const QString &tiff() const { return ImageExportUtils::imageFormats().front().filter; }
+    const QString &jpeg() const { return ImageExportUtils::imageFormats().back().filter; }
 };
 
 } // namespace

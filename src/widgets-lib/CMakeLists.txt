@@ -8,18 +8,20 @@ add_library(widgets-lib STATIC
     include/widgets/AdjustmentsPanel.h
     include/widgets/CollapsibleSection.h
     include/widgets/CurveView.h
+    include/widgets/HistogramUtils.h
     include/widgets/HistogramView.h
     include/widgets/ImageView.h
     include/widgets/ParameterSlider.h
-    include/widgets/Sections.h
+    include/widgets/SectionUtils.h
     include/widgets/SliderStyle.h
     src/AdjustmentsPanel.cpp
     src/CollapsibleSection.cpp
     src/CurveView.cpp
+    src/HistogramUtils.cpp
     src/HistogramView.cpp
     src/ImageView.cpp
     src/ParameterSlider.cpp
-    src/Sections.cpp
+    src/SectionUtils.cpp
     src/SliderStyle.cpp)
 add_library(stepit-grader::widgets ALIAS widgets-lib)
 target_include_directories(widgets-lib PUBLIC include)

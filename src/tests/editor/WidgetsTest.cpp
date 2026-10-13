@@ -4,17 +4,18 @@
 #include "../testutils/TestImages.h"
 
 #include "core/StandardPipeline.h"
-#include "editor/Icons.h"
+#include "editor/IconUtils.h"
 #include "editor/RecentFilesMenu.h"
-#include "editor/Theme.h"
-#include "editor/WhiteBalancePicker.h"
+#include "editor/ThemeUtils.h"
+#include "editor/WhiteBalanceUtils.h"
 #include "widgets/AdjustmentsPanel.h"
 #include "widgets/CollapsibleSection.h"
 #include "widgets/CurveView.h"
+#include "widgets/HistogramUtils.h"
 #include "widgets/HistogramView.h"
 #include "widgets/ImageView.h"
 #include "widgets/ParameterSlider.h"
-#include "widgets/Sections.h"
+#include "widgets/SectionUtils.h"
 #include "widgets/SliderStyle.h"
 
 #include <QAbstractSpinBox>
@@ -139,7 +140,7 @@ TEST(SliderStyleTest, GivesAnySliderTheLook)
 TEST(AdjustmentsPanelTest, SectionsFollowThePipeline)
 {
     // Without an order, the sections come as the effects run, each with its parameters in order.
-    const auto sections = sectionsOf(*core::makeStandardPipeline());
+    const auto sections = SectionUtils::sectionsOf(*core::makeStandardPipeline());
     ASSERT_EQ(sections.size(), 8u);
     EXPECT_EQ(sections[0].title, "Color");
     EXPECT_EQ(sections[1].title, "Noise Reduction");
@@ -157,7 +158,8 @@ TEST(AdjustmentsPanelTest, SectionsFollowThePipeline)
 
 TEST(AdjustmentsPanelTest, SectionsFollowTheOrderGiven)
 {
-    const auto sections = sectionsOf(*core::makeStandardPipeline(), core::standardSectionOrder());
+    const auto sections
+        = SectionUtils::sectionsOf(*core::makeStandardPipeline(), core::standardSectionOrder());
     QStringList titles;
     for (const auto &section : sections) {
         titles << section.title;
@@ -202,7 +204,7 @@ TEST(AdjustmentsPanelTest, SectionsFollowTheOrderGiven)
     EXPECT_EQ(effects, (QStringList{"Texture", "Clarity2012", "Sharpness"}));
 
     // A section the order does not name follows those it names, in the order of the pipeline.
-    const auto partial = sectionsOf(*core::makeStandardPipeline(), {"HDR", "Light"});
+    const auto partial = SectionUtils::sectionsOf(*core::makeStandardPipeline(), {"HDR", "Light"});
     EXPECT_EQ(partial[0].title, "HDR");
     EXPECT_EQ(partial[1].title, "Light");
     EXPECT_EQ(partial[2].title, "Color");
@@ -211,7 +213,7 @@ TEST(AdjustmentsPanelTest, SectionsFollowTheOrderGiven)
 
 TEST(AdjustmentsPanelTest, EmitsTheSettingsWhenASliderMoves)
 {
-    AdjustmentsPanel panel{sectionsOf(*core::makeStandardPipeline())};
+    AdjustmentsPanel panel{SectionUtils::sectionsOf(*core::makeStandardPipeline())};
     QSignalSpy spy{&panel, &AdjustmentsPanel::settingsChanged};
 
     core::Settings shown;
@@ -279,7 +281,7 @@ TEST(CollapsibleSectionTest, ClickingTheTitleFoldsTheContent)
 
 TEST(AdjustmentsPanelTest, SectionsFoldAndReportIt)
 {
-    AdjustmentsPanel panel{sectionsOf(*core::makeStandardPipeline())};
+    AdjustmentsPanel panel{SectionUtils::sectionsOf(*core::makeStandardPipeline())};
     panel.show();
     QSignalSpy spy{&panel, &AdjustmentsPanel::sectionExpandedChanged};
     EXPECT_EQ(panel.sectionTitles().size(), 8);
@@ -343,7 +345,7 @@ TEST(ParameterSliderTest, MarksHowFarItMovedFromItsDefault)
 
 TEST(AdjustmentsPanelTest, ASectionWidgetGoesAboveTheSlidersAndFoldsWithThem)
 {
-    AdjustmentsPanel panel{sectionsOf(*core::makeStandardPipeline())};
+    AdjustmentsPanel panel{SectionUtils::sectionsOf(*core::makeStandardPipeline())};
     auto *drawing = new QLabel{"curve"};
     panel.addSectionWidget("Tone Curve", drawing);
     // A section the panel does not have takes nothing, and keeps nothing.
@@ -384,7 +386,7 @@ TEST(AdjustmentsPanelTest, TheTitleIsTheSameBlockOpenOrClosed)
 
 TEST(AdjustmentsPanelTest, AHeadingNamesTheGroupBelowItAndStandsApart)
 {
-    AdjustmentsPanel panel{sectionsOf(*core::makeStandardPipeline())};
+    AdjustmentsPanel panel{SectionUtils::sectionsOf(*core::makeStandardPipeline())};
     panel.addHeading("HueAdjustmentRed", "Hue");
     panel.addHeading("SaturationAdjustmentRed", "Saturation");
     panel.addHeading("NoSuchSlider", "Nothing");
@@ -462,7 +464,7 @@ TEST(HistogramTest, CountsEachLevelAndTheClippedPixels)
 {
     QImage image{100, 100, QImage::Format_RGB888};
     image.fill(QColor{128, 128, 128});
-    Histogram histogram = histogramOf(image);
+    Histogram histogram = HistogramUtils::histogramOf(image);
     EXPECT_EQ(histogram.pixels, 10000);
     EXPECT_EQ(histogram.counts[Histogram::RED][128], 10000);
     EXPECT_EQ(histogram.counts[Histogram::LUMINANCE][128], 10000);
@@ -478,23 +480,24 @@ TEST(HistogramTest, CountsEachLevelAndTheClippedPixels)
     for (int x = 0; x < 100; ++x) {
         image.setPixelColor(x, 99, QColor{128, 128, 0});
     }
-    histogram = histogramOf(image);
+    histogram = HistogramUtils::histogramOf(image);
     EXPECT_EQ(histogram.clippedWhite, 5000);
     EXPECT_EQ(histogram.clippedBlack, 100);
-    EXPECT_EQ(histogramOf(QImage{}).pixels, 0);
+    EXPECT_EQ(HistogramUtils::histogramOf(QImage{}).pixels, 0);
 }
 
 TEST(HistogramTest, SamplesALargeImageOnAGrid)
 {
     QImage image{4000, 3000, QImage::Format_RGB888};
     image.fill(QColor{10, 200, 90});
-    const Histogram histogram = histogramOf(image, 500'000);
+    const Histogram histogram = HistogramUtils::histogramOf(image, 500'000);
     EXPECT_LE(histogram.pixels, 500'000);
     EXPECT_GT(histogram.pixels, 250'000);
     EXPECT_EQ(histogram.counts[Histogram::GREEN][200], histogram.pixels);
     // Another format is read as the screen shows it.
     QImage argb = image.convertToFormat(QImage::Format_ARGB32);
-    EXPECT_EQ(histogramOf(argb, 500'000).counts[Histogram::BLUE][90], histogram.pixels);
+    const Histogram fromArgb = HistogramUtils::histogramOf(argb, 500'000);
+    EXPECT_EQ(fromArgb.counts[Histogram::BLUE][90], histogram.pixels);
 }
 
 TEST(HistogramViewTest, LightsTheTriangleOfAClippedEndOnly)
@@ -503,7 +506,7 @@ TEST(HistogramViewTest, LightsTheTriangleOfAClippedEndOnly)
     view.resize(260, 110);
     QImage image{100, 100, QImage::Format_RGB888};
     image.fill(QColor{255, 255, 255});
-    view.setHistogram(histogramOf(image));
+    view.setHistogram(HistogramUtils::histogramOf(image));
     const QImage drawn = view.grab().toImage();
     const QColor lit = view.palette().color(QPalette::Highlight);
     const auto isLit = [&](QPoint at) {
@@ -561,7 +564,7 @@ TEST(WhiteBalancePickerTest, SetsTheWhiteBalanceAndKeepsTheOtherValues)
     }
     core::Settings settings;
     settings.setValue("Exposure2012", 0.4);
-    const auto pick = pickWhiteBalance(image, settings, QPointF{50, 50}, 5);
+    const auto pick = WhiteBalanceUtils::pickWhiteBalance(image, settings, QPointF{50, 50}, 5);
     ASSERT_TRUE(pick);
     EXPECT_DOUBLE_EQ(pick->settings.values().at("Exposure2012"), 0.4);
     // Warm light is corrected by cooling: a temperature below 0.
@@ -572,17 +575,17 @@ TEST(WhiteBalancePickerTest, SetsTheWhiteBalanceAndKeepsTheOtherValues)
 TEST(WhiteBalancePickerTest, ExplainsAnAreaItCannotUse)
 {
     const core::Image white = testutils::uniform(20, 20, 1.0f, 1.0f, 1.0f);
-    const auto clipped = pickWhiteBalance(white, {}, QPointF{10, 10}, 3);
+    const auto clipped = WhiteBalanceUtils::pickWhiteBalance(white, {}, QPointF{10, 10}, 3);
     ASSERT_FALSE(clipped);
     EXPECT_TRUE(clipped.error().contains("overexposed"));
 
     const core::Image black = testutils::uniform(20, 20, 0, 0, 0);
-    EXPECT_FALSE(pickWhiteBalance(black, {}, QPointF{10, 10}, 3));
+    EXPECT_FALSE(WhiteBalanceUtils::pickWhiteBalance(black, {}, QPointF{10, 10}, 3));
 }
 
 TEST(AdjustmentsPanelTest, SectionsFoldAndScrollWithTheSlidersDisabled)
 {
-    AdjustmentsPanel panel{sectionsOf(*core::makeStandardPipeline())};
+    AdjustmentsPanel panel{SectionUtils::sectionsOf(*core::makeStandardPipeline())};
     panel.resize(300, 200);
     panel.show();
     panel.setControlsEnabled(false);
@@ -704,8 +707,8 @@ TEST(IconsTest, EveryIconIsBuiltInWithADrawingForEachTheme)
         QPalette palette = original;
         palette.setColor(QPalette::Window, dark ? QColor{40, 40, 40} : QColor{240, 240, 240});
         QApplication::setPalette(palette);
-        EXPECT_EQ(isDarkTheme(), dark);
-        const QImage image = themedIcon(name).pixmap(48).toImage();
+        EXPECT_EQ(IconUtils::isDarkTheme(), dark);
+        const QImage image = IconUtils::themedIcon(name).pixmap(48).toImage();
         int opaque = 0;
         double sum = 0;
         for (int y = 0; y < image.height(); ++y) {
@@ -732,7 +735,7 @@ TEST(IconsTest, EveryIconIsBuiltInWithADrawingForEachTheme)
             EXPECT_GT(dark, light + 50) << name.toStdString();
         }
     }
-    EXPECT_TRUE(themedIcon("no-such-icon").isNull());
+    EXPECT_TRUE(IconUtils::themedIcon("no-such-icon").isNull());
     QApplication::setPalette(original);
 }
 
@@ -746,13 +749,13 @@ TEST(ThemeTest, DarkAndLightAndBackToTheSystemsStyle)
         const auto *proxy = qobject_cast<QProxyStyle *>(QApplication::style());
         return proxy != nullptr && proxy->baseStyle()->name() == "fusion";
     };
-    applyTheme(Theme::Dark);
+    ThemeUtils::applyTheme(ThemeUtils::Theme::Dark);
     EXPECT_TRUE(fusion());
     // The dark theme's grey.
     EXPECT_EQ(QApplication::palette().color(QPalette::Window), QColor(53, 53, 53));
-    EXPECT_TRUE(isDarkTheme());
+    EXPECT_TRUE(IconUtils::isDarkTheme());
     // A disabled icon is grey, not darkened out of sight.
-    const QPixmap disabled = themedIcon("zoom-in").pixmap(24, QIcon::Disabled);
+    const QPixmap disabled = IconUtils::themedIcon("zoom-in").pixmap(24, QIcon::Disabled);
     const QImage image = disabled.toImage();
     bool grey = false;
     for (int y = 0; y < image.height() && !grey; ++y) {
@@ -763,19 +766,20 @@ TEST(ThemeTest, DarkAndLightAndBackToTheSystemsStyle)
     }
     EXPECT_TRUE(grey);
 
-    applyTheme(Theme::Light);
+    ThemeUtils::applyTheme(ThemeUtils::Theme::Light);
     EXPECT_TRUE(fusion());
-    EXPECT_FALSE(isDarkTheme());
+    EXPECT_FALSE(IconUtils::isDarkTheme());
 
-    applyTheme(Theme::System);
+    ThemeUtils::applyTheme(ThemeUtils::Theme::System);
     EXPECT_EQ(QApplication::style()->name(), system);
     QApplication::setPalette(original);
 }
 
 TEST(ThemeTest, NamesRoundTrip)
 {
-    for (Theme theme : {Theme::System, Theme::Light, Theme::Dark}) {
-        EXPECT_EQ(themeNamed(nameOf(theme)), theme);
+    for (ThemeUtils::Theme theme :
+         {ThemeUtils::Theme::System, ThemeUtils::Theme::Light, ThemeUtils::Theme::Dark}) {
+        EXPECT_EQ(ThemeUtils::themeNamed(ThemeUtils::nameOf(theme)), theme);
     }
-    EXPECT_FALSE(themeNamed("purple"));
+    EXPECT_FALSE(ThemeUtils::themeNamed("purple"));
 }

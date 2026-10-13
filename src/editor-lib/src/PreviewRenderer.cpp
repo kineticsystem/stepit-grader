@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "editor/PreviewRenderer.h"
-#include "editor/ImageConversion.h"
+#include "editor/ImageConversionUtils.h"
 
 #include "core/Geometry.h"
 
@@ -106,7 +106,7 @@ void PreviewRenderer::startPreview()
         const auto image = pipeline->render(*preview, settings, core::RenderContext{scale}, [stop] {
             return stop->load();
         });
-        QImage shown = image ? toQImage(*image) : QImage{};
+        QImage shown = image ? ImageConversionUtils::toQImage(*image) : QImage{};
         const QSize fullSize{full->width, full->height};
         QMetaObject::invokeMethod(
             qApp,
@@ -155,7 +155,7 @@ void PreviewRenderer::startFull()
         if (!image || stale()) {
             return;
         }
-        QImage shown = toQImage(*image);
+        QImage shown = ImageConversionUtils::toQImage(*image);
         QMetaObject::invokeMethod(
             qApp,
             [self, settings, shown = std::move(shown), counter, generation] {

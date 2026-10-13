@@ -16,7 +16,9 @@ add_executable(stepit-grader-tests
     editor/CameraLookViewModelTest.cpp
     editor/DocumentTest.cpp
     editor/ImageExportTest.cpp
+    editor/LeavePictureViewModelTest.cpp
     editor/SaveImageViewModelTest.cpp
+    editor/WhiteBalanceViewModelTest.cpp
     editor/WidgetsTest.cpp
     cli/CliTest.cpp)
 target_link_libraries(stepit-grader-tests PRIVATE

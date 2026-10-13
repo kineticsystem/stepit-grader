@@ -4,34 +4,40 @@
 set(CMAKE_AUTOMOC ON)
 
 add_library(editor-lib STATIC
-    include/editor/CameraLook.h
+    include/editor/CameraLookUtils.h
     include/editor/Document.h
-    include/editor/ImageExport.h
+    include/editor/ImageExportUtils.h
     include/editor/MainWindow.h
     include/editor/PreviewRenderer.h
     include/editor/RecentFilesMenu.h
     include/editor/Status.h
     include/editor/WaitingDialog.h
     include/editor/actions/MatchCameraLookAction.h
+    include/editor/actions/PickWhiteBalanceAction.h
     include/editor/actions/SaveImageAction.h
     include/editor/viewmodel/CameraLookViewModel.h
+    include/editor/viewmodel/LeavePictureViewModel.h
     include/editor/viewmodel/SaveImageViewModel.h
-    src/CameraLook.cpp
+    include/editor/viewmodel/WhiteBalanceViewModel.h
+    src/CameraLookUtils.cpp
     src/Document.cpp
-    src/Icons.cpp
-    src/ImageConversion.cpp
-    src/ImageExport.cpp
+    src/IconUtils.cpp
+    src/ImageConversionUtils.cpp
+    src/ImageExportUtils.cpp
     src/MainWindow.cpp
     src/PreviewRenderer.cpp
     src/RecentFilesMenu.cpp
     src/Status.cpp
-    src/Theme.cpp
+    src/ThemeUtils.cpp
     src/WaitingDialog.cpp
-    src/WhiteBalancePicker.cpp
+    src/WhiteBalanceUtils.cpp
     src/actions/MatchCameraLookAction.cpp
+    src/actions/PickWhiteBalanceAction.cpp
     src/actions/SaveImageAction.cpp
     src/viewmodel/CameraLookViewModel.cpp
-    src/viewmodel/SaveImageViewModel.cpp)
+    src/viewmodel/LeavePictureViewModel.cpp
+    src/viewmodel/SaveImageViewModel.cpp
+    src/viewmodel/WhiteBalanceViewModel.cpp)
 target_include_directories(editor-lib PUBLIC include)
 # The icons, a light and a dark drawing of each, built into the library:
 # nothing to install beside the program.

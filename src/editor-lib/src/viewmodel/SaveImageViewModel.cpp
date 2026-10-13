@@ -3,7 +3,7 @@
 
 #include "editor/viewmodel/SaveImageViewModel.h"
 #include "editor/Document.h"
-#include "editor/ImageExport.h"
+#include "editor/ImageExportUtils.h"
 
 #include <QFileInfo>
 #include <QFutureWatcher>
@@ -18,10 +18,10 @@ namespace {
 constexpr const char *IMAGE_FORMAT_KEY = "imageFormat";
 
 /// The format of `filter`, or the first for a filter that names none.
-const ImageFormat &formatOf(const QString &filter)
+const ImageExportUtils::ImageFormat &formatOf(const QString &filter)
 {
-    const auto &formats = imageFormats();
-    const auto found = std::ranges::find(formats, filter, &ImageFormat::filter);
+    const auto &formats = ImageExportUtils::imageFormats();
+    const auto found = std::ranges::find(formats, filter, &ImageExportUtils::ImageFormat::filter);
     return found != formats.end() ? *found : formats.front();
 }
 
@@ -41,7 +41,7 @@ SaveImageViewModel::SaveImageViewModel(
 QStringList SaveImageViewModel::filters() const
 {
     QStringList filters;
-    for (const ImageFormat &format : imageFormats()) {
+    for (const ImageExportUtils::ImageFormat &format : ImageExportUtils::imageFormats()) {
         filters << format.filter;
     }
     return filters;
@@ -63,7 +63,7 @@ std::expected<QString, QString> SaveImageViewModel::save(QString path, const QSt
     if (!m_document->isOpen()) {
         return std::unexpected(tr("No picture is open."));
     }
-    const ImageFormat format = formatOf(filter);
+    const ImageExportUtils::ImageFormat format = formatOf(filter);
     m_settings->setValue(IMAGE_FORMAT_KEY, format.filter);
     if (QFileInfo{path}.suffix().isEmpty()) {
         path += "." + format.suffix;
@@ -85,11 +85,12 @@ std::expected<QString, QString> SaveImageViewModel::save(QString path, const QSt
         }
     });
     watcher->setFuture(
-        QtConcurrent::run(
-            [image = m_document->image(),
-             settings = m_document->settings(),
-             pipeline = m_pipeline,
-             path,
-             format] { return saveImage(*image, settings, *pipeline, path, format); }));
+        QtConcurrent::run([image = m_document->image(),
+                           settings = m_document->settings(),
+                           pipeline = m_pipeline,
+                           path,
+                           format] {
+            return ImageExportUtils::saveImage(*image, settings, *pipeline, path, format);
+        }));
     return path;
 }

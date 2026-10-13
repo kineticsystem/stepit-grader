@@ -1,13 +1,15 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/ImageConversion.h"
+#include "editor/ImageConversionUtils.h"
 
 #include "core/Display.h"
 
 #include <QColorSpace>
 
 #include <cstring>
+
+namespace ImageConversionUtils {
 
 QImage toQImage(const core::Image &image)
 {
@@ -23,3 +25,5 @@ QImage toQImage(const core::Image &image)
     out.setColorSpace(QColorSpace::SRgb);
     return out;
 }
+
+} // namespace ImageConversionUtils

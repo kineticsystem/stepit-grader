@@ -13,6 +13,13 @@
 #include <expected>
 #include <vector>
 
+/**
+ * Saving the edited picture as a file: the formats it can be saved as, and the save itself, the
+ * picture graded at its full size and written as a TIFF or a JPEG. Runs on any thread;
+ * `SaveImageViewModel` chooses the file and runs it in the background.
+ */
+namespace ImageExportUtils {
+
 /// A kind of file the edited picture can be saved as.
 struct ImageFormat
 {
@@ -38,3 +45,5 @@ std::expected<void, QString> saveImage(
     const core::Pipeline &pipeline,
     const QString &path,
     const ImageFormat &format);
+
+} // namespace ImageExportUtils

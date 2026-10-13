@@ -17,6 +17,14 @@
 #include <expected>
 #include <vector>
 
+/**
+ * Matching a camera's look, the work without its window: reading a camera's JPEG into a picture
+ * to compare with the raw, and finding the grade that makes raw files look like their JPEGs with
+ * core::match::fit(). Runs on any thread; `CameraLookViewModel` runs it in the background and
+ * applies its result.
+ */
+namespace CameraLookUtils {
+
 /// The long side of the pictures the match compares, in pixels: enough for the tones and the
 /// colours, small enough for a trial to take a few tens of milliseconds.
 constexpr int CAMERA_LOOK_SIZE = 1000;
@@ -41,3 +49,5 @@ std::expected<core::match::Result, QString> matchCameraLook(
     const core::Pipeline &pipeline,
     const core::Settings &base,
     StatusController &status);
+
+} // namespace CameraLookUtils

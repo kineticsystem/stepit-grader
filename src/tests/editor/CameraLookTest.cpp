@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/CameraLook.h"
+#include "editor/CameraLookUtils.h"
 #include "../testutils/Fakes.h"
 #include "core/StandardPipeline.h"
 #include "editor/Status.h"
@@ -48,14 +48,14 @@ std::vector<std::uint8_t> halves()
 
 TEST(CameraLookTest, TheJpegComesUprightInLinearSrgb)
 {
-    const auto upright = cameraJpegImage(halves(), 1, 40, 20);
+    const auto upright = CameraLookUtils::cameraJpegImage(halves(), 1, 40, 20);
     ASSERT_TRUE(upright.has_value());
     EXPECT_EQ(upright->width, 40);
     EXPECT_NEAR(upright->pixel(5, 10)[0], 1.0f, 0.03f);
     EXPECT_NEAR(upright->pixel(35, 10)[2], 1.0f, 0.03f);
 
     // Turned a quarter clockwise, as a raw shot in portrait: 20 wide, red at the top.
-    const auto turned = cameraJpegImage(halves(), 6, 20, 40);
+    const auto turned = CameraLookUtils::cameraJpegImage(halves(), 6, 20, 40);
     ASSERT_TRUE(turned.has_value());
     EXPECT_EQ(turned->width, 20);
     EXPECT_EQ(turned->height, 40);
@@ -65,9 +65,9 @@ TEST(CameraLookTest, TheJpegComesUprightInLinearSrgb)
 
 TEST(CameraLookTest, AJpegOfAnotherShapeIsRefusedAndOfAnotherSizeScaled)
 {
-    EXPECT_FALSE(cameraJpegImage(halves(), 1, 40, 40).has_value());
-    EXPECT_FALSE(cameraJpegImage({1, 2, 3}, 1, 40, 20).has_value());
-    const auto larger = cameraJpegImage(halves(), 1, 80, 40);
+    EXPECT_FALSE(CameraLookUtils::cameraJpegImage(halves(), 1, 40, 40).has_value());
+    EXPECT_FALSE(CameraLookUtils::cameraJpegImage({1, 2, 3}, 1, 40, 20).has_value());
+    const auto larger = CameraLookUtils::cameraJpegImage(halves(), 1, 80, 40);
     ASSERT_TRUE(larger.has_value());
     EXPECT_EQ(larger->width, 80);
 }
@@ -114,7 +114,7 @@ TEST(CameraLookTest, MatchesARawFileAndStopsWhenAsked)
             status.stop();
         }
     });
-    const auto result = matchCameraLook(
+    const auto result = CameraLookUtils::matchCameraLook(
         {QString::fromStdString(file.string())},
         imageio::RawShotReader{},
         *core::makeStandardPipeline(),
@@ -131,7 +131,7 @@ TEST(CameraLookTest, MatchesARawFileAndStopsWhenAsked)
 TEST(CameraLookTest, AFileThatIsNotARawIsReported)
 {
     StatusController status;
-    const auto result = matchCameraLook(
+    const auto result = CameraLookUtils::matchCameraLook(
         {"/no/such/file.CR2"},
         imageio::RawShotReader{},
         *core::makeStandardPipeline(),

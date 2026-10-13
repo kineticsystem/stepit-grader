@@ -2,17 +2,20 @@
 // SPDX-License-Identifier: MIT
 
 #include "editor/MainWindow.h"
-#include "editor/viewmodel/CameraLookViewModel.h"
 #include "editor/Document.h"
-#include "editor/Icons.h"
-#include "editor/viewmodel/SaveImageViewModel.h"
+#include "editor/IconUtils.h"
 #include "editor/PreviewRenderer.h"
 #include "editor/RecentFilesMenu.h"
-#include "editor/Theme.h"
-#include "editor/WhiteBalancePicker.h"
+#include "editor/ThemeUtils.h"
 #include "editor/actions/MatchCameraLookAction.h"
+#include "editor/actions/PickWhiteBalanceAction.h"
 #include "editor/actions/SaveImageAction.h"
+#include "editor/viewmodel/CameraLookViewModel.h"
+#include "editor/viewmodel/LeavePictureViewModel.h"
+#include "editor/viewmodel/SaveImageViewModel.h"
+#include "editor/viewmodel/WhiteBalanceViewModel.h"
 #include "widgets/CurveView.h"
+#include "widgets/HistogramUtils.h"
 #include "widgets/HistogramView.h"
 #include "widgets/ImageView.h"
 
@@ -32,7 +35,6 @@
 #include <QToolBar>
 #include <QToolButton>
 #include <QVBoxLayout>
-#include <QtConcurrent>
 
 #include "core/effects/ColorMixerEffect.h"
 #include "core/effects/ToneCurveEffect.h"
@@ -61,6 +63,11 @@ constexpr int SAVED_MESSAGE_MS = 3000;
 /// How long it shows a failed save; the title's * stays until a save succeeds.
 constexpr int SAVE_FAILED_MESSAGE_MS = 15000;
 
+/// How long the status bar shows what a pick of the white balance did.
+constexpr int PICK_MESSAGE_MS = 6000;
+/// How long it tells that a picture was not opened, as another was opening.
+constexpr int BUSY_MESSAGE_MS = 5000;
+
 /// How long the status bar tells that a raw file can be matched to its camera's look.
 constexpr int RAW_HINT_MS = 10000;
 
@@ -88,6 +95,8 @@ MainWindow::MainWindow(
     PreviewRenderer *renderer,
     SaveImageViewModel *saveImage,
     CameraLookViewModel *cameraLook,
+    LeavePictureViewModel *leavePicture,
+    WhiteBalanceViewModel *whiteBalance,
     std::vector<AdjustmentsPanel::Section> sections,
     QWidget *parent)
     : QMainWindow{parent}
@@ -95,6 +104,8 @@ MainWindow::MainWindow(
     , m_renderer{renderer}
     , m_saveImage{saveImage}
     , m_cameraLook{cameraLook}
+    , m_leavePicture{leavePicture}
+    , m_whiteBalance{whiteBalance}
     , m_view{new ImageView{this}}
     , m_panel{new AdjustmentsPanel{std::move(sections)}}
     , m_fileLabel{new QLabel{this}}
@@ -194,14 +205,12 @@ MainWindow::MainWindow(
     connect(m_document, &Document::saved, this, [this](const QString &path) {
         statusBar()
             ->showMessage(tr("Saved %1").arg(QDir::toNativeSeparators(path)), SAVED_MESSAGE_MS);
-        continueWhenSaved(false);
     });
     // The document saves by itself and tries again at the next change: a dialog for each failure
     // would interrupt every slider move.
     connect(m_document, &Document::saveFailed, this, [this](const QString &message) {
         statusBar()
             ->showMessage(tr("Cannot save the settings: %1").arg(message), SAVE_FAILED_MESSAGE_MS);
-        continueWhenSaved(true);
     });
     connect(
         m_renderer,
@@ -209,15 +218,46 @@ MainWindow::MainWindow(
         this,
         [this, histogram](const QImage &image, QSize fullSize, bool full) {
             m_view->setImage(image, fullSize);
-            histogram->setHistogram(histogramOf(image));
+            histogram->setHistogram(HistogramUtils::histogramOf(image));
             m_renderLabel->setText(full ? QString{} : tr("Preview"));
         });
     connect(m_view, &ImageView::fileDropped, this, &MainWindow::openFile);
     connect(m_view, &ImageView::zoomChanged, this, &MainWindow::updateZoom);
-    connect(m_view, &ImageView::pointPicked, this, &MainWindow::pickWhiteBalanceAt);
-    connect(m_view, &ImageView::pickCancelled, m_pickWhite, [this] {
-        m_pickWhite->setChecked(false);
+    connect(m_whiteBalance, &WhiteBalanceViewModel::picked, this, [this](const QString &message) {
+        statusBar()->showMessage(message, PICK_MESSAGE_MS);
     });
+    connect(m_whiteBalance, &WhiteBalanceViewModel::failed, this, [this](const QString &message) {
+        statusBar()->showMessage(message, PICK_MESSAGE_MS);
+    });
+    connect(m_leavePicture, &LeavePictureViewModel::opening, this, [this](const QString &path) {
+        QApplication::setOverrideCursor(Qt::WaitCursor);
+        m_fileLabel->setText(tr("Opening %1…").arg(QDir::toNativeSeparators(path)));
+    });
+    // The window waits for the settings to be written, then closes again, from the event loop.
+    connect(
+        m_leavePicture,
+        &LeavePictureViewModel::readyToClose,
+        this,
+        &QWidget::close,
+        Qt::QueuedConnection);
+    // Only when the edit would be lost is the user asked.
+    connect(
+        m_leavePicture,
+        &LeavePictureViewModel::editWouldBeLost,
+        this,
+        [this](const QString &fileName) {
+            const auto answer = QMessageBox::warning(
+                this,
+                tr("Cannot Save"),
+                tr("The settings of %1 cannot be saved. Leave them unsaved?").arg(fileName),
+                QMessageBox::Discard | QMessageBox::Cancel,
+                QMessageBox::Cancel);
+            if (answer == QMessageBox::Discard) {
+                m_leavePicture->discard();
+            } else {
+                m_leavePicture->stay();
+            }
+        });
 
     // The eyedropper first in the section, above the sliders it sets, larger than a tool's icon:
     // the white balance is the first thing set on a picture. Its tooltip says what it picks.
@@ -291,13 +331,9 @@ void MainWindow::createActions()
     edit->addSeparator();
     // Neither in a menu nor on the toolbar: its button is at the top of the Color section. The
     // window holds it, so its key works anywhere in the window.
-    m_pickWhite = new QAction{tr("Pick &White Balance"), this};
+    m_pickWhite = new PickWhiteBalanceAction{m_whiteBalance, m_view, this};
     addAction(m_pickWhite);
     setThemedIcon(m_pickWhite, "color-picker");
-    m_pickWhite->setShortcut(QKeySequence{tr("W")});
-    m_pickWhite->setCheckable(true);
-    m_pickWhite->setToolTip(tr("Click an area that should be white or grey (W)"));
-    connect(m_pickWhite, &QAction::toggled, m_view, &ImageView::setPickMode);
     QAction *matchLook = new MatchCameraLookAction{m_cameraLook, this};
     edit->addAction(matchLook);
 
@@ -310,17 +346,25 @@ void MainWindow::createActions()
     connect(m_showBefore, &QAction::toggled, this, &MainWindow::showBefore);
     view->addSeparator();
     QAction *zoomIn = view->addAction(
-        themedIcon("zoom-in"), tr("Zoom &In"), QKeySequence::ZoomIn, m_view, &ImageView::zoomIn);
+        IconUtils::themedIcon("zoom-in"),
+        tr("Zoom &In"),
+        QKeySequence::ZoomIn,
+        m_view,
+        &ImageView::zoomIn);
     QAction *zoomOut = view->addAction(
-        themedIcon("zoom-out"), tr("Zoom &Out"), QKeySequence::ZoomOut, m_view, &ImageView::zoomOut);
+        IconUtils::themedIcon("zoom-out"),
+        tr("Zoom &Out"),
+        QKeySequence::ZoomOut,
+        m_view,
+        &ImageView::zoomOut);
     QAction *fit = view->addAction(
-        themedIcon("zoom-fit-best"),
+        IconUtils::themedIcon("zoom-fit-best"),
         tr("&Fit to Window"),
         QKeySequence{tr("Ctrl+0")},
         m_view,
         &ImageView::fitToWindow);
     QAction *actual = view->addAction(
-        themedIcon("zoom-original"),
+        IconUtils::themedIcon("zoom-original"),
         tr("&Actual Size"),
         QKeySequence{tr("Ctrl+1")},
         m_view,
@@ -375,28 +419,30 @@ void MainWindow::chooseFile()
 
 void MainWindow::openFile(const QString &path)
 {
-    if (!QFileInfo::exists(path)) {
+    const auto opening = m_leavePicture->open(path);
+    if (opening) {
+        return;
+    }
+    switch (opening.error()) {
+    case LeavePictureViewModel::Refusal::Missing:
         // E.g. a recent picture since moved or deleted: it goes from the list.
         m_recentFiles->removeFile(path);
         QMessageBox::warning(
             this, tr("Cannot Open"), tr("%1 no longer exists.").arg(QDir::toNativeSeparators(path)));
-        return;
-    }
-    if (!m_document->canOpen(path)) {
+        break;
+    case LeavePictureViewModel::Refusal::NotAPicture:
         QMessageBox::warning(
             this,
             tr("Cannot Open"),
             tr("%1 is not a TIFF, DNG or camera raw file.").arg(QFileInfo{path}.fileName()));
-        return;
+        break;
+    case LeavePictureViewModel::Refusal::Busy:
+        statusBar()->showMessage(
+            tr("%1 is not opened: wait for the picture opening first.")
+                .arg(QFileInfo{path}.fileName()),
+            BUSY_MESSAGE_MS);
+        break;
     }
-    if (m_document->isOpening()) {
-        return;
-    }
-    whenSaved([this, path] {
-        QApplication::setOverrideCursor(Qt::WaitCursor);
-        m_fileLabel->setText(tr("Opening %1…").arg(QDir::toNativeSeparators(path)));
-        m_document->open(path);
-    });
 }
 
 void MainWindow::onOpened()
@@ -419,55 +465,13 @@ void MainWindow::onOpened()
     // The settings are rendered once the document announces them, right after.
 }
 
-void MainWindow::whenSaved(std::function<void()> then)
-{
-    m_whenSaved = std::move(then);
-    m_document->save();
-    continueWhenSaved(false);
-}
-
-void MainWindow::continueWhenSaved(bool failed)
-{
-    // A save asked before may end first: the action waits for the last one.
-    if (!m_whenSaved || m_document->isSaving()) {
-        return;
-    }
-    if (m_document->isModified()) {
-        if (!failed) {
-            // Changed again while it was written: written again.
-            m_document->save();
-            if (m_document->isSaving()) {
-                return;
-            }
-        }
-        // Only here would the edit be lost, so only here does a failure ask.
-        const auto answer = QMessageBox::warning(
-            this,
-            tr("Cannot Save"),
-            tr("The settings of %1 cannot be saved. Leave them unsaved?")
-                .arg(QFileInfo{m_document->path()}.fileName()),
-            QMessageBox::Discard | QMessageBox::Cancel,
-            QMessageBox::Cancel);
-        if (answer != QMessageBox::Discard) {
-            m_whenSaved = {};
-            return;
-        }
-    }
-    std::exchange(m_whenSaved, {})();
-}
-
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    if (m_closing || (!m_document->isModified() && !m_document->isSaving())) {
+    if (m_leavePicture->close()) {
         event->accept();
-        return;
+    } else {
+        event->ignore();
     }
-    // The window waits for the settings to be written, then closes again, from the event loop.
-    event->ignore();
-    whenSaved([this] {
-        m_closing = true;
-        QMetaObject::invokeMethod(this, &QWidget::close, Qt::QueuedConnection);
-    });
 }
 
 void MainWindow::updateTitle()
@@ -476,50 +480,6 @@ void MainWindow::updateTitle()
                                               : tr("No Image");
     setWindowTitle(tr("%1[*] — StepIt Grader").arg(name));
     setWindowModified(m_document->isModified());
-}
-
-void MainWindow::pickWhiteBalanceAt(QPointF point, double radius)
-{
-    // One pick, then back to dragging, as most editors do.
-    m_pickWhite->setChecked(false);
-    if (!m_document->isOpen()) {
-        return;
-    }
-    const auto image = m_document->image();
-    auto *watcher = new QFutureWatcher<std::expected<WhiteBalancePick, QString>>{this};
-    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, image] {
-        watcher->deleteLater();
-        // Measured on a picture since left: not this one's white balance.
-        if (m_document->image() != image) {
-            return;
-        }
-        const auto pick = watcher->result();
-        if (!pick) {
-            statusBar()->showMessage(pick.error(), 6000);
-            return;
-        }
-        // The settings may have changed meanwhile: only the white balance is the pick's.
-        core::Settings whiteBalance;
-        for (const core::Parameter &parameter :
-             {core::WhiteBalanceEffect::TEMPERATURE, core::WhiteBalanceEffect::TINT}) {
-            whiteBalance.setValue(parameter.id, pick->settings.value(parameter));
-        }
-        m_document->mergeSettings(whiteBalance);
-        showWhiteBalancePicked(*pick);
-    });
-    watcher->setFuture(QtConcurrent::run([image, settings = m_document->settings(), point, radius] {
-        return pickWhiteBalance(*image, settings, point, radius);
-    }));
-}
-
-void MainWindow::showWhiteBalancePicked(const WhiteBalancePick &pick)
-{
-    QString message = pick.clamped ? tr("White balance set as near neutral as the sliders go.")
-                                   : tr("White balance set from the area picked.");
-    if (pick.clipped > 0) {
-        message += ' ' + tr("%n clipped pixel(s) left out.", nullptr, pick.clipped);
-    }
-    statusBar()->showMessage(message, 6000);
 }
 
 void MainWindow::updateZoom(double zoom)
@@ -541,18 +501,21 @@ void MainWindow::createSettingsMenu()
     QMenu *settings = menuBar()->addMenu(tr("&Settings"));
     QMenu *themes = settings->addMenu(tr("&Theme"));
     auto *group = new QActionGroup{themes};
-    const Theme current = themeNamed(QSettings{}.value(THEME_SETTING).toString())
-                              .value_or(Theme::System);
-    const std::pair<Theme, QString> choices[]
-        = {{Theme::System, tr("&System")}, {Theme::Light, tr("&Light")}, {Theme::Dark, tr("&Dark")}};
+    const ThemeUtils::Theme current = ThemeUtils::themeNamed(
+                                          QSettings{}.value(ThemeUtils::THEME_SETTING).toString())
+                                          .value_or(ThemeUtils::Theme::System);
+    const std::pair<ThemeUtils::Theme, QString> choices[]
+        = {{ThemeUtils::Theme::System, tr("&System")},
+           {ThemeUtils::Theme::Light, tr("&Light")},
+           {ThemeUtils::Theme::Dark, tr("&Dark")}};
     for (const auto &[theme, label] : choices) {
         QAction *action = themes->addAction(label);
         action->setCheckable(true);
         action->setChecked(theme == current);
         group->addAction(action);
         connect(action, &QAction::triggered, this, [this, theme] {
-            applyTheme(theme);
-            QSettings{}.setValue(THEME_SETTING, nameOf(theme));
+            ThemeUtils::applyTheme(theme);
+            QSettings{}.setValue(ThemeUtils::THEME_SETTING, ThemeUtils::nameOf(theme));
             refreshIcons();
         });
     }
@@ -560,7 +523,7 @@ void MainWindow::createSettingsMenu()
 
 void MainWindow::setThemedIcon(QAction *action, const QString &name)
 {
-    action->setIcon(themedIcon(name));
+    action->setIcon(IconUtils::themedIcon(name));
     m_themedIcons.emplace_back(action, name);
 }
 
@@ -568,7 +531,7 @@ void MainWindow::refreshIcons()
 {
     // An icon keeps the drawing of the theme it was made in: each is made again for the new one.
     for (const auto &[action, name] : m_themedIcons) {
-        action->setIcon(themedIcon(name));
+        action->setIcon(IconUtils::themedIcon(name));
     }
 }
 

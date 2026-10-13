@@ -7,6 +7,12 @@
 
 #include <optional>
 
+/**
+ * The application's look, System, Light or Dark: applying it, and its name as `QSettings` keeps
+ * it. `main()` applies the saved one before the window is made; Settings > Theme changes it.
+ */
+namespace ThemeUtils {
+
 /// The look of the application.
 enum class Theme {
     /// The desktop's own style and colours.
@@ -31,3 +37,5 @@ inline constexpr const char *THEME_SETTING = "theme";
 QString nameOf(Theme theme);
 /// The theme of a saved name, or nothing.
 std::optional<Theme> themeNamed(const QString &name);
+
+} // namespace ThemeUtils

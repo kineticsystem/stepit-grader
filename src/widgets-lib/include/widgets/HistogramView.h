@@ -8,7 +8,8 @@
 
 #include <array>
 
-/// How many pixels of an image sit at each level of red, green, blue and luminance, 0 to 255.
+/// How many pixels of an image sit at each level of red, green, blue and luminance, 0 to 255:
+/// `HistogramUtils::histogramOf()` counts them.
 struct Histogram
 {
     static constexpr int LEVELS = 256;
@@ -21,13 +22,6 @@ struct Histogram
     int clippedBlack = 0;
     int clippedWhite = 0;
 };
-
-/**
- * The histogram of an image as the screen shows it, 8 bits a channel. An image of more than
- * `maxPixels` is sampled on an even grid, so a full picture costs no more than a preview; the
- * luminance is that of Rec. 709, the screen's.
- */
-Histogram histogramOf(const QImage &image, int maxPixels = 500'000);
 
 /**
  * A histogram, drawn: red, green and blue overlaid, the luminance as a line over them, from black
