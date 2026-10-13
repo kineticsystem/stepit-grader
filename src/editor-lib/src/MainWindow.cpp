@@ -130,6 +130,7 @@ MainWindow::MainWindow(
     m_status->followSaveImage(m_saveImage);
     m_status->followWhiteBalance(m_whiteBalance);
     m_status->followLeavePicture(m_leavePicture);
+    m_status->followCameraLook(m_cameraLook);
     new DialogsMediator{this, m_document, m_leavePicture};
 
     connect(m_document, &Document::opened, this, &MainWindow::onOpened);
@@ -347,4 +348,3 @@ void MainWindow::refreshIcons()
         action->setIcon(IconUtils::themedIcon(name));
     }
 }
-

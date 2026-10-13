@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <QDeadlineTimer>
 #include <QObject>
 #include <QString>
 
@@ -38,6 +39,8 @@ public:
     void followSaveImage(const SaveImageViewModel *saveImage);
     void followWhiteBalance(const WhiteBalanceViewModel *whiteBalance);
     void followLeavePicture(const LeavePictureViewModel *leavePicture);
+    /// What a match of the camera's look found and applied.
+    void followCameraLook(const CameraLookViewModel *cameraLook);
 
 public Q_SLOTS:
     /// The picture being saved to `path`, in the background.
@@ -53,4 +56,7 @@ private:
     QLabel *m_beforeLabel;
     QLabel *m_renderLabel;
     QLabel *m_zoomLabel;
+    /// Until when the document's saves say nothing, so a message to read is not replaced by one
+    /// the user does not need.
+    QDeadlineTimer m_quietSaves;
 };
