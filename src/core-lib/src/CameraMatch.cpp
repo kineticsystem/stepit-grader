@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <map>
 #include <numbers>
 #include <numeric>
@@ -232,6 +233,65 @@ double matchingExposure(
     return stops[stops.size() / 2];
 }
 
+/// Whether every effect a trial may run works pixel by pixel: those of the sliders searched, and
+/// those the base settings turn on. The samples then need only their compared pixels rendered.
+bool trialsArePointwise(const Pipeline &pipeline, const Options &options)
+{
+    for (const auto &effect : pipeline.effects()) {
+        if (effect->isPointwise()) {
+            continue;
+        }
+        if (!effect->isIdentity(options.base)) {
+            return false;
+        }
+        for (const Parameter &parameter : effect->parameters()) {
+            for (const Stage &stage : options.stages) {
+                if (std::ranges::find(stage.ids, parameter.id) != stage.ids.end()) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+/// The samples with their compared pixels alone, in a row, in the order they are compared.
+std::vector<Sample> packed(const std::vector<Sample> &samples)
+{
+    std::vector<Sample> rows;
+    for (const Sample &sample : samples) {
+        Sample row;
+        row.source = Image{static_cast<int>(sample.pixels.size()), 1};
+        for (std::size_t i = 0; i < sample.pixels.size(); ++i) {
+            std::copy_n(
+                &sample.source.data[static_cast<std::size_t>(sample.pixels[i]) * 3],
+                3,
+                &row.source.data[i * 3]);
+        }
+        row.pixels.resize(sample.pixels.size());
+        std::iota(row.pixels.begin(), row.pixels.end(), 0);
+        row.target = sample.target;
+        row.scale = sample.scale;
+        rows.push_back(std::move(row));
+    }
+    return rows;
+}
+
+/// The index of the first effect with a slider of `stage`: the effects before it do the same in
+/// every trial of the stage.
+std::size_t firstEffectOf(const Pipeline &pipeline, const Stage &stage)
+{
+    const auto &effects = pipeline.effects();
+    for (std::size_t i = 0; i < effects.size(); ++i) {
+        for (const Parameter &parameter : effects[i]->parameters()) {
+            if (std::ranges::find(stage.ids, parameter.id) != stage.ids.end()) {
+                return i;
+            }
+        }
+    }
+    return effects.size();
+}
+
 } // namespace
 
 double deltaE2000(const Lab &a, const Lab &b)
@@ -393,8 +453,13 @@ Result fit(const std::vector<Sample> &samples, const Pipeline &pipeline, const O
         }
     }
 
+    // A trial renders only the pixels it compares, unless an effect looks at their neighbours.
+    const std::vector<Sample> rows = trialsArePointwise(pipeline, options) ? packed(samples)
+                                                                           : std::vector<Sample>{};
+    const std::vector<Sample> &work = rows.empty() ? samples : rows;
+
     Result result;
-    result.errorBefore = errorOf(samples, pipeline, options.base);
+    result.errorBefore = errorOf(work, pipeline, options.base);
     Settings best = options.base;
     for (const Stage &stage : options.stages) {
         for (const std::string &id : stage.ids) {
@@ -403,11 +468,11 @@ Result fit(const std::vector<Sample> &samples, const Pipeline &pipeline, const O
     }
     if (best.has("Exposure2012")) {
         const Slider &exposure = sliders["Exposure2012"];
-        const double stops = std::clamp(
-            matchingExposure(samples, pipeline, best), exposure.minimum, exposure.maximum);
+        const double stops
+            = std::clamp(matchingExposure(work, pipeline, best), exposure.minimum, exposure.maximum);
         best.setValue(exposure.id, std::round(stops * 100) / 100);
     }
-    double bestError = errorOf(samples, pipeline, best);
+    double bestError = errorOf(work, pipeline, best);
 
     Progress progress;
     progress.stages = static_cast<int>(options.stages.size());
@@ -417,6 +482,19 @@ Result fit(const std::vector<Sample> &samples, const Pipeline &pipeline, const O
             progress.stage = static_cast<int>(s);
             progress.stageName = stage.name;
             std::map<std::vector<double>, double> tried;
+
+            // The effects before the stage's first do the same in every trial: the samples go
+            // through them once, and each trial renders the rest.
+            const auto &effects = pipeline.effects();
+            const auto first = effects.begin()
+                               + static_cast<std::ptrdiff_t>(firstEffectOf(pipeline, stage));
+            const Pipeline head{std::vector<std::shared_ptr<const Effect>>{effects.begin(), first}};
+            const Pipeline tail{std::vector<std::shared_ptr<const Effect>>{first, effects.end()}};
+            std::vector<Sample> stageSamples = work;
+            for (Sample &sample : stageSamples) {
+                sample.source
+                    = *head.render(std::move(sample.source), best, RenderContext{sample.scale});
+            }
 
             const auto settingsAt = [&](const std::vector<double> &steps) {
                 Settings settings = best;
@@ -443,7 +521,7 @@ Result fit(const std::vector<Sample> &samples, const Pipeline &pipeline, const O
                 if (options.stopped && options.stopped()) {
                     throw Stop{};
                 }
-                const double error = errorOf(samples, pipeline, settings);
+                const double error = errorOf(stageSamples, tail, settings);
                 tried[key] = error;
                 ++result.trials;
                 if (error < stageBestError) {

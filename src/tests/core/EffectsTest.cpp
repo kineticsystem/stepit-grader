@@ -26,7 +26,9 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
+#include <numeric>
 #include <random>
 #include <set>
 
@@ -70,6 +72,49 @@ TEST(EffectsTest, EveryEffectAtItsDefaultsChangesNothing)
         EXPECT_LT(testutils::maxDifference(image, original), 1e-5f) << effect->section();
         EXPECT_TRUE(effect->isIdentity(Settings{}));
     }
+}
+
+// The camera match renders only the pixels it compares, in a row, through the pointwise effects.
+TEST(EffectsTest, PointwiseEffectsGiveEachPixelTheSameWhereverItIs)
+{
+    const Image original = colourful();
+    std::vector<std::size_t> order(original.pixelCount());
+    std::iota(order.begin(), order.end(), 0);
+    std::ranges::shuffle(order, std::mt19937{1});
+    Image row{static_cast<int>(order.size()), 1};
+    for (std::size_t i = 0; i < order.size(); ++i) {
+        std::copy_n(&original.data[order[i] * 3], 3, &row.data[i * 3]);
+    }
+
+    int pointwise = 0;
+    for (const auto &effect : makeStandardPipeline()->effects()) {
+        if (!effect->isPointwise()) {
+            continue;
+        }
+        ++pointwise;
+        Settings settings;
+        for (const Parameter &parameter : effect->parameters()) {
+            const double end = parameter.maximum > parameter.defaultValue ? parameter.maximum
+                                                                          : parameter.minimum;
+            settings.setValue(
+                parameter.id, parameter.defaultValue + 0.3 * (end - parameter.defaultValue));
+        }
+        Image image = original;
+        effect->apply(image, settings, RenderContext{});
+        Image packed = row;
+        effect->apply(packed, settings, RenderContext{});
+        float worst = 0;
+        for (std::size_t i = 0; i < order.size(); ++i) {
+            for (int c = 0; c < 3; ++c) {
+                worst = std::max(
+                    worst, std::abs(packed.data[i * 3 + c] - image.data[order[i] * 3 + c]));
+            }
+        }
+        EXPECT_LT(worst, 1e-6f) << effect->parameters().front().id;
+        EXPECT_GT(testutils::maxDifference(image, original), 1e-3f)
+            << effect->parameters().front().id;
+    }
+    EXPECT_EQ(pointwise, 8);
 }
 
 TEST(EffectsTest, ParametersHaveUniqueIdsAndDefaultsInRange)

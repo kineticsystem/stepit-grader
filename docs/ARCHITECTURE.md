@@ -171,6 +171,7 @@ An [`Effect`](../src/core-lib/include/core/Effect.h) is one adjustment. It owns 
 | `section()` | The section of the tools panel it belongs to, for example `"Light"`. |
 | `parameters()` | Its [`Parameter`](../src/core-lib/include/core/Parameter.h)s: id, label, range, default and decimals. |
 | `isIdentity(settings)` | Whether it would change nothing. By default, this is true when every parameter is at its default. |
+| `isPointwise()` | Whether each pixel comes out from itself alone, so the effect gives the same pixels on any set of them. False by default; the white balance, exposure, contrast, blacks, tone curve, vibrance, saturation and colour mixer say true. The camera match uses it to render only the pixels it compares. |
 | `apply(image, settings, context)` | Changes the image in place. It is safe to call from several threads at once. |
 
 [`Settings`](../src/core-lib/include/core/Settings.h) maps parameter ids to values. A parameter without a value has its default. So an empty `Settings` changes nothing, and a parameter added later reads as its default from an old sidecar.
@@ -243,8 +244,9 @@ Timings on a 21-megapixel Canon 5D Mark II picture, on a 10-core i9, with every 
 
 [`core::match`](../src/core-lib/include/core/CameraMatch.h) finds the slider values that make raw pictures look like the JPEGs the camera made from them: the camera's look, as a grade. It runs inside the programs, in C++, so the AppImage needs nothing else installed.
 
-- **What is compared.** One `Sample` per picture, made by `makeSample()`. It holds the raw picture in the working space, reduced by the editor to 1,000 pixels on its long side, and up to 100,000 pixels of the camera's JPEG, the same pixels on every run. Clipped JPEG pixels (a channel at 98% or more) are left out, because they say nothing about the camera's curve.
+- **What is compared.** One `Sample` per picture, made by `makeSample()`. It holds the raw picture in the working space, reduced by the editor to 1,000 pixels on its long side, and up to `SAMPLE_PIXELS`, 25,000, pixels of the camera's JPEG, the same pixels on every run. On real pictures 25,000 fit as well as 100,000, for a quarter of the work. Clipped JPEG pixels (a channel at 98% or more) are left out, because they say nothing about the camera's curve.
 - **The difference.** Each trial grades the samples with the pipeline and converts them to sRGB clipped to [0, 1], as the screen shows them. It then takes the mean CIEDE2000 difference from the JPEGs (Sharma et al., 2005). Below 1, a difference is invisible.
+- **What a trial renders.** When every effect a trial can run is pointwise (`Effect::isPointwise()`: each pixel comes out from itself alone), `fit()` packs each sample's compared pixels into a row and renders only those. That holds for every searched slider's effect, so it fails only when the base settings turn on an effect that looks at neighbours, such as the shadows or the noise reduction; then the whole reduced picture is rendered. In each stage, the effects before the first one that owns a searched slider do the same in every trial, so the samples go through them once at the start of the stage. Both give exactly the differences of a full render.
 - **The search.** A Nelder-Mead simplex, run in stages. Each stage searches its own sliders while the others stay at their best values so far.
   - The search starts from `Options::base`, for example the picture's own settings. Sliders that no stage searches keep their base values throughout, so the grade fits the picture as it will be shown. `Result::settings` holds only the searched sliders.
   - The searched sliders start from their defaults, whatever their base values. `Result::errorBefore` is the difference with the base alone.
@@ -255,7 +257,7 @@ Timings on a 21-megapixel Canon 5D Mark II picture, on a 10-core i9, with every 
 
 The local tools (highlights, shadows, structure and HDR compression) are left out. Their result depends on the picture's content, so values fitted on one picture would do something different on the next.
 
-On a 21-megapixel Canon 5D Mark II picture, on a 10-core i9, a trial takes about 20 ms and keeps all ten cores busy. A whole search of about 1,000 trials takes 20 seconds, plus about 3 seconds to read each raw file.
+On three raw pictures from a 2009 Canon, matched together on a 12-thread machine, a whole search of about 1,000 trials takes 10 seconds, plus about 3 seconds to read each raw file.
 
 ## Reading and Saving
 
@@ -687,7 +689,7 @@ All the tests are in one program, [`src/tests`](../src/tests), using GoogleTest 
 
 | Folder | Test cases | What they cover |
 |---|---|---|
-| [`core`](../src/tests/core) | 58 | The effects, the colour maths, the filters, the camera match and the thread pool. |
+| [`core`](../src/tests/core) | 60 | The effects, the colour maths, the filters, the camera match and the thread pool. |
 | [`io`](../src/tests/io) | 27 | Replacing files, the readers, the TIFF writer and the XMP sidecar. |
 | [`editor`](../src/tests/editor) | 107 | The widgets, the document, the renderer, the view models, the actions, the mediators and the utilities. |
 | [`cli`](../src/tests/cli) | 7 | The options and the grader. |
@@ -698,8 +700,8 @@ All the tests are in one program, [`src/tests`](../src/tests), using GoogleTest 
 - `parallelFor` covers its range once. It rethrows a range's exception after every range has ended, whether thrown on another thread or the calling one, and its threads still serve the next call.
 - CIEDE2000 matches its reference pairs. White and black convert correctly to L\*a\*b\*, and brighter than white counts as white.
 - A sample leaves out clipped pixels, keeps at most its count (the same pixels on every run), and refuses a JPEG of another size.
-- The match finds the grade that made a JPEG. It fits over the settings it is given and returns only the sliders it searched. It stops when asked with its best so far, reports progress in order to the end, and its standard stages name sliders of the pipeline.
-- Every effect at its defaults changes nothing, parameter ids are unique and defaults are in range, and each effect moves the picture the right way (for example, the highlights change the bright side of a step and leave the dark side).
+- The match finds the grade that made a JPEG. It fits over the settings it is given and returns only the sliders it searched. It finds the same grade, with the same differences, whether it renders only the pixels it compares or every pixel through every effect. It stops when asked with its best so far, reports progress in order to the end, and its standard stages name sliders of the pipeline.
+- Every effect at its defaults changes nothing, each pointwise effect gives every pixel the same result alone in a row as in the picture, parameter ids are unique and defaults are in range, and each effect moves the picture the right way (for example, the highlights change the bright side of a step and leave the dark side).
 - The tone curve's splits stay in order with room between them. The curve moves its own region and no other, keeps colours, leaves white and above alone, never goes down (even with the splits crossed), and changes nothing when only the splits move.
 - The colour mixer's bands follow the colour wheel and use the raw editors' ids. A band changes only its own colours: it turns the hue, scales the chroma and moves the luminance by a stop. Greys stay grey with every slider at its end.
 - The luminance noise reduction smooths sensor grain to under 40% on both sides of an edge, which stays as steep. Its detail slider puts grain back, and a grey stays grey.
@@ -772,7 +774,7 @@ What has no automated test, and how to check it by hand:
 
 **HDR compression on the brightest channel.** A curve on the luminance would let a bright, saturated colour keep one channel above white, which then clips to a different hue. On the brightest channel, every channel ends at or below white with its ratios intact. The price: saturated highlights are compressed more than grey ones of the same luminance.
 
-**A search, not a camera profile, to match the camera's look.** The camera's look is found as values of the editor's own sliders, including the tone curve and the colour mixer, by trying them against the camera's JPEG. It needs no camera profile and no file from the camera maker or another editor. The result is an ordinary grade that the panel shows and the sidecar stores. The price: the sliders are not a free-form curve or colour table, so some differences remain, about 2 in CIEDE2000 on a colour chart. The search also takes about half a minute per picture; the window shows its progress, and the user can stop it with the best grade so far.
+**A search, not a camera profile, to match the camera's look.** The camera's look is found as values of the editor's own sliders, including the tone curve and the colour mixer, by trying them against the camera's JPEG. It needs no camera profile and no file from the camera maker or another editor. The result is an ordinary grade that the panel shows and the sidecar stores. The price: the sliders are not a free-form curve or colour table, so some differences remain, about 2 in CIEDE2000 on a colour chart. The search also takes a few seconds per picture; the window shows its progress, and the user can stop it with the best grade so far.
 
 **Each action is a view model and a view.** An action's rules (which file it may write, which files it reads, how its result combines with the picture's settings) live in a view model with no widget, so a test can reach them without a dialog. The action keeps the dialogs, which only a person can answer. A view model reports with signals and never calls a view, so it can be tested alone and a second view could follow it. The price: two classes per action, and one more pair for the window to connect.
 

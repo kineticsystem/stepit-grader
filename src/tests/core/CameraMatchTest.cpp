@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <memory>
 #include <stdexcept>
 
 using namespace core;
@@ -64,6 +65,39 @@ match::Options threeSliders()
     options.stages = {{"Test", {"Exposure2012", "Contrast2012", "Saturation"}}};
     options.maxTrials = 400;
     return options;
+}
+
+/// An effect as another does it, but taken to look at a pixel's neighbours.
+class NotPointwise : public Effect
+{
+public:
+    explicit NotPointwise(std::shared_ptr<const Effect> effect)
+        : m_effect{std::move(effect)}
+    {}
+
+    std::string section() const override { return m_effect->section(); }
+    std::vector<Parameter> parameters() const override { return m_effect->parameters(); }
+    bool isIdentity(const Settings &settings) const override
+    {
+        return m_effect->isIdentity(settings);
+    }
+    void apply(Image &image, const Settings &settings, const RenderContext &context) const override
+    {
+        m_effect->apply(image, settings, context);
+    }
+
+private:
+    std::shared_ptr<const Effect> m_effect;
+};
+
+/// The standard pipeline, made to render every pixel.
+Pipeline renderingEveryPixel()
+{
+    std::vector<std::shared_ptr<const Effect>> effects;
+    for (const auto &effect : makeStandardPipeline()->effects()) {
+        effects.push_back(std::make_shared<NotPointwise>(effect));
+    }
+    return Pipeline{effects};
 }
 
 } // namespace
@@ -141,6 +175,32 @@ TEST(CameraMatchTest, FitsOverTheSettingsItIsGivenAndReturnsOnlyTheSlidersSearch
     EXPECT_LT(over.errorAfter, alone.errorAfter);
     EXPECT_NEAR(over.settings.values().at("Exposure2012"), 0.7, 0.15);
     EXPECT_FALSE(over.settings.has("Blacks2012"));
+}
+
+// The search renders only the pixels it compares, and the effects before a stage's once: the
+// differences it finds are those of the whole pictures rendered through every effect.
+TEST(CameraMatchTest, FindsTheSameWhateverItRenders)
+{
+    const Image source = colourful();
+    const std::vector samples{match::makeSample(source, cameraJpegOf(source, known()), 1.0)};
+    auto options = threeSliders();
+    // The saturation comes after the exposure and the contrast: its stage starts down the pipeline.
+    options.stages = {{"Light", {"Exposure2012", "Contrast2012"}}, {"Colour", {"Saturation"}}};
+    const auto fast = match::fit(samples, *makeStandardPipeline(), options);
+    const auto full = match::fit(samples, renderingEveryPixel(), options);
+
+    EXPECT_EQ(fast.settings, full.settings);
+    EXPECT_DOUBLE_EQ(fast.errorBefore, full.errorBefore);
+    EXPECT_DOUBLE_EQ(fast.errorAfter, full.errorAfter);
+    EXPECT_EQ(fast.trials, full.trials);
+    // The second stage found its slider over the first stage's grade.
+    EXPECT_NEAR(fast.settings.values().at("Saturation"), 20, 10);
+
+    // The difference of the grade found, rendered whole through every effect.
+    match::Options measure;
+    measure.stages = {};
+    measure.base = fast.settings;
+    EXPECT_DOUBLE_EQ(match::fit(samples, renderingEveryPixel(), measure).errorBefore, fast.errorAfter);
 }
 
 TEST(CameraMatchTest, StopsWhenAskedWithTheBestSoFar)
