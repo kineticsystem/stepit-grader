@@ -5,6 +5,7 @@ set(CMAKE_AUTOMOC ON)
 
 add_library(editor-lib STATIC
     include/editor/CameraLookUtils.h
+    include/editor/ConcurrentUtils.h
     include/editor/Document.h
     include/editor/FileUtils.h
     include/editor/ImageExportUtils.h

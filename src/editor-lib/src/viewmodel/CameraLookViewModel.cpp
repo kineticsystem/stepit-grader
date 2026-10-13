@@ -3,12 +3,11 @@
 
 #include "editor/viewmodel/CameraLookViewModel.h"
 #include "editor/CameraLookUtils.h"
+#include "editor/ConcurrentUtils.h"
 #include "editor/Document.h"
 #include "imageio/CameraShotReader.h"
 
 #include <QFileInfo>
-#include <QFutureWatcher>
-#include <QtConcurrent>
 
 CameraLookViewModel::CameraLookViewModel(
     Document *document,
@@ -53,28 +52,25 @@ std::shared_ptr<StatusController> CameraLookViewModel::start(const QStringList &
         return nullptr;
     }
     m_status = std::make_shared<StatusController>();
-    using Outcome = std::expected<core::match::Result, QString>;
-    auto *watcher = new QFutureWatcher<Outcome>{this};
-    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher] {
-        watcher->deleteLater();
-        m_status.reset();
-        const Outcome outcome = watcher->result();
-        if (!outcome) {
-            Q_EMIT failed(outcome.error());
-            return;
-        }
-        m_result = *outcome;
-        Q_EMIT finished();
-    });
     // The picture's settings as the match starts: the grade found goes over them.
-    watcher->setFuture(
-        QtConcurrent::run([raws,
-                           reader = m_reader,
-                           pipeline = m_pipeline,
-                           base = m_document->settings(),
-                           status = m_status] {
+    ConcurrentUtils::run(
+        this,
+        [raws,
+         reader = m_reader,
+         pipeline = m_pipeline,
+         base = m_document->settings(),
+         status = m_status] {
             return CameraLookUtils::matchCameraLook(raws, *reader, *pipeline, base, *status);
-        }));
+        },
+        [this](const std::expected<core::match::Result, QString> &outcome) {
+            m_status.reset();
+            if (!outcome) {
+                Q_EMIT failed(outcome.error());
+                return;
+            }
+            m_result = *outcome;
+            Q_EMIT finished();
+        });
     return m_status;
 }
 

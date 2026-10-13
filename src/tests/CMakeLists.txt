@@ -14,6 +14,7 @@ add_executable(stepit-grader-tests
     io/XmpSidecarTest.cpp
     editor/CameraLookTest.cpp
     editor/CameraLookViewModelTest.cpp
+    editor/ConcurrentUtilsTest.cpp
     editor/DocumentTest.cpp
     editor/FileUtilsTest.cpp
     editor/ImageExportTest.cpp
