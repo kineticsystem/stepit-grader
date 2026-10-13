@@ -22,12 +22,12 @@ class QSettings;
  *
  * The format used last is kept in the `QSettings` it is given, so the next save offers it first.
  */
-class ImageExporter : public QObject
+class SaveImageViewModel : public QObject
 {
     Q_OBJECT
 
 public:
-    ImageExporter(
+    SaveImageViewModel(
         Document *document,
         std::shared_ptr<const core::Pipeline> pipeline,
         QSettings *settings,

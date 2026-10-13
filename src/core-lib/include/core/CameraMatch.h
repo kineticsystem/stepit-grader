@@ -80,6 +80,12 @@ struct Progress
 struct Options
 {
     std::vector<Stage> stages = standardStages();
+    /**
+     * The settings the grade found goes over, e.g. the picture's own: the sliders not searched keep
+     * their values here through the search, so the grade fits the picture as it will be shown.
+     * The sliders searched start from their defaults whatever their values here.
+     */
+    Settings base;
     /// The most trials of each stage.
     int maxTrials = 1500;
     /// Called after each trial, from the searching thread.
@@ -90,9 +96,10 @@ struct Options
 
 struct Result
 {
-    /// The values of the sliders searched; the others are left out, at their defaults.
+    /// The values of the sliders searched; the others are left out, as in `Options::base`.
     Settings settings;
-    /// The mean difference from the JPEGs, before any edit and with the settings found.
+    /// The mean difference from the JPEGs, with `Options::base`, and with the settings found over
+    /// it.
     double errorBefore = 0;
     double errorAfter = 0;
     int trials = 0;

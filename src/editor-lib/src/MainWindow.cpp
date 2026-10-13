@@ -5,7 +5,7 @@
 #include "editor/viewmodel/CameraLookViewModel.h"
 #include "editor/Document.h"
 #include "editor/Icons.h"
-#include "editor/ImageExporter.h"
+#include "editor/viewmodel/SaveImageViewModel.h"
 #include "editor/PreviewRenderer.h"
 #include "editor/RecentFilesMenu.h"
 #include "editor/Theme.h"
@@ -86,14 +86,14 @@ void showCurve(CurveView &view, const core::Settings &settings)
 MainWindow::MainWindow(
     Document *document,
     PreviewRenderer *renderer,
-    ImageExporter *exporter,
+    SaveImageViewModel *saveImage,
     CameraLookViewModel *cameraLook,
     std::vector<AdjustmentsPanel::Section> sections,
     QWidget *parent)
     : QMainWindow{parent}
     , m_document{document}
     , m_renderer{renderer}
-    , m_exporter{exporter}
+    , m_saveImage{saveImage}
     , m_cameraLook{cameraLook}
     , m_view{new ImageView{this}}
     , m_panel{new AdjustmentsPanel{std::move(sections)}}
@@ -264,16 +264,16 @@ void MainWindow::createActions()
     loadSettings->setToolTip(
         tr("Apply the settings of a sidecar, e.g. one saved for another picture"));
     file->addSeparator();
-    auto *saveImage = new SaveImageAction{m_exporter, this};
-    connect(saveImage, &SaveImageAction::started, this, [this](const QString &path) {
+    auto *saveImageAction = new SaveImageAction{m_saveImage, this};
+    connect(saveImageAction, &SaveImageAction::started, this, [this](const QString &path) {
         statusBar()->showMessage(tr("Saving %1…").arg(QDir::toNativeSeparators(path)));
     });
-    connect(m_exporter, &ImageExporter::saved, this, [this](const QString &path) {
+    connect(m_saveImage, &SaveImageViewModel::saved, this, [this](const QString &path) {
         statusBar()
             ->showMessage(tr("Saved %1").arg(QDir::toNativeSeparators(path)), SAVED_MESSAGE_MS);
     });
-    connect(m_exporter, &ImageExporter::saveFailed, statusBar(), &QStatusBar::clearMessage);
-    file->addAction(saveImage);
+    connect(m_saveImage, &SaveImageViewModel::saveFailed, statusBar(), &QStatusBar::clearMessage);
+    file->addAction(saveImageAction);
     file->addSeparator();
     file->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
 
@@ -350,7 +350,7 @@ void MainWindow::createActions()
     for (QAction *action :
          {save,
           loadSettings,
-          static_cast<QAction *>(saveImage),
+          static_cast<QAction *>(saveImageAction),
           revert,
           reset,
           m_pickWhite,

@@ -15,7 +15,7 @@
 struct WhiteBalancePick;
 class CameraLookViewModel;
 class Document;
-class ImageExporter;
+class SaveImageViewModel;
 class ImageView;
 class PreviewRenderer;
 class QLabel;
@@ -38,7 +38,7 @@ public:
     MainWindow(
         Document *document,
         PreviewRenderer *renderer,
-        ImageExporter *exporter,
+        SaveImageViewModel *saveImage,
         CameraLookViewModel *cameraLook,
         std::vector<AdjustmentsPanel::Section> sections,
         QWidget *parent = nullptr);
@@ -78,7 +78,7 @@ private:
 
     Document *m_document;
     PreviewRenderer *m_renderer;
-    ImageExporter *m_exporter;
+    SaveImageViewModel *m_saveImage;
     CameraLookViewModel *m_cameraLook;
     ImageView *m_view;
     AdjustmentsPanel *m_panel;

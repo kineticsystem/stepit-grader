@@ -64,6 +64,7 @@ std::expected<core::match::Result, QString> matchCameraLook(
     const QStringList &raws,
     const imageio::CameraShotReader &reader,
     const core::Pipeline &pipeline,
+    const core::Settings &base,
     StatusController &status)
 {
     std::vector<core::match::Sample> samples;
@@ -95,6 +96,7 @@ std::expected<core::match::Result, QString> matchCameraLook(
     }
 
     core::match::Options options;
+    options.base = base;
     options.stopped = [&status] { return status.isStopped(); };
     options.progress = [&status](const core::match::Progress &progress) {
         status.setStatus(Status{

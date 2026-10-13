@@ -66,10 +66,13 @@ std::shared_ptr<StatusController> CameraLookViewModel::start(const QStringList &
         m_result = *outcome;
         Q_EMIT finished();
     });
-    watcher->setFuture(
-        QtConcurrent::run([raws, reader = m_reader, pipeline = m_pipeline, status = m_status] {
-            return matchCameraLook(raws, *reader, *pipeline, *status);
-        }));
+    // The picture's settings as the match starts: the grade found goes over them.
+    watcher->setFuture(QtConcurrent::run(
+        [raws,
+         reader = m_reader,
+         pipeline = m_pipeline,
+         base = m_document->settings(),
+         status = m_status] { return matchCameraLook(raws, *reader, *pipeline, base, *status); }));
     return m_status;
 }
 
@@ -78,8 +81,8 @@ QString CameraLookViewModel::summary() const
     if (!m_result) {
         return {};
     }
-    QString text = tr("The difference from the camera's JPEG is %1 before any edit, and %2 with "
-                      "the grade found, after %3 trials.")
+    QString text = tr("The difference from the camera's JPEG is %1 as the picture is now, and %2 "
+                      "with the grade found, after %3 trials.")
                        .arg(m_result->errorBefore, 0, 'f', 1)
                        .arg(m_result->errorAfter, 0, 'f', 1)
                        .arg(m_result->trials);

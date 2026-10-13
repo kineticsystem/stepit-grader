@@ -31,11 +31,13 @@ std::expected<core::Image, QString> cameraJpegImage(
 
 /**
  * Finds the grade that makes the raw files look like their camera's JPEGs: reads them with
- * `reader`, then searches the sliders with core::match::fit(). Reports how it goes to `status`,
- * and stops when asked, with the best grade found so far. Runs on any thread.
+ * `reader`, then searches the sliders with core::match::fit(), the others at their values in
+ * `base`, the picture's settings. Reports how it goes to `status`, and stops when asked, with the
+ * best grade found so far. Runs on any thread.
  */
 std::expected<core::match::Result, QString> matchCameraLook(
     const QStringList &raws,
     const imageio::CameraShotReader &reader,
     const core::Pipeline &pipeline,
+    const core::Settings &base,
     StatusController &status);

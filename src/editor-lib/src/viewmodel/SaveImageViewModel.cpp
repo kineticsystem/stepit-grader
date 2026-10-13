@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/ImageExporter.h"
+#include "editor/viewmodel/SaveImageViewModel.h"
 #include "editor/Document.h"
 #include "editor/ImageExport.h"
 
@@ -27,7 +27,7 @@ const ImageFormat &formatOf(const QString &filter)
 
 } // namespace
 
-ImageExporter::ImageExporter(
+SaveImageViewModel::SaveImageViewModel(
     Document *document,
     std::shared_ptr<const core::Pipeline> pipeline,
     QSettings *settings,
@@ -38,7 +38,7 @@ ImageExporter::ImageExporter(
     , m_settings{settings}
 {}
 
-QStringList ImageExporter::filters() const
+QStringList SaveImageViewModel::filters() const
 {
     QStringList filters;
     for (const ImageFormat &format : imageFormats()) {
@@ -47,18 +47,18 @@ QStringList ImageExporter::filters() const
     return filters;
 }
 
-QString ImageExporter::preferredFilter() const
+QString SaveImageViewModel::preferredFilter() const
 {
     return formatOf(m_settings->value(IMAGE_FORMAT_KEY).toString()).filter;
 }
 
-QString ImageExporter::suggestedPath(const QString &filter) const
+QString SaveImageViewModel::suggestedPath(const QString &filter) const
 {
     const QFileInfo picture{m_document->path()};
     return picture.dir().filePath(picture.completeBaseName() + "-graded." + formatOf(filter).suffix);
 }
 
-std::expected<QString, QString> ImageExporter::save(QString path, const QString &filter)
+std::expected<QString, QString> SaveImageViewModel::save(QString path, const QString &filter)
 {
     if (!m_document->isOpen()) {
         return std::unexpected(tr("No picture is open."));

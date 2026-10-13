@@ -122,6 +122,27 @@ TEST(CameraMatchTest, FindsTheGradeThatMadeTheJpeg)
     EXPECT_NEAR(result.settings.value(Parameter{"Saturation"}), 20, 10);
 }
 
+TEST(CameraMatchTest, FitsOverTheSettingsItIsGivenAndReturnsOnlyTheSlidersSearched)
+{
+    // The camera's look, and a slider the search does not move, already set on the picture.
+    Settings picture;
+    picture.setValue("Blacks2012", -40);
+    Settings camera = known();
+    camera.setValue("Blacks2012", -40);
+    const Image source = colourful();
+    const std::vector samples{match::makeSample(source, cameraJpegOf(source, camera), 1.0)};
+
+    auto options = threeSliders();
+    const auto alone = match::fit(samples, *makeStandardPipeline(), options);
+    options.base = picture;
+    const auto over = match::fit(samples, *makeStandardPipeline(), options);
+
+    EXPECT_LT(over.errorAfter, 0.5);
+    EXPECT_LT(over.errorAfter, alone.errorAfter);
+    EXPECT_NEAR(over.settings.values().at("Exposure2012"), 0.7, 0.15);
+    EXPECT_FALSE(over.settings.has("Blacks2012"));
+}
+
 TEST(CameraMatchTest, StopsWhenAskedWithTheBestSoFar)
 {
     const Image source = colourful();

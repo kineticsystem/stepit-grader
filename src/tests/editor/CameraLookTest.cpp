@@ -118,6 +118,7 @@ TEST(CameraLookTest, MatchesARawFileAndStopsWhenAsked)
         {QString::fromStdString(file.string())},
         imageio::RawShotReader{},
         *core::makeStandardPipeline(),
+        core::Settings{},
         status);
     ASSERT_TRUE(result.has_value()) << result.error().toStdString();
     EXPECT_TRUE(result->stopped);
@@ -131,6 +132,10 @@ TEST(CameraLookTest, AFileThatIsNotARawIsReported)
 {
     StatusController status;
     const auto result = matchCameraLook(
-        {"/no/such/file.CR2"}, imageio::RawShotReader{}, *core::makeStandardPipeline(), status);
+        {"/no/such/file.CR2"},
+        imageio::RawShotReader{},
+        *core::makeStandardPipeline(),
+        core::Settings{},
+        status);
     EXPECT_FALSE(result.has_value());
 }

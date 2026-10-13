@@ -190,13 +190,15 @@ double errorOf(const std::vector<Sample> &samples, const Pipeline &pipeline, con
     return count > 0 ? sum / count : 0.0;
 }
 
-/// The exposure that brings the median brightness of the graded samples to that of their JPEGs.
-double matchingExposure(const std::vector<Sample> &samples, const Pipeline &pipeline)
+/// The exposure that brings the median brightness of the samples, graded with `settings`, to that
+/// of their JPEGs.
+double matchingExposure(
+    const std::vector<Sample> &samples, const Pipeline &pipeline, const Settings &settings)
 {
     const Matrix3 &toSrgb = color::rec2020ToSrgb();
     std::vector<double> stops;
     for (const Sample &sample : samples) {
-        const auto graded = pipeline.render(sample.source, Settings{}, RenderContext{sample.scale});
+        const auto graded = pipeline.render(sample.source, settings, RenderContext{sample.scale});
         std::vector<double> ours;
         std::vector<double> theirs;
         for (std::size_t i = 0; i < sample.pixels.size(); ++i) {
@@ -393,8 +395,8 @@ Result fit(const std::vector<Sample> &samples, const Pipeline &pipeline, const O
     }
 
     Result result;
-    result.errorBefore = errorOf(samples, pipeline, Settings{});
-    Settings best;
+    result.errorBefore = errorOf(samples, pipeline, options.base);
+    Settings best = options.base;
     for (const Stage &stage : options.stages) {
         for (const std::string &id : stage.ids) {
             best.setValue(id, sliders[id].defaultValue);
@@ -402,8 +404,8 @@ Result fit(const std::vector<Sample> &samples, const Pipeline &pipeline, const O
     }
     if (best.has("Exposure2012")) {
         const Slider &exposure = sliders["Exposure2012"];
-        const double stops
-            = std::clamp(matchingExposure(samples, pipeline), exposure.minimum, exposure.maximum);
+        const double stops = std::clamp(
+            matchingExposure(samples, pipeline, best), exposure.minimum, exposure.maximum);
         best.setValue(exposure.id, std::round(stops * 100) / 100);
     }
     double bestError = errorOf(samples, pipeline, best);
@@ -480,7 +482,11 @@ Result fit(const std::vector<Sample> &samples, const Pipeline &pipeline, const O
     if (options.progress && !result.stopped) {
         options.progress(progress);
     }
-    result.settings = best;
+    for (const Stage &stage : options.stages) {
+        for (const std::string &id : stage.ids) {
+            result.settings.setValue(id, valueOf(best, sliders[id]));
+        }
+    }
     result.errorAfter = bestError;
     return result;
 }

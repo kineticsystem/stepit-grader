@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "editor/Document.h"
-#include "editor/ImageExporter.h"
+#include "editor/viewmodel/SaveImageViewModel.h"
 #include "editor/MainWindow.h"
 #include "editor/PreviewRenderer.h"
 #include "editor/Theme.h"
@@ -65,12 +65,12 @@ int main(int argc, char *argv[])
         pipeline->parameters()};
     PreviewRenderer renderer{pipeline};
     QSettings settings;
-    ImageExporter exporter{&document, pipeline, &settings};
+    SaveImageViewModel saveImage{&document, pipeline, &settings};
     CameraLookViewModel cameraLook{&document, pipeline, std::make_shared<imageio::RawShotReader>()};
     MainWindow window{
         &document,
         &renderer,
-        &exporter,
+        &saveImage,
         &cameraLook,
         sectionsOf(*pipeline, core::standardSectionOrder())};
     window.show();
