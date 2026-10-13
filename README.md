@@ -49,7 +49,7 @@ With StepIt Grader you can:
 - Save the graded picture at full size, as a 16-bit TIFF or a JPEG.
 - Grade any number of pictures from the command line with saved settings.
 
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes how the code is built, and [docs/Review.md](docs/Review.md) reviews it.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes how the code is built.
 
 ![StepIt Grader in its dark theme: a macro of a wasp in the middle, the histogram and the tools on the right, the Light section open](docs/img/screenshot.png)
 
