@@ -34,11 +34,18 @@ public:
     std::optional<core::Settings> load(
         const std::filesystem::path &image,
         const std::vector<core::Parameter> &parameters) const override;
+    /**
+     * Updates the sidecar, keeping what else it holds. One that is not XMP is replaced by a new
+     * one, and kept beside it, as damagedCopy() names it.
+     */
     void save(
         const std::filesystem::path &image,
         const core::Settings &settings,
         const std::vector<core::Parameter> &parameters) const override;
 };
+
+/// Where a sidecar that could not be updated is kept, e.g. `IMG_0001.xmp.damaged`.
+std::filesystem::path damagedCopy(const std::filesystem::path &sidecar);
 
 namespace xmp {
 

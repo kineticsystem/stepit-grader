@@ -181,6 +181,14 @@ MainWindow::MainWindow(
         statusBar()
             ->showMessage(tr("Loaded the settings of %1").arg(QDir::toNativeSeparators(file)), 5000);
     });
+    connect(m_document, &Document::sidecarUnreadable, this, [this](const QString &message) {
+        QMessageBox::warning(
+            this,
+            tr("Cannot Read the Settings"),
+            tr("%1\n\nThe picture opens with no edit. The first change replaces the settings "
+               "file, and keeps the damaged one beside it, with .damaged after its name.")
+                .arg(message));
+    });
     connect(m_document, &Document::settingsLoadFailed, this, [this](const QString &message) {
         QMessageBox::warning(this, tr("Cannot Load Settings"), message);
     });

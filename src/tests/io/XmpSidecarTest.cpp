@@ -128,7 +128,29 @@ TEST(XmpSidecarTest, ReportsASidecarThatIsNotXml)
     const fs::path image = testutils::outputFolder() / "IMG_0002.tif";
     std::ofstream{imageio::XmpSidecar{}.location(image)} << "<not xml";
     EXPECT_THROW(imageio::XmpSidecar{}.load(image, parameters()), imageio::Error);
-    EXPECT_THROW(imageio::XmpSidecar{}.save(image, {}, parameters()), imageio::Error);
+}
+
+TEST(XmpSidecarTest, ReplacesASidecarThatIsNotXmpAndKeepsItBeside)
+{
+    const imageio::XmpSidecar sidecar;
+    const fs::path image = testutils::outputFolder() / "IMG_0003.tif";
+    const fs::path path = sidecar.location(image);
+    fs::remove(imageio::damagedCopy(path));
+    std::ofstream{path} << "<not xml";
+
+    core::Settings settings;
+    settings.setValue("Exposure2012", 0.5);
+    sidecar.save(image, settings, parameters());
+    const auto loaded = sidecar.load(image, parameters());
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_DOUBLE_EQ(loaded->value(ExposureEffect::EXPOSURE), 0.5);
+
+    // The damaged one is kept, as it was, for what it may still hold.
+    ASSERT_TRUE(fs::exists(imageio::damagedCopy(path)));
+    std::ifstream copy{imageio::damagedCopy(path)};
+    const std::string kept{std::istreambuf_iterator<char>{copy}, {}};
+    EXPECT_EQ(kept, "<not xml");
+    EXPECT_EQ(imageio::damagedCopy(path).filename(), "IMG_0003.xmp.damaged");
 }
 
 TEST(XmpSidecarTest, LoadsTheSettingsOfAFileOfAnyName)

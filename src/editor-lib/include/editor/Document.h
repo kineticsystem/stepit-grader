@@ -50,7 +50,9 @@ public:
 
     /**
      * Saves the settings of the picture open, if they wait to be, then reads the image and its
-     * settings in the background; ends with opened() or openFailed().
+     * settings in the background; ends with opened() or openFailed(). Settings that cannot be read
+     * do not keep the picture from opening: it opens with no edit, and sidecarUnreadable() says
+     * why, after opened().
      */
     void open(const QString &path);
 
@@ -105,6 +107,8 @@ Q_SIGNALS:
     void saveFailed(const QString &message);
     void settingsLoaded(const QString &file);
     void settingsLoadFailed(const QString &message);
+    /// The picture opened has settings that cannot be read: it is shown with no edit.
+    void sidecarUnreadable(const QString &message);
 
 private:
     struct Loaded
@@ -112,6 +116,8 @@ private:
         std::shared_ptr<const core::Image> image;
         core::Settings settings;
         QString error;
+        /// Why the settings could not be read, when the image could.
+        QString settingsError;
     };
 
     struct Written

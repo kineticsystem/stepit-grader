@@ -13,6 +13,7 @@
 
 #include <map>
 #include <mutex>
+#include <set>
 #include <thread>
 
 namespace testutils {
@@ -46,6 +47,10 @@ public:
         const std::filesystem::path &image, const std::vector<core::Parameter> &) const override
     {
         const std::lock_guard lock{mutex};
+        if (damaged.contains(image)) {
+            throw imageio::Error{
+                "Cannot read " + location(image).string() + ": not an XMP document"};
+        }
         const auto file = files.find(image);
         return file != files.end() ? std::optional{file->second} : stored;
     }
@@ -79,6 +84,8 @@ public:
     mutable std::mutex mutex;
     mutable std::optional<core::Settings> stored;
     mutable std::map<std::filesystem::path, core::Settings> files;
+    /// The pictures whose settings cannot be read.
+    std::set<std::filesystem::path> damaged;
     mutable int saves = 0;
     /// The thread of the last save or loadFile(), to check it is not the caller's.
     mutable std::thread::id lastThread;
