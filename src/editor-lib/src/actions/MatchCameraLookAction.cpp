@@ -6,6 +6,7 @@
 #include "editor/WaitingDialog.h"
 #include "editor/viewmodel/CameraLookViewModel.h"
 
+#include <QLocale>
 #include <QMessageBox>
 
 MatchCameraLookAction::MatchCameraLookAction(CameraLookViewModel *viewModel, QWidget *parent)
@@ -52,10 +53,10 @@ void MatchCameraLookAction::showFound()
 {
     closeWaiting();
     const QString text = m_viewModel->summary() + "\n\n"
-                         + tr(
-                             "Apply it to the picture? It sets the white balance, the tone, the "
-                             "tone curve and the colour mixer; the other sliders stay as they "
-                             "are. The picture's settings keep it, as any grade.");
+                         + tr("Apply it to the picture? It sets the sliders of %1; the other "
+                              "sliders stay as they are. The picture's settings keep it, as any "
+                              "grade.")
+                               .arg(QLocale{}.createSeparatedList(m_viewModel->sectionsSet()));
     if (QMessageBox::question(
             m_parent,
             tr("Match Camera Look"),

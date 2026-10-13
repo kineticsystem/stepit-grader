@@ -57,8 +57,13 @@ public:
      */
     std::shared_ptr<StatusController> start(const QStringList &raws);
 
-    /// What the last match found, for the user to apply or not; empty before one.
+    /// What the last match found, for the user to apply or not; empty before one, or after one failed.
     QString summary() const;
+    /**
+     * The sections of the tools panel whose sliders a match sets, in the pipeline's order, e.g.
+     * Color, Light, Tone Curve and Color Mixer: the others stay as they are.
+     */
+    QStringList sectionsSet() const;
     /// Applies the grade the last match found: the sliders it sets, the others as they are.
     void apply();
 
@@ -72,5 +77,6 @@ private:
     std::shared_ptr<const imageio::CameraShotReader> m_reader;
     /// The match running, or none.
     std::shared_ptr<StatusController> m_status;
+    /// The grade the last match found: none while one runs, nor after one failed.
     std::optional<core::match::Result> m_result;
 };
