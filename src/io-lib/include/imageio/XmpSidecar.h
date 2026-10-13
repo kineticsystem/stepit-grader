@@ -30,7 +30,19 @@ public:
 
     std::string extension() const override { return "xmp"; }
 
+    /**
+     * `<name>.xmp` for a camera raw file or a DNG, as raw editors name it; for any other image,
+     * e.g. a TIFF, its whole name with `.xmp`, `<name>.tif.xmp`, so a raw file and a TIFF of the
+     * same name in one folder each keep their own.
+     */
     std::filesystem::path location(const std::filesystem::path &image) const override;
+    /**
+     * Where a sidecar of an image that is not raw was saved until it took its whole name,
+     * `<name>.xmp`, read when the new one is missing; nothing when a raw file of the same name
+     * beside it owns that file, or the image is raw itself.
+     */
+    std::optional<std::filesystem::path> formerLocation(const std::filesystem::path &image) const;
+    /// The settings of the image's sidecar, or of its former one when it has none yet.
     std::optional<core::Settings> load(
         const std::filesystem::path &image,
         const std::vector<core::Parameter> &parameters) const override;

@@ -3,6 +3,7 @@
 
 #include "imageio/XmpSidecar.h"
 #include "imageio/Error.h"
+#include "imageio/RawReader.h"
 
 #include <pugixml.hpp>
 
@@ -106,6 +107,12 @@ void setAttribute(pugi::xml_node node, const std::string &name, const std::strin
     while (pugi::xml_node element = node.child(name.c_str())) {
         node.remove_child(element);
     }
+}
+
+/// A camera raw file or a DNG: what raw editors keep the settings of in `<name>.xmp`.
+bool isRaw(const std::filesystem::path &file)
+{
+    return RawReader{}.canRead(file);
 }
 
 } // namespace
@@ -220,15 +227,43 @@ core::Settings XmpSidecar::loadFile(
 std::filesystem::path XmpSidecar::location(const std::filesystem::path &image) const
 {
     std::filesystem::path sidecar = image;
-    return sidecar.replace_extension(".xmp");
+    if (isRaw(image)) {
+        return sidecar.replace_extension(".xmp");
+    }
+    return sidecar += ".xmp";
+}
+
+std::optional<std::filesystem::path> XmpSidecar::formerLocation(
+    const std::filesystem::path &image) const
+{
+    if (isRaw(image)) {
+        return std::nullopt;
+    }
+    std::filesystem::path former = image;
+    former.replace_extension(".xmp");
+    // A raw file of the same name beside it owns that sidecar.
+    std::error_code error;
+    const std::filesystem::path folder = image.has_parent_path() ? image.parent_path() : ".";
+    for (const auto &entry : std::filesystem::directory_iterator{folder, error}) {
+        const std::filesystem::path &other = entry.path();
+        if (other.stem() == image.stem() && isRaw(other)) {
+            return std::nullopt;
+        }
+    }
+    return former;
 }
 
 std::optional<core::Settings> XmpSidecar::load(
     const std::filesystem::path &image, const std::vector<core::Parameter> &parameters) const
 {
-    const std::filesystem::path path = location(image);
+    std::filesystem::path path = location(image);
     if (!std::filesystem::exists(path)) {
-        return std::nullopt;
+        // Saved, until now, under the image's name without its extension.
+        const auto former = formerLocation(image);
+        if (!former || !std::filesystem::exists(*former)) {
+            return std::nullopt;
+        }
+        path = *former;
     }
     try {
         return xmp::parse(readFile(path), parameters);
