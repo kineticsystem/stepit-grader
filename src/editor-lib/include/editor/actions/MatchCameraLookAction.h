@@ -11,8 +11,8 @@ class WaitingDialog;
 
 /**
  * Edit > Match Camera Look…: asks for the raw files when the picture open is not one, follows the
- * match in a WaitingDialog, and asks whether to apply the grade found. The dialogs only: what is
- * matched, and how the grade meets the picture's, is the view model's.
+ * match in a WaitingDialog, and says why a match failed. The dialogs only: what is matched, and
+ * how the grade found is applied over the picture's, is the view model's.
  */
 class MatchCameraLookAction : public QAction
 {
@@ -24,7 +24,6 @@ public:
 private:
     void execute();
     void closeWaiting();
-    void showFound();
     void showFailed(const QString &message);
 
     CameraLookViewModel *m_viewModel;

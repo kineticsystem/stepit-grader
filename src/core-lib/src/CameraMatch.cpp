@@ -22,10 +22,29 @@ namespace {
 constexpr float CLIPPED = 0.956f;
 /// One step of the search, as a fraction of a slider's range: every slider moves about as much.
 constexpr double UNIT_OF_RANGE = 1.0 / 40;
-/// How far the first trials move each slider from the start, in steps.
-constexpr double FIRST_MOVE = 3.0;
-/// A stage ends when its trials lie within this many steps of each other, and their differences
-/// within this much.
+/// The step of each slider for the slopes of Levenberg-Marquardt, in steps: big enough that the
+/// rounding to the slider's decimals moves the slope little.
+constexpr double SLOPE_STEP = 1.0;
+/// The most iterations of Levenberg-Marquardt in a stage; it usually ends in fewer than 20.
+constexpr int MAX_ITERATIONS = 40;
+/// The tries of each iteration at a smaller move, once a move makes the differences worse.
+constexpr int MAX_DAMPED_TRIES = 8;
+/// The damping of the first iteration, then how it shrinks after a better move and grows after a
+/// worse one: from a step along the slopes to a short one down the steepest descent.
+constexpr double FIRST_DAMPING = 1e-2;
+constexpr double DAMPING_DOWN = 3.0;
+constexpr double DAMPING_UP = 4.0;
+/// Levenberg-Marquardt ends once an iteration improves the squared differences by less than this
+/// share, or moves every slider by less than this many steps.
+constexpr double MIN_GAIN = 1e-4;
+constexpr double MIN_MOVE = 0.05;
+/// How far the Nelder-Mead polish's first trials move each slider, in steps: near, as it starts
+/// where Levenberg-Marquardt ends.
+constexpr double POLISH_MOVE = 1.0;
+/// The most trials of the polish in a stage.
+constexpr int POLISH_TRIALS = 300;
+/// The polish ends when its trials lie within this many steps of each other, and their
+/// differences within this much.
 constexpr double STEPS_TOLERANCE = 0.2;
 constexpr double ERROR_TOLERANCE = 0.005;
 /// The seed of the pixels kept, so every run compares the same ones.
@@ -58,9 +77,144 @@ struct Slider
     double unit = 1;
 };
 
+/// The solution of `a` x = `b`, `a` an n by n matrix by rows, by Gaussian elimination with
+/// partial pivoting.
+std::vector<double> solve(std::vector<double> a, std::vector<double> b)
+{
+    const std::size_t n = b.size();
+    for (std::size_t column = 0; column < n; ++column) {
+        std::size_t pivot = column;
+        for (std::size_t row = column + 1; row < n; ++row) {
+            if (std::abs(a[row * n + column]) > std::abs(a[pivot * n + column])) {
+                pivot = row;
+            }
+        }
+        for (std::size_t k = 0; k < n; ++k) {
+            std::swap(a[column * n + k], a[pivot * n + k]);
+        }
+        std::swap(b[column], b[pivot]);
+        for (std::size_t row = column + 1; row < n; ++row) {
+            const double factor = a[row * n + column] / a[column * n + column];
+            for (std::size_t k = column; k < n; ++k) {
+                a[row * n + k] -= factor * a[column * n + k];
+            }
+            b[row] -= factor * b[column];
+        }
+    }
+    std::vector<double> x(n);
+    for (std::size_t row = n; row-- > 0;) {
+        double sum = b[row];
+        for (std::size_t k = row + 1; k < n; ++k) {
+            sum -= a[row * n + k] * x[k];
+        }
+        x[row] = sum / a[row * n + row];
+    }
+    return x;
+}
+
+double sumOfSquares(const std::vector<float> &values)
+{
+    double sum = 0;
+    for (const float value : values) {
+        sum += static_cast<double>(value) * value;
+    }
+    return sum;
+}
+
+/**
+ * Levenberg-Marquardt (Levenberg, 1944; Marquardt, 1963) from `start`, within [`low`, `high`]:
+ * it moves every slider at once along the slopes of each pixel's difference, measured one slider
+ * at a time, so it needs far fewer trials than a search that sees only the mean difference.
+ * `residuals` gives the differences at a point. Returns where it ends, early once `exhausted`
+ * says so.
+ */
+std::vector<double> levenbergMarquardt(
+    const std::function<std::vector<float>(const std::vector<double> &)> &residuals,
+    std::vector<double> x,
+    const std::vector<double> &low,
+    const std::vector<double> &high,
+    const std::function<bool()> &exhausted)
+{
+    const std::size_t n = x.size();
+    std::vector<float> r = residuals(x);
+    double squares = sumOfSquares(r);
+    double damping = FIRST_DAMPING;
+    for (int iteration = 0; iteration < MAX_ITERATIONS && !exhausted(); ++iteration) {
+        // The slopes, forward, or backward at the top of a slider's range.
+        std::vector<std::vector<float>> slopes(n);
+        for (std::size_t i = 0; i < n; ++i) {
+            auto moved = x;
+            const double step = x[i] + SLOPE_STEP <= high[i] ? SLOPE_STEP : -SLOPE_STEP;
+            moved[i] += step;
+            slopes[i] = residuals(moved);
+            for (std::size_t k = 0; k < r.size(); ++k) {
+                slopes[i][k] = static_cast<float>((slopes[i][k] - r[k]) / step);
+            }
+        }
+        // The normal equations: (JᵀJ + damping · diag(JᵀJ)) move = -Jᵀr.
+        std::vector<double> jtj(n * n);
+        std::vector<double> jtr(n);
+        parallelForEach(n, [&](std::size_t i) {
+            for (std::size_t j = 0; j <= i; ++j) {
+                double sum = 0;
+                for (std::size_t k = 0; k < r.size(); ++k) {
+                    sum += static_cast<double>(slopes[i][k]) * slopes[j][k];
+                }
+                jtj[i * n + j] = sum;
+            }
+            double sum = 0;
+            for (std::size_t k = 0; k < r.size(); ++k) {
+                sum += static_cast<double>(slopes[i][k]) * r[k];
+            }
+            jtr[i] = -sum;
+        });
+        for (std::size_t i = 0; i < n; ++i) {
+            for (std::size_t j = i + 1; j < n; ++j) {
+                jtj[i * n + j] = jtj[j * n + i];
+            }
+        }
+
+        bool better = false;
+        double longest = 0;
+        for (int attempt = 0; attempt < MAX_DAMPED_TRIES && !better; ++attempt) {
+            auto damped = jtj;
+            for (std::size_t i = 0; i < n; ++i) {
+                // A slider that changes nothing still gets a little damping, so the matrix solves.
+                damped[i * n + i] += damping * std::max(jtj[i * n + i], 1e-9);
+            }
+            const std::vector<double> move = solve(damped, jtr);
+            auto next = x;
+            longest = 0;
+            for (std::size_t i = 0; i < n; ++i) {
+                next[i] = std::clamp(x[i] + move[i], low[i], high[i]);
+                longest = std::max(longest, std::abs(next[i] - x[i]));
+            }
+            std::vector<float> nextR = residuals(next);
+            const double nextSquares = sumOfSquares(nextR);
+            if (nextSquares < squares) {
+                better = true;
+                const double gain = (squares - nextSquares) / squares;
+                x = std::move(next);
+                r = std::move(nextR);
+                squares = nextSquares;
+                damping /= DAMPING_DOWN;
+                if (gain < MIN_GAIN) {
+                    return x;
+                }
+            } else {
+                damping *= DAMPING_UP;
+            }
+        }
+        if (!better || longest < MIN_MOVE) {
+            break;
+        }
+    }
+    return x;
+}
+
 /**
  * The Nelder-Mead simplex search (Nelder and Mead, 1965), with the usual coefficients, from
- * `start`, its first simplex `FIRST_MOVE` steps along each axis. Stops after `maxTrials` new
+ * `start`, its first simplex `POLISH_MOVE` steps along each axis. Stops after `maxTrials` new
  * values, or once the simplex is within the tolerances.
  */
 void nelderMead(
@@ -73,7 +227,7 @@ void nelderMead(
     std::vector<std::vector<double>> points{start};
     for (std::size_t i = 0; i < n; ++i) {
         auto point = start;
-        point[i] += FIRST_MOVE;
+        point[i] += POLISH_MOVE;
         points.push_back(point);
     }
     std::vector<double> values;
@@ -163,15 +317,30 @@ double valueOf(const Settings &settings, const Slider &slider)
     return it == settings.values().end() ? slider.defaultValue : it->second;
 }
 
-/// The mean difference of the samples, graded with `settings`, from their JPEGs.
-double errorOf(const std::vector<Sample> &samples, const Pipeline &pipeline, const Settings &settings)
+/**
+ * The mean difference of the samples, graded with `settings`, from their JPEGs. With `residuals`,
+ * also each pixel's difference in L*a*b*, three numbers per pixel, for Levenberg-Marquardt: unlike
+ * CIEDE2000, it is smooth, so its slopes say where to go.
+ */
+double errorOf(
+    const std::vector<Sample> &samples,
+    const Pipeline &pipeline,
+    const Settings &settings,
+    std::vector<float> *residuals = nullptr)
 {
+    if (residuals) {
+        residuals->clear();
+    }
     const Matrix3 &toSrgb = color::rec2020ToSrgb();
     double sum = 0;
     std::size_t count = 0;
     for (const Sample &sample : samples) {
         const auto graded = pipeline.render(sample.source, settings, RenderContext{sample.scale});
         std::vector<double> differences(sample.pixels.size());
+        const std::size_t at = residuals ? residuals->size() : 0;
+        if (residuals) {
+            residuals->resize(at + sample.pixels.size() * 3);
+        }
         parallelForEach(sample.pixels.size(), [&](std::size_t i) {
             const float *p = &graded->data[static_cast<std::size_t>(sample.pixels[i]) * 3];
             float srgb[3];
@@ -180,7 +349,13 @@ double errorOf(const std::vector<Sample> &samples, const Pipeline &pipeline, con
                     toSrgb[row * 3] * p[0] + toSrgb[row * 3 + 1] * p[1]
                     + toSrgb[row * 3 + 2] * p[2]);
             }
-            differences[i] = deltaE2000(sample.target[i], labOfLinearSrgb(srgb));
+            const Lab lab = labOfLinearSrgb(srgb);
+            differences[i] = deltaE2000(sample.target[i], lab);
+            if (residuals) {
+                for (int c = 0; c < 3; ++c) {
+                    (*residuals)[at + i * 3 + c] = lab[c] - sample.target[i][c];
+                }
+            }
         });
         sum += std::accumulate(differences.begin(), differences.end(), 0.0);
         count += differences.size();
@@ -509,19 +684,21 @@ Result fit(const std::vector<Sample> &samples, const Pipeline &pipeline, const O
             };
             Settings stageBest = best;
             double stageBestError = bestError;
-            const auto cost = [&](const std::vector<double> &steps) {
+            // A trial at `steps`; with `residuals`, also its differences per pixel, so graded
+            // again even if tried before.
+            const auto trial = [&](const std::vector<double> &steps, std::vector<float> *residuals) {
                 const Settings settings = settingsAt(steps);
                 std::vector<double> key;
                 for (const std::string &id : stage.ids) {
                     key.push_back(valueOf(settings, sliders[id]));
                 }
-                if (const auto it = tried.find(key); it != tried.end()) {
+                if (const auto it = tried.find(key); it != tried.end() && !residuals) {
                     return it->second;
                 }
                 if (options.stopped && options.stopped()) {
                     throw Stop{};
                 }
-                const double error = errorOf(stageSamples, tail, settings);
+                const double error = errorOf(stageSamples, tail, settings, residuals);
                 tried[key] = error;
                 ++result.trials;
                 if (error < stageBestError) {
@@ -545,11 +722,32 @@ Result fit(const std::vector<Sample> &samples, const Pipeline &pipeline, const O
             };
 
             std::vector<double> start;
+            std::vector<double> low;
+            std::vector<double> high;
             for (const std::string &id : stage.ids) {
-                start.push_back(valueOf(best, sliders[id]) / sliders[id].unit);
+                const Slider &slider = sliders[id];
+                start.push_back(valueOf(best, slider) / slider.unit);
+                low.push_back(slider.minimum / slider.unit);
+                high.push_back(slider.maximum / slider.unit);
             }
+            // Levenberg-Marquardt gets close in few trials, on the smooth L*a*b* differences;
+            // Nelder-Mead then polishes the CIEDE2000 difference, the one the user is shown.
+            const auto end = levenbergMarquardt(
+                [&](const std::vector<double> &steps) {
+                    std::vector<float> residuals;
+                    trial(steps, &residuals);
+                    return residuals;
+                },
+                start,
+                low,
+                high,
+                [&] { return static_cast<int>(tried.size()) >= options.maxTrials; });
+            const int polishFrom = static_cast<int>(tried.size());
             nelderMead(
-                cost, start, [&tried] { return static_cast<int>(tried.size()); }, options.maxTrials);
+                [&](const std::vector<double> &steps) { return trial(steps, nullptr); },
+                end,
+                [&tried, polishFrom] { return static_cast<int>(tried.size()) - polishFrom; },
+                std::min(POLISH_TRIALS, std::max(0, options.maxTrials - polishFrom)));
         }
     } catch (const Stop &) {
         result.stopped = true;

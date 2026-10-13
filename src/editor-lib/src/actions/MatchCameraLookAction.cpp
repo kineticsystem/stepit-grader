@@ -6,7 +6,6 @@
 #include "editor/WaitingDialog.h"
 #include "editor/viewmodel/CameraLookViewModel.h"
 
-#include <QLocale>
 #include <QMessageBox>
 
 MatchCameraLookAction::MatchCameraLookAction(CameraLookViewModel *viewModel, QWidget *parent)
@@ -16,7 +15,8 @@ MatchCameraLookAction::MatchCameraLookAction(CameraLookViewModel *viewModel, QWi
 {
     setToolTip(tr("Find the grade that makes raw files look like their camera's JPEGs"));
     connect(this, &QAction::triggered, this, &MatchCameraLookAction::execute);
-    connect(m_viewModel, &CameraLookViewModel::finished, this, &MatchCameraLookAction::showFound);
+    // The grade found is applied, and the status bar says so: nothing to ask.
+    connect(m_viewModel, &CameraLookViewModel::finished, this, &MatchCameraLookAction::closeWaiting);
     connect(m_viewModel, &CameraLookViewModel::failed, this, &MatchCameraLookAction::showFailed);
 }
 
@@ -46,25 +46,6 @@ void MatchCameraLookAction::closeWaiting()
     if (m_waiting) {
         m_waiting->accept();
         m_waiting->deleteLater();
-    }
-}
-
-void MatchCameraLookAction::showFound()
-{
-    closeWaiting();
-    const QString text = m_viewModel->summary() + "\n\n"
-                         + tr("Apply it to the picture? It sets the sliders of %1; the other "
-                              "sliders stay as they are. The picture's settings keep it, as any "
-                              "grade.")
-                               .arg(QLocale{}.createSeparatedList(m_viewModel->sectionsSet()));
-    if (QMessageBox::question(
-            m_parent,
-            tr("Match Camera Look"),
-            text,
-            QMessageBox::Apply | QMessageBox::Discard,
-            QMessageBox::Apply)
-        == QMessageBox::Apply) {
-        m_viewModel->apply();
     }
 }
 

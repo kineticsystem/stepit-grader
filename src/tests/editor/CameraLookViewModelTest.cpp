@@ -5,8 +5,8 @@
 #include "../testutils/TestImages.h"
 
 #include "core/StandardPipeline.h"
-#include "editor/viewmodel/CameraLookViewModel.h"
 #include "editor/Document.h"
+#include "editor/viewmodel/CameraLookViewModel.h"
 
 #include <QBuffer>
 #include <QImage>
@@ -56,9 +56,7 @@ struct CameraLookViewModelTest : ::testing::Test
         return reader;
     }();
     Document document{
-        std::make_shared<RawAndTiffReader>(),
-        std::make_shared<FakeStore>(),
-        pipeline->parameters()};
+        std::make_shared<RawAndTiffReader>(), std::make_shared<FakeStore>(), pipeline->parameters()};
     CameraLookViewModel viewModel{&document, pipeline, shots};
 
     void open(const QString &path)
@@ -113,13 +111,16 @@ TEST_F(CameraLookViewModelTest, FindsAGradeAndAppliesItOverThePicturesOwn)
     document.setSettings(own);
     EXPECT_TRUE(viewModel.summary().isEmpty());
 
+    QSignalSpy finished{&viewModel, &CameraLookViewModel::finished};
     ASSERT_TRUE(matchAndWait({"/raws/a.cr2"}));
     EXPECT_FALSE(viewModel.isRunning());
     EXPECT_TRUE(viewModel.summary().contains("stopped"));
+    ASSERT_EQ(finished.count(), 1);
+    EXPECT_EQ(finished.first().at(0).toString(), viewModel.summary());
+    EXPECT_TRUE(viewModel.summary().contains("Tone Curve"));
 
-    viewModel.apply();
-    // The camera's JPEG is lighter: the grade found brightens the picture; the clarity, which the
-    // match does not set, stays.
+    // Applied without asking. The camera's JPEG is lighter: the grade found brightens the
+    // picture; the clarity, which the match does not set, stays.
     ASSERT_TRUE(document.settings().has("Exposure2012"));
     EXPECT_GT(document.settings().values().at("Exposure2012"), 0.0);
     EXPECT_DOUBLE_EQ(document.settings().values().at("Clarity2012"), 30);
@@ -135,8 +136,7 @@ TEST_F(CameraLookViewModelTest, ReportsARawFileWithoutItsCameraJpeg)
     EXPECT_TRUE(failed.first().at(0).toString().contains("no camera JPEG"));
     EXPECT_FALSE(viewModel.isRunning());
 
-    // Nothing found: nothing to apply.
-    viewModel.apply();
+    // Nothing found: nothing applied.
     EXPECT_TRUE(document.settings().values().empty());
 }
 
@@ -151,17 +151,17 @@ TEST_F(CameraLookViewModelTest, StartsOneMatchAtATimeAndNoneWithoutFiles)
     ASSERT_TRUE(QTest::qWaitFor([&] { return !viewModel.isRunning(); }, WAIT_MS));
 }
 
-TEST_F(CameraLookViewModelTest, AFailedMatchLeavesNoGradeToApply)
+TEST_F(CameraLookViewModelTest, AFailedMatchAppliesNothingAndForgetsTheLastGrade)
 {
     open("/pictures/a.tif");
     ASSERT_TRUE(matchAndWait({"/raws/a.cr2"}));
     ASSERT_FALSE(viewModel.summary().isEmpty());
+    const core::Settings applied = document.settings();
 
     shots->shot.cameraJpeg.clear();
     ASSERT_FALSE(matchAndWait({"/raws/a.cr2"}));
     EXPECT_TRUE(viewModel.summary().isEmpty());
-    viewModel.apply();
-    EXPECT_TRUE(document.settings().values().empty());
+    EXPECT_EQ(document.settings(), applied);
 }
 
 TEST_F(CameraLookViewModelTest, NamesTheSectionsWhoseSlidersAMatchSets)

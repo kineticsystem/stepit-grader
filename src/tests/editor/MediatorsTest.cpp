@@ -108,6 +108,12 @@ TEST_F(MediatorsTest, TheStatusBarSaysWhatThePictureIsAndHowItIsShown)
     Q_EMIT renderer.rendered(QImage{}, QSize{}, true);
     EXPECT_EQ(label("render"), "");
 
+    // What a match found stays, though its grade's save follows at once.
+    status.followCameraLook(&cameraLook);
+    Q_EMIT cameraLook.finished("Matched the camera's look");
+    Q_EMIT document.saved("/pictures/a.xmp");
+    EXPECT_EQ(bar.currentMessage(), "Matched the camera's look");
+
     status.showBefore(true);
     EXPECT_FALSE(bar.findChild<QLabel *>("before")->isHidden());
     status.showBefore(false);

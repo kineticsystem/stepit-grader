@@ -22,7 +22,7 @@ class CameraShotReader;
 
 /**
  * Edit > Match Camera Look… without its dialogs: which raw files are matched, the search in the
- * background, what the user is told of the grade found, and how it meets the picture's own. The
+ * background, the grade found applied over the picture's own, and what the user is told of it. The
  * action that asks and shows, `MatchCameraLookAction`, follows it through its signals, and tests
  * drive it as the action does, with a fake reader.
  */
@@ -52,23 +52,22 @@ public:
     bool isRunning() const { return m_status != nullptr; }
     /**
      * Starts matching `raws` in the background, and returns what follows it, to show and to stop
-     * it; ends with finished() or failed(). Returns nothing, and starts nothing, while a match
-     * runs or with no file.
+     * it; ends with the grade found applied and finished(), or with failed(). Returns nothing, and
+     * starts nothing, while a match runs or with no file.
      */
     std::shared_ptr<StatusController> start(const QStringList &raws);
 
-    /// What the last match found, for the user to apply or not; empty before one, or after one failed.
+    /// What the last match found and applied, in a line; empty before one, or after one failed.
     QString summary() const;
     /**
      * The sections of the tools panel whose sliders a match sets, in the pipeline's order, e.g.
      * Color, Light, Tone Curve and Color Mixer: the others stay as they are.
      */
     QStringList sectionsSet() const;
-    /// Applies the grade the last match found: the sliders it sets, the others as they are.
-    void apply();
-
 Q_SIGNALS:
-    void finished();
+    /// The grade found is applied: the sliders it sets, the others as they are. A bad grade is
+    /// undone as any edit, so the user is not asked first.
+    void finished(const QString &summary);
     void failed(const QString &message);
 
 private:

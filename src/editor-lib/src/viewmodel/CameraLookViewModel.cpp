@@ -8,6 +8,7 @@
 #include "imageio/CameraShotReader.h"
 
 #include <QFileInfo>
+#include <QLocale>
 
 #include <set>
 #include <string>
@@ -74,7 +75,8 @@ std::shared_ptr<StatusController> CameraLookViewModel::start(const QStringList &
                 return;
             }
             m_result = *outcome;
-            Q_EMIT finished();
+            m_document->mergeSettings(m_result->settings);
+            Q_EMIT finished(summary());
         });
     return m_status;
 }
@@ -84,13 +86,15 @@ QString CameraLookViewModel::summary() const
     if (!m_result) {
         return {};
     }
-    QString text = tr("The difference from the camera's JPEG is %1 as the picture is now, and %2 "
-                      "with the grade found, after %3 trials.")
-                       .arg(m_result->errorBefore, 0, 'f', 1)
-                       .arg(m_result->errorAfter, 0, 'f', 1)
-                       .arg(m_result->trials);
+    QString text
+        = tr("Matched the camera's look in %1: the difference from its JPEG went from %2 to "
+             "%3, after %4 trials.")
+              .arg(QLocale{}.createSeparatedList(sectionsSet()))
+              .arg(m_result->errorBefore, 0, 'f', 1)
+              .arg(m_result->errorAfter, 0, 'f', 1)
+              .arg(m_result->trials);
     if (m_result->stopped) {
-        text += "\n\n" + tr("The search was stopped: this is the best grade found by then.");
+        text += " " + tr("The search was stopped: this is the best grade found by then.");
     }
     return text;
 }
@@ -111,11 +115,4 @@ QStringList CameraLookViewModel::sectionsSet() const
         }
     }
     return sections;
-}
-
-void CameraLookViewModel::apply()
-{
-    if (m_result) {
-        m_document->mergeSettings(m_result->settings);
-    }
 }

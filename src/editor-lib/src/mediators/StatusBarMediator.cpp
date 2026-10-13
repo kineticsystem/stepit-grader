@@ -26,6 +26,8 @@ constexpr int SAVE_FAILED_MESSAGE_MS = 15000;
 constexpr int PICK_MESSAGE_MS = 6000;
 /// How long it tells that a raw file can be matched to its camera's look.
 constexpr int RAW_HINT_MS = 10000;
+/// How long it shows what a match of the camera's look found: a line of numbers to read.
+constexpr int MATCH_MESSAGE_MS = 20000;
 
 } // namespace
 
@@ -75,6 +77,9 @@ void StatusBarMediator::followDocument(
             tr("Loaded the settings of %1").arg(QDir::toNativeSeparators(file)), LOADED_MESSAGE_MS);
     });
     connect(document, &Document::saved, this, [this](const QString &path) {
+        if (!m_quietSaves.hasExpired()) {
+            return;
+        }
         m_statusBar
             ->showMessage(tr("Saved %1").arg(QDir::toNativeSeparators(path)), SAVED_MESSAGE_MS);
     });
@@ -124,6 +129,15 @@ void StatusBarMediator::followLeavePicture(const LeavePictureViewModel *leavePic
     connect(leavePicture, &LeavePictureViewModel::opening, this, [this](const QString &path) {
         QApplication::setOverrideCursor(Qt::WaitCursor);
         m_fileLabel->setText(tr("Opening %1…").arg(QDir::toNativeSeparators(path)));
+    });
+}
+
+void StatusBarMediator::followCameraLook(const CameraLookViewModel *cameraLook)
+{
+    // The grade applied is saved a moment later: that save does not hide what was found.
+    connect(cameraLook, &CameraLookViewModel::finished, this, [this](const QString &summary) {
+        m_statusBar->showMessage(summary, MATCH_MESSAGE_MS);
+        m_quietSaves.setRemainingTime(MATCH_MESSAGE_MS);
     });
 }
 

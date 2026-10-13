@@ -15,8 +15,8 @@
 /**
  * Finds the slider values that make a raw picture, graded, look like the JPEG its camera made of
  * it: the camera's own look, as a grade. The pictures are compared as the screen shows them, by
- * the CIEDE2000 colour difference, and a Nelder-Mead search moves the sliders in stages: first
- * the tones, then the colours.
+ * the CIEDE2000 colour difference. The sliders are searched in stages, first the tones, then the
+ * colours: in each, Levenberg-Marquardt gets close and a Nelder-Mead search polishes.
  */
 namespace core::match {
 
