@@ -247,7 +247,9 @@ Timings on a 21-megapixel Canon 5D Mark II picture, on a 10-core i9, with every 
 - **What is compared.** One `Sample` per picture, made by `makeSample()`. It holds the raw picture in the working space, reduced by the editor to 1,000 pixels on its long side, and up to `SAMPLE_PIXELS`, 25,000, pixels of the camera's JPEG, the same pixels on every run. On real pictures 25,000 fit as well as 100,000, for a quarter of the work. Clipped JPEG pixels (a channel at 98% or more) are left out, because they say nothing about the camera's curve.
 - **The difference.** Each trial grades the samples with the pipeline and converts them to sRGB clipped to [0, 1], as the screen shows them. It then takes the mean CIEDE2000 difference from the JPEGs (Sharma et al., 2005). Below 1, a difference is invisible.
 - **What a trial renders.** When every effect a trial can run is pointwise (`Effect::isPointwise()`: each pixel comes out from itself alone), `fit()` packs each sample's compared pixels into a row and renders only those. That holds for every searched slider's effect, so it fails only when the base settings turn on an effect that looks at neighbours, such as the shadows or the noise reduction; then the whole reduced picture is rendered. In each stage, the effects before the first one that owns a searched slider do the same in every trial, so the samples go through them once at the start of the stage. Both give exactly the differences of a full render.
-- **The search.** A Nelder-Mead simplex, run in stages. Each stage searches its own sliders while the others stay at their best values so far.
+- **The search.** Run in stages. Each stage searches its own sliders while the others stay at their best values so far, in two steps:
+  - Levenberg-Marquardt gets close in few trials. It measures how each pixel's L\*a\*b\* difference changes with each slider, one slider at a time, and moves every slider at once. The L\*a\*b\* difference is used here because, unlike CIEDE2000, it is smooth, so its slopes say where to go.
+  - A Nelder-Mead simplex, of at most 300 trials, then polishes the mean CIEDE2000 difference, the one the user is shown.
   - The search starts from `Options::base`, for example the picture's own settings. Sliders that no stage searches keep their base values throughout, so the grade fits the picture as it will be shown. `Result::settings` holds only the searched sliders.
   - The searched sliders start from their defaults, whatever their base values. `Result::errorBefore` is the difference with the base alone.
   - `standardStages()` first searches the tone: exposure, contrast, blacks, saturation, vibrance, white balance and the tone curve. Then it searches the colour mixer's 24 sliders.
@@ -257,7 +259,7 @@ Timings on a 21-megapixel Canon 5D Mark II picture, on a 10-core i9, with every 
 
 The local tools (highlights, shadows, structure and HDR compression) are left out. Their result depends on the picture's content, so values fitted on one picture would do something different on the next.
 
-On three raw pictures from a 2009 Canon, matched together on a 12-thread machine, a whole search of about 1,000 trials takes 10 seconds, plus about 3 seconds to read each raw file.
+On three raw pictures from a 2009 Canon, matched together on a 12-thread machine, a whole search of about 800 trials takes 10 seconds, plus about 3 seconds to read each raw file.
 
 ## Reading and Saving
 
