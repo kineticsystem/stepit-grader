@@ -3,13 +3,16 @@
 
 #include "editor/MainWindow.h"
 #include "editor/Document.h"
-#include "editor/FileUtils.h"
 #include "editor/IconUtils.h"
 #include "editor/PreviewRenderer.h"
 #include "editor/RecentFilesMenu.h"
 #include "editor/SessionProperties.h"
+#include "editor/ThemeMenu.h"
 #include "editor/ThemeUtils.h"
+#include "editor/actions/BeforeAfterToggleAction.h"
+#include "editor/actions/LoadSettingsAction.h"
 #include "editor/actions/MatchCameraLookAction.h"
+#include "editor/actions/OpenAction.h"
 #include "editor/actions/PickWhiteBalanceAction.h"
 #include "editor/actions/SaveImageAction.h"
 #include "editor/viewmodel/CameraLookViewModel.h"
@@ -21,7 +24,6 @@
 #include "widgets/HistogramView.h"
 #include "widgets/ImageView.h"
 
-#include <QActionGroup>
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDir>
@@ -32,7 +34,6 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QSettings>
-#include <QSignalBlocker>
 #include <QStatusBar>
 #include <QToolBar>
 #include <QToolButton>
@@ -170,12 +171,6 @@ MainWindow::MainWindow(
         [this, curveView](const core::Settings &settings) {
             m_panel->setSettings(settings);
             showCurve(*curveView, settings);
-            // A change is seen on the edited picture: the picture before the edit gives way to it.
-            if (m_showBefore->isChecked()) {
-                const QSignalBlocker blocker{m_showBefore};
-                m_showBefore->setChecked(false);
-                m_beforeLabel->hide();
-            }
             m_renderLabel->setText(tr("Rendering…"));
             m_renderer->render(settings);
         });
@@ -283,7 +278,9 @@ MainWindow::MainWindow(
 void MainWindow::createActions()
 {
     QMenu *file = menuBar()->addMenu(tr("&File"));
-    file->addAction(tr("&Open…"), QKeySequence::Open, this, &MainWindow::chooseFile);
+    auto *open = new OpenAction{m_document, this};
+    connect(open, &OpenAction::fileChosen, this, &MainWindow::openFile);
+    file->addAction(open);
 
     m_recentFiles = new RecentFilesMenu{tr("Open &Recent"), RECENT_FILES, this};
     m_recentFiles->setFiles(
@@ -293,15 +290,12 @@ void MainWindow::createActions()
         QSettings{}.setValue(SessionProperties::Files::RECENT_FILES, files);
     });
     file->addMenu(m_recentFiles);
-    QAction *open = file->actions().constFirst();
     setThemedIcon(open, "document-open");
     QAction *save
         = file->addAction(tr("&Save Settings"), QKeySequence::Save, m_document, &Document::save);
     setThemedIcon(save, "document-save");
-    QAction *loadSettings = file->addAction(
-        tr("&Load Settings…"), QKeySequence{tr("Ctrl+L")}, this, &MainWindow::chooseSettings);
-    loadSettings->setToolTip(
-        tr("Apply the settings of a sidecar, e.g. one saved for another picture"));
+    QAction *loadSettings = new LoadSettingsAction{m_document, this};
+    file->addAction(loadSettings);
     file->addSeparator();
     auto *saveImageAction = new SaveImageAction{m_saveImage, this};
     connect(saveImageAction, &SaveImageAction::started, this, [this](const QString &path) {
@@ -337,12 +331,13 @@ void MainWindow::createActions()
     edit->addAction(matchLook);
 
     QMenu *view = menuBar()->addMenu(tr("&View"));
-    m_showBefore = view->addAction(tr("&Before and After"));
-    setThemedIcon(m_showBefore, "image-v-split");
-    m_showBefore->setShortcut(QKeySequence{Qt::Key_Backslash});
-    m_showBefore->setCheckable(true);
-    m_showBefore->setToolTip(tr("Show the picture before the edit, or after (\\)"));
-    connect(m_showBefore, &QAction::toggled, this, &MainWindow::showBefore);
+    auto *showBefore = new BeforeAfterToggleAction{m_document, m_renderer, this};
+    connect(showBefore, &QAction::toggled, this, [this] {
+        m_renderLabel->setText(tr("Rendering…"));
+    });
+    connect(showBefore, &BeforeAfterToggleAction::beforeShown, m_beforeLabel, &QWidget::setVisible);
+    view->addAction(showBefore);
+    setThemedIcon(showBefore, "image-v-split");
     view->addSeparator();
     QAction *zoomIn = view->addAction(
         IconUtils::themedIcon("zoom-in"),
@@ -384,35 +379,16 @@ void MainWindow::createActions()
     toolbar->addAction(open);
     toolbar->addAction(save);
     toolbar->addSeparator();
-    toolbar->addAction(m_showBefore);
+    toolbar->addAction(showBefore);
     toolbar->addSeparator();
     for (QAction *action : {zoomIn, zoomOut, fit, actual}) {
         toolbar->addAction(action);
     }
 
-    for (QAction *action :
-         {save,
-          loadSettings,
-          static_cast<QAction *>(saveImageAction),
-          revert,
-          reset,
-          m_pickWhite,
-          m_showBefore,
-          matchLook}) {
+    for (QAction *action : std::initializer_list<QAction *>{
+             save, loadSettings, saveImageAction, revert, reset, m_pickWhite, showBefore, matchLook}) {
         action->setEnabled(false);
         connect(m_document, &Document::opened, action, [action] { action->setEnabled(true); });
-    }
-}
-
-void MainWindow::chooseFile()
-{
-    const QString path = FileUtils::getOpenFile(
-        this,
-        tr("Open Image"),
-        tr("Images (%1)").arg(m_document->nameFilters().join(' ')),
-        SessionProperties::Files::LAST_FOLDER);
-    if (!path.isEmpty()) {
-        openFile(path);
     }
 }
 
@@ -486,38 +462,12 @@ void MainWindow::updateZoom(double zoom)
     m_zoomLabel->setText(QString{"%1%"}.arg(qRound(zoom * 100)));
 }
 
-void MainWindow::showBefore(bool before)
-{
-    m_beforeLabel->setVisible(before);
-    // The picture before the edit is the picture with no settings: the renderer shows it from its
-    // cache once rendered, so switching back and forth is at once.
-    m_renderLabel->setText(tr("Rendering…"));
-    m_renderer->render(before ? core::Settings{} : m_document->settings());
-}
-
 void MainWindow::createSettingsMenu()
 {
     QMenu *settings = menuBar()->addMenu(tr("&Settings"));
-    QMenu *themes = settings->addMenu(tr("&Theme"));
-    auto *group = new QActionGroup{themes};
-    const ThemeUtils::Theme current
-        = ThemeUtils::themeNamed(QSettings{}.value(SessionProperties::Options::THEME).toString())
-              .value_or(ThemeUtils::Theme::System);
-    const std::pair<ThemeUtils::Theme, QString> choices[]
-        = {{ThemeUtils::Theme::System, tr("&System")},
-           {ThemeUtils::Theme::Light, tr("&Light")},
-           {ThemeUtils::Theme::Dark, tr("&Dark")}};
-    for (const auto &[theme, label] : choices) {
-        QAction *action = themes->addAction(label);
-        action->setCheckable(true);
-        action->setChecked(theme == current);
-        group->addAction(action);
-        connect(action, &QAction::triggered, this, [this, theme] {
-            ThemeUtils::applyTheme(theme);
-            QSettings{}.setValue(SessionProperties::Options::THEME, ThemeUtils::nameOf(theme));
-            refreshIcons();
-        });
-    }
+    auto *themes = new ThemeMenu{new QSettings{this}, settings};
+    connect(themes, &ThemeMenu::themeChanged, this, &MainWindow::refreshIcons);
+    settings->addMenu(themes);
 }
 
 void MainWindow::setThemedIcon(QAction *action, const QString &name)
@@ -534,15 +484,3 @@ void MainWindow::refreshIcons()
     }
 }
 
-void MainWindow::chooseSettings()
-{
-    const QString path = FileUtils::getOpenFile(
-        this,
-        tr("Load Settings"),
-        tr("Settings (%1)").arg(m_document->settingsNameFilter()),
-        SessionProperties::Files::LAST_SETTINGS_FOLDER,
-        QFileInfo{m_document->path()}.absolutePath());
-    if (!path.isEmpty()) {
-        m_document->loadSettings(path);
-    }
-}
