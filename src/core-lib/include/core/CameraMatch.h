@@ -41,13 +41,18 @@ struct Sample
     std::vector<Lab> target;
 };
 
+/// The JPEG pixels compared per picture: as many as fit the camera's look as well as 100,000 do,
+/// a quarter of the work per trial.
+constexpr int SAMPLE_PIXELS = 25'000;
+
 /**
  * A sample from a raw picture and its camera JPEG, both of the same size: the raw in the working
  * space, the JPEG in linear sRGB. The JPEG's clipped pixels, a channel at 98% or more, say
  * nothing of the camera's curve and are left out; of the others, at most `maxPixels` are kept, the
  * same for every run.
  */
-Sample makeSample(Image source, const Image &jpegLinearSrgb, double scale, int maxPixels = 100'000);
+Sample makeSample(
+    Image source, const Image &jpegLinearSrgb, double scale, int maxPixels = SAMPLE_PIXELS);
 
 /// A group of sliders searched together, the others kept at their best values so far.
 struct Stage
@@ -107,8 +112,11 @@ struct Result
     bool stopped = false;
 };
 
-/// Searches the sliders of `options.stages` so the samples, graded by `pipeline`, look like their
-/// JPEGs.
+/**
+ * Searches the sliders of `options.stages` so the samples, graded by `pipeline`, look like their
+ * JPEGs. A trial renders only the pixels compared when every effect it runs is pointwise, and
+ * renders the effects before a stage's first slider once for the whole stage.
+ */
 Result fit(const std::vector<Sample> &samples, const Pipeline &pipeline, const Options &options);
 
 } // namespace core::match

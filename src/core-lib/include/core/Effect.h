@@ -42,6 +42,10 @@ public:
     /// default.
     virtual bool isIdentity(const Settings &settings) const;
 
+    /// Whether each pixel comes out from itself alone, never from its neighbours: the effect then
+    /// gives the same pixels on any set of them, e.g. a sample packed in a row. Not by default.
+    virtual bool isPointwise() const { return false; }
+
     /// Changes the image in place. Must be safe to call from several threads at once.
     virtual void apply(Image &image, const Settings &settings, const RenderContext &context) const
         = 0;

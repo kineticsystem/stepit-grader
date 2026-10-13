@@ -31,6 +31,7 @@ public:
 
     std::string section() const override { return "Color Mixer"; }
     std::vector<Parameter> parameters() const override;
+    bool isPointwise() const override { return true; }
     void apply(Image &image, const Settings &settings, const RenderContext &context) const override;
 
     /// The Oklab hue, in degrees, at the middle of each band: that of the pure sRGB colour.

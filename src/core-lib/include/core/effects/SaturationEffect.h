@@ -15,6 +15,7 @@ public:
 
     std::string section() const override { return "Light"; }
     std::vector<Parameter> parameters() const override { return {SATURATION}; }
+    bool isPointwise() const override { return true; }
     void apply(Image &image, const Settings &settings, const RenderContext &context) const override;
 };
 

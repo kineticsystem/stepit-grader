@@ -40,6 +40,7 @@ public:
     }
     /// The splits alone move no tone: only the four regions do.
     bool isIdentity(const Settings &settings) const override;
+    bool isPointwise() const override { return true; }
     void apply(Image &image, const Settings &settings, const RenderContext &context) const override;
 
     /**
