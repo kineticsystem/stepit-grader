@@ -150,7 +150,7 @@ TEST(XmpSidecarTest, ReplacesASidecarThatIsNotXmpAndKeepsItBeside)
     std::ifstream copy{imageio::damagedCopy(path)};
     const std::string kept{std::istreambuf_iterator<char>{copy}, {}};
     EXPECT_EQ(kept, "<not xml");
-    EXPECT_EQ(imageio::damagedCopy(path).filename(), "IMG_0003.xmp.damaged");
+    EXPECT_EQ(imageio::damagedCopy(path).filename(), "IMG_0003.tif.xmp.damaged");
 }
 
 TEST(XmpSidecarTest, LoadsTheSettingsOfAFileOfAnyName)
@@ -162,4 +162,46 @@ TEST(XmpSidecarTest, LoadsTheSettingsOfAFileOfAnyName)
     EXPECT_EQ(sidecar.extension(), "xmp");
     EXPECT_DOUBLE_EQ(sidecar.loadFile(file, parameters()).value(ExposureEffect::EXPOSURE), 0.65);
     EXPECT_THROW(sidecar.loadFile(folder / "missing.xmp", parameters()), imageio::Error);
+}
+
+TEST(XmpSidecarTest, ARawFileAndATiffOfTheSameNameEachHaveTheirOwn)
+{
+    const imageio::XmpSidecar sidecar;
+    EXPECT_EQ(sidecar.location("/pictures/IMG_0001.CR2"), fs::path{"/pictures/IMG_0001.xmp"});
+    EXPECT_EQ(sidecar.location("/pictures/IMG_0001.dng"), fs::path{"/pictures/IMG_0001.xmp"});
+    EXPECT_EQ(sidecar.location("/pictures/IMG_0001.tif"), fs::path{"/pictures/IMG_0001.tif.xmp"});
+    EXPECT_EQ(sidecar.location("/pictures/IMG_0001.tiff"), fs::path{"/pictures/IMG_0001.tiff.xmp"});
+}
+
+TEST(XmpSidecarTest, ATiffReadsItsFormerSidecarUnlessARawFileOwnsIt)
+{
+    const imageio::XmpSidecar sidecar;
+    const fs::path folder = testutils::outputFolder() / "former-sidecar";
+    fs::remove_all(folder);
+    fs::create_directories(folder);
+    const fs::path tiff = folder / "angle_18.tif";
+    std::ofstream{folder / "angle_18.xmp"} << EDITOR_SIDECAR;
+
+    // Saved under the old name, before a TIFF's sidecar took its whole name: read from there.
+    ASSERT_TRUE(sidecar.formerLocation(tiff).has_value());
+    const auto former = sidecar.load(tiff, parameters());
+    ASSERT_TRUE(former.has_value());
+    EXPECT_DOUBLE_EQ(former->value(ExposureEffect::EXPOSURE), 0.65);
+
+    // Saved under the new name, the old file left as it is; the new one is read from then on.
+    core::Settings settings;
+    settings.setValue("Exposure2012", -1.0);
+    sidecar.save(tiff, settings, parameters());
+    EXPECT_TRUE(fs::exists(folder / "angle_18.tif.xmp"));
+    EXPECT_DOUBLE_EQ(sidecar.load(tiff, parameters())->value(ExposureEffect::EXPOSURE), -1.0);
+    EXPECT_DOUBLE_EQ(
+        sidecar.load(folder / "angle_18.CR2", parameters())->value(ExposureEffect::EXPOSURE), 0.65);
+
+    // With a raw file of the same name beside it, the old file is the raw file's: not read.
+    const fs::path other = folder / "IMG_0001.tif";
+    std::ofstream{folder / "IMG_0001.xmp"} << EDITOR_SIDECAR;
+    std::ofstream{folder / "IMG_0001.CR2"} << "raw";
+    EXPECT_FALSE(sidecar.formerLocation(other).has_value());
+    EXPECT_FALSE(sidecar.load(other, parameters()).has_value());
+    EXPECT_FALSE(sidecar.formerLocation(folder / "IMG_0001.CR2").has_value());
 }

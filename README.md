@@ -211,7 +211,7 @@ A window shows how far it is: the stage, the trials and the difference so far. I
 
 ### Save the Settings
 
-The editor saves the settings by itself, next to the picture, e.g. `IMG_0001.xmp` for `IMG_0001.CR2`: 1 second after the last change, so a slider dragged writes the file once, when it stops. Opening another picture or closing the window saves at once what is still waiting, without asking. A picture opened and closed without a change gets no sidecar. When we open the picture again, it opens with its sidecar's settings, ready for another change.
+The editor saves the settings by itself, next to the picture: `IMG_0001.xmp` for a raw file, `IMG_0001.CR2`, as raw editors name it, and `IMG_0001.tif.xmp` for a TIFF, `IMG_0001.tif`, so a raw file and a TIFF of the same name each keep their own. A TIFF whose sidecar was saved as `IMG_0001.xmp` by an earlier version opens with it, unless a raw file of the same name is beside it, and its next change is saved as `IMG_0001.tif.xmp`. The settings are saved 1 second after the last change, so a slider dragged writes the file once, when it stops. Opening another picture or closing the window saves at once what is still waiting, without asking. A picture opened and closed without a change gets no sidecar. When we open the picture again, it opens with its sidecar's settings, ready for another change.
 
 The window's title shows `*` while the settings are not written yet: for the second after a change, or until the next change after a save that failed. A failed save is shown in the status bar and tried again at the next change; only when the edit would be lost, on closing the window or opening another picture, does the editor ask whether to go on without it. **File > Save Settings** saves at once.
 
@@ -281,7 +281,7 @@ Without `--settings`, each picture is graded with its own sidecar, or with no ed
 
 | Option | Default | What it does |
 |---|---|---|
-| `-s`, `--settings <file.xmp>` | each picture's own sidecar | The settings for every picture: any sidecar the editor saved. |
+| `-s`, `--settings <file.xmp>` | each picture's own sidecar, `IMG_0001.xmp` for a raw file, `IMG_0001.tif.xmp` for a TIFF | The settings for every picture: any sidecar the editor saved. |
 | `-o`, `--output <folder>` | required | Where the TIFFs go, made if missing: `<folder>/<picture's name>.tif`. |
 | `-c`, `--colour-space <name>` | `srgb` | The TIFFs' colour space, with its ICC profile embedded: `srgb`, `adobe-rgb`, `prophoto` or `rec2020-linear`. sRGB is what every screen assumes; Adobe RGB and ProPhoto RGB keep the saturated colours sRGB clips, for prints; linear Rec. 2020 is the editor's own working space, for more processing. |
 | `--compress` | off | Deflate, lossless: about half the size. |
@@ -333,7 +333,7 @@ The picture is edited in linear Rec. 2020 with 32-bit floats: no colour is clipp
 
 ## The Sidecar
 
-The settings are saved in an XMP file with the picture's name, each value an attribute of the `crs` namespace, the one most raw editors keep their settings in, under the name they give it:
+The settings are saved in an XMP file next to the picture, `IMG_0001.xmp` for a raw file and `IMG_0001.tif.xmp` for a TIFF, each value an attribute of the `crs` namespace, the one most raw editors keep their settings in, under the name they give it:
 
 ```xml
 <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="stepit-grader">
