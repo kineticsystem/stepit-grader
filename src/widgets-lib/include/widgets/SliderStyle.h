@@ -26,7 +26,11 @@ public:
     /// One style for every slider, owned by the application.
     static SliderStyle *instance();
 
-    /// Draws the slider with this style, and lights its circle up under the mouse.
+    /**
+     * Draws the slider with this style, and lights its circle up under the mouse. The wheel does
+     * not move it: it scrolls the panel the slider is in, which would otherwise move whichever
+     * slider passed under the mouse.
+     */
     static void apply(QSlider *slider);
 
     /**
@@ -48,6 +52,7 @@ public:
         const QStyleOptionComplex *option,
         QPainter *painter,
         const QWidget *widget) const override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     SliderStyle() = default;
