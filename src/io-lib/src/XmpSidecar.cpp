@@ -8,10 +8,10 @@
 
 #include <pugixml.hpp>
 
-#include <charconv>
 #include <cmath>
 #include <format>
 #include <fstream>
+#include <locale>
 #include <sstream>
 
 namespace imageio {
@@ -66,9 +66,13 @@ std::optional<double> number(std::string text)
     if (!text.empty() && text.front() == '+') {
         text.erase(0, 1);
     }
+    // A stream in the "C" locale, not std::from_chars, whose double Apple's library has only from
+    // macOS 26: the number is read the same in every locale, and must be the whole text.
+    std::istringstream in{text};
+    in.imbue(std::locale::classic());
     double value = 0;
-    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
-    if (error != std::errc{} || end != text.data() + text.size()) {
+    in >> std::noskipws >> value;
+    if (in.fail() || in.peek() != std::char_traits<char>::eof()) {
         return std::nullopt;
     }
     return value;
