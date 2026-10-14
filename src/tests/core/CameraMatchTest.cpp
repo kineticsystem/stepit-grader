@@ -94,7 +94,9 @@ private:
 Pipeline renderingEveryPixel()
 {
     std::vector<std::shared_ptr<const Effect>> effects;
-    for (const auto &effect : makeStandardPipeline()->effects()) {
+    // Kept alive: GCC 13 does not extend a temporary's life over a range-for loop as C++23 does.
+    const auto pipeline = makeStandardPipeline();
+    for (const auto &effect : pipeline->effects()) {
         effects.push_back(std::make_shared<NotPointwise>(effect));
     }
     return Pipeline{effects};

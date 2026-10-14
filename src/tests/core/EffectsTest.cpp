@@ -87,7 +87,9 @@ TEST(EffectsTest, PointwiseEffectsGiveEachPixelTheSameWhereverItIs)
     }
 
     int pointwise = 0;
-    for (const auto &effect : makeStandardPipeline()->effects()) {
+    // Kept alive: GCC 13 does not extend a temporary's life over a range-for loop as C++23 does.
+    const auto pipeline = makeStandardPipeline();
+    for (const auto &effect : pipeline->effects()) {
         if (!effect->isPointwise()) {
             continue;
         }
