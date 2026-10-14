@@ -20,7 +20,13 @@ LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/<library>`, 
 
 ## Packaging
 
-`setup/linux/package-stepit-grader.sh` makes the Linux AppImage, with both programs (`--cli` for the command line), into `build/linux-package/`. It needs `./install-deps.sh` first, which downloads linuxdeploy into `deps/linuxdeploy`.
+StepIt Grader runs on Ubuntu 24.04 or later, Windows 11 and macOS 26 or later (Apple Silicon and Intel). Each script needs `./install-deps.sh` first and packages both programs:
+
+- `setup/linux/package-stepit-grader.sh`: the AppImage (`--cli` for the command line), into `build/linux-package/`, with linuxdeploy, which `install-deps.sh` downloads into `deps/linuxdeploy`.
+- `setup/mac/package-stepit-grader.sh`: a universal DMG into `build/macos-package/`. The oldest macOS is `CMAKE_OSX_DEPLOYMENT_TARGET` in `CMakeLists.txt`, the only place it is set.
+- `setup/win/package-stepit-grader.sh`, in MSYS2 MINGW64: an Inno Setup installer and a ZIP into `build/win-package/`.
+
+The CI, `.github/workflows/ci.yml`, builds, tests and packages on the three systems for every pull request; a tag `v<version>`, the version of `CMakeLists.txt`, publishes the packages as a GitHub Release.
 
 ## Architecture
 
@@ -39,7 +45,7 @@ LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/<library>`, 
 For the `architect` and `reviewer` skills: what they cannot find out alone.
 
 - `docs/ARCHITECTURE.md` follows one idea: **an edit is a set of named values, never pixels**. If a change breaks it, say so in the document and to the user.
-- Its sections, in order: Introduction, The Big Picture, The Libraries (`| Library | Owns | Links | Must never |`), The Engine (the image and the working space, `Effect` and `Pipeline`, a table of the effects with their parameter ids, threads and memory with times measured on a real picture, and Matching a Camera's Look), Reading and Saving (the readers, the XMP sidecar), The Command Line, The Editor (the widgets and their signals, the document, the renderer, the menu actions, the mediators, `main()`), The Engine in Another Program, A Slider Moves (a sequence diagram, at most four participants), Threads, The Linux AppImage, Tests, How to Extend StepIt Grader, Design Decisions and Trade-offs.
+- Its sections, in order: Introduction, The Big Picture, The Libraries (`| Library | Owns | Links | Must never |`), The Engine (the image and the working space, `Effect` and `Pipeline`, a table of the effects with their parameter ids, threads and memory with times measured on a real picture, and Matching a Camera's Look), Reading and Saving (the readers, the XMP sidecar), The Command Line, The Editor (the widgets and their signals, the document, the renderer, the menu actions, the mediators, `main()`), The Engine in Another Program, A Slider Moves (a sequence diagram, at most four participants), Threads, The Packages and the CI (the AppImage, the DMG, the Windows installer, the CI), Tests, How to Extend StepIt Grader, Design Decisions and Trade-offs.
 - Includes between libraries: `grep -rhoE '#include "(core|imageio|widgets|editor|cli)/' src/<lib> | sort | uniq -c`. `core-lib`, `io-lib` and `cli-lib` include no Qt.
 - Tests: one table per folder of `src/tests`, with its count, `grep -rhE '^(TEST|TEST_F|TEST_P)\(' src/tests/<folder> | wc -l`; tests that need the raw samples are marked "(with the samples)".
 - A throwaway test goes in the folder of `src/tests` of its library, in the `add_executable()` of `src/tests/CMakeLists.txt`, and runs with `QT_QPA_PLATFORM=offscreen build/bin/stepit-grader-tests --gtest_filter='ReviewProbe.*'`.
