@@ -31,6 +31,7 @@
 #include <QStyleOptionSlider>
 #include <QTest>
 #include <QToolButton>
+#include <QWheelEvent>
 
 #include <gtest/gtest.h>
 
@@ -142,6 +143,61 @@ TEST(SliderStyleTest, GivesAnySliderTheLook)
     SliderStyle::apply(&slider);
     EXPECT_EQ(slider.style(), SliderStyle::instance());
     EXPECT_TRUE(slider.testAttribute(Qt::WA_Hover));
+}
+
+/**
+ * A turn of the wheel over the widget, one notch towards the user; whether it was accepted. A
+ * slider given the style leaves the wheel unaccepted: Qt then gives a real turn of the wheel to the
+ * slider's parents, up to the scroll area, which scrolls. The scrolling itself is Qt's, and only
+ * happens for a wheel event of the mouse, which a test cannot send.
+ */
+bool turnWheel(QWidget *widget)
+{
+    const QPointF centre = QRectF{widget->rect()}.center();
+    QWheelEvent wheel{
+        centre,
+        widget->mapToGlobal(centre),
+        QPoint{},
+        QPoint{0, -120},
+        Qt::NoButton,
+        Qt::NoModifier,
+        Qt::NoScrollPhase,
+        false};
+    QApplication::sendEvent(widget, &wheel);
+    return wheel.isAccepted();
+}
+
+TEST(ParameterSliderTest, TheWheelLeavesItAlone)
+{
+    // A turn meant to scroll the long panel would otherwise move whichever slider passed under it.
+    ParameterSlider parameter{"Exposure", -5, 5, 0, 2};
+    auto *slider = parameter.findChild<QSlider *>();
+    const int before = slider->value();
+
+    EXPECT_FALSE(turnWheel(slider));
+    EXPECT_EQ(slider->value(), before);
+}
+
+TEST(SliderStyleTest, TheWheelLeavesAnySliderWithTheStyleAlone)
+{
+    QSlider slider{Qt::Horizontal};
+    slider.setRange(0, 100);
+    slider.setValue(50);
+    SliderStyle::apply(&slider);
+
+    EXPECT_FALSE(turnWheel(&slider));
+    EXPECT_EQ(slider.value(), 50);
+}
+
+TEST(SliderStyleTest, APlainSliderStillTakesTheWheel)
+{
+    // The filter works on the sliders given the style, not on every slider.
+    QSlider slider{Qt::Horizontal};
+    slider.setRange(0, 100);
+    slider.setValue(50);
+
+    EXPECT_TRUE(turnWheel(&slider));
+    EXPECT_NE(slider.value(), 50);
 }
 
 TEST(AdjustmentsPanelTest, SectionsFollowThePipeline)

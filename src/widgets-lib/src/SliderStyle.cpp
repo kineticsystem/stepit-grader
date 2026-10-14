@@ -59,6 +59,18 @@ void SliderStyle::apply(QSlider *slider)
     slider->setStyle(instance());
     // The ring takes the highlight under the mouse, which needs hover events.
     slider->setAttribute(Qt::WA_Hover);
+    slider->installEventFilter(instance());
+}
+
+bool SliderStyle::eventFilter(QObject *watched, QEvent *event)
+{
+    if (event->type() == QEvent::Wheel && qobject_cast<QSlider *>(watched)) {
+        // Kept from the slider and ignored: Qt then gives it to the slider's parents, up to the
+        // scroll area, which scrolls.
+        event->ignore();
+        return true;
+    }
+    return QProxyStyle::eventFilter(watched, event);
 }
 
 void SliderStyle::setDefaultValue(QSlider *slider, int value)
