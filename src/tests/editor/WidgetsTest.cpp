@@ -214,7 +214,7 @@ TEST(AdjustmentsPanelTest, SectionsFollowThePipeline)
     EXPECT_EQ(sections[3].parameters.front().id, "Exposure2012");
     EXPECT_EQ(sections[4].title, "Tone Curve");
     EXPECT_EQ(sections[4].parameters.size(), 7u);
-    EXPECT_EQ(sections[5].title, "Effects");
+    EXPECT_EQ(sections[5].title, "Detail");
     EXPECT_EQ(sections[6].title, "Color Mixer");
     EXPECT_EQ(sections[6].parameters.size(), 24u);
     EXPECT_EQ(sections[7].title, "HDR");
@@ -235,7 +235,7 @@ TEST(AdjustmentsPanelTest, SectionsFollowTheOrderGiven)
             "Light",
             "Tone Curve",
             "Color Mixer",
-            "Effects",
+            "Detail",
             "Noise Reduction",
             "Chromatic Aberration",
             "HDR"}));

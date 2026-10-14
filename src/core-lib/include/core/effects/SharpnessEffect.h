@@ -19,7 +19,7 @@ public:
     static inline const Parameter SHARPNESS{"Sharpness", "Sharpness", 0, 150, 0, 0};
     static inline const Parameter RADIUS{"SharpenRadius", "Radius", 0.5, 3.0, 1.0, 1};
 
-    std::string section() const override { return "Effects"; }
+    std::string section() const override { return "Detail"; }
     std::vector<Parameter> parameters() const override { return {SHARPNESS, RADIUS}; }
     /// Nothing to sharpen without an amount, whatever the radius.
     bool isIdentity(const Settings &settings) const override;
