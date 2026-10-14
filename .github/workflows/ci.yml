@@ -1,0 +1,191 @@
+# Builds StepIt Grader and runs its tests on the three systems it must build on,
+# as the README tells a developer to:
+#
+# - Ubuntu 24.04 and macOS, with Qt from the Qt installer's packages, through
+#   install-qt-action, and the libraries of install-deps.sh;
+# - Windows, in an MSYS2 MINGW64 shell, with MSYS2's own Qt, built by the same
+#   compiler as the rest.
+#
+# deps/ is cached under the hash of the scripts that build it, so the libraries
+# are built again only when one of their versions changes. The tests that need
+# raw-converter's sample raw files skip themselves: the samples are not
+# downloaded here.
+#
+# On Ubuntu, the AppImage is made too, and kept as the run's artifact.
+
+name: CI
+
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The Qt the editor is tested with; any 6.5 or later builds it.
+  QT_VERSION: "6.11.*"
+
+jobs:
+  ubuntu:
+    name: Ubuntu 24.04
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install the build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -qq build-essential cmake ninja-build pkg-config curl zlib1g-dev \
+            libgl1-mesa-dev libxkbcommon-dev
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+
+      - uses: actions/cache@v4
+        with:
+          path: deps
+          key: deps-${{ runner.os }}-${{ hashFiles('install-deps.sh', 'scripts/**') }}
+
+      - name: Build the libraries
+        run: ./install-deps.sh
+
+      - name: Build
+        run: |
+          export Qt6_DIR="$QT_ROOT_DIR/lib/cmake/Qt6"
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Keep the test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-log-ubuntu
+          path: build/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+
+      - name: Make the AppImage
+        run: |
+          export Qt6_DIR="$QT_ROOT_DIR/lib/cmake/Qt6"
+          ./setup/linux/package-stepit-grader.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stepit-grader-appimage
+          path: build/linux-package/*.AppImage
+
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # CMake, make, curl and zlib come with the runner.
+      - name: Install the build tools
+        run: brew install ninja pkg-config
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+
+      - uses: actions/cache@v4
+        with:
+          path: deps
+          key: deps-${{ runner.os }}-${{ hashFiles('install-deps.sh', 'scripts/**') }}
+
+      - name: Build the libraries
+        run: ./install-deps.sh
+
+      - name: Build
+        run: |
+          export Qt6_DIR="$QT_ROOT_DIR/lib/cmake/Qt6"
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Keep the test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-log-macos
+          path: build/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      # The scripts run in bash, which fails on the carriage returns Git would
+      # give them on Windows.
+      - name: Keep the line endings
+        shell: pwsh
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-svg make curl
+
+      - uses: actions/cache@v4
+        with:
+          path: deps
+          key: deps-${{ runner.os }}-${{ hashFiles('install-deps.sh', 'scripts/**') }}
+
+      - name: Build the libraries
+        run: ./install-deps.sh
+
+      # Windows has no run path: the DLLs of deps/ are found on the PATH, by the
+      # tests' discovery after the build and by ctest. Set in each step, as the
+      # MSYS2 shell starts from a PATH of its own.
+      - name: Build
+        run: |
+          export PATH="$(printf '%s:' "$PWD"/deps/*/bin "$PWD"/deps/*/lib)$PATH"
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+
+      - name: Test
+        run: |
+          export PATH="$(printf '%s:' "$PWD"/deps/*/bin "$PWD"/deps/*/lib)$PATH"
+          ctest --test-dir build --output-on-failure
+
+      - name: Keep the test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-log-windows
+          path: build/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+
+  format:
+    name: Format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: sudo apt-get update -qq && sudo apt-get install -qq clang-format
+
+      - name: Check the format
+        run: git ls-files '*.cpp' '*.h' | xargs clang-format --dry-run -Werror
