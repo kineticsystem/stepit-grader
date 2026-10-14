@@ -94,10 +94,6 @@ jobs:
   macos:
     name: macOS
     runs-on: macos-latest
-    env:
-      # The oldest macOS the DMG runs on, as in setup/mac and install-deps.sh,
-      # so that the tests build against the same library as the DMG.
-      MACOSX_DEPLOYMENT_TARGET: "13.3"
     steps:
       - uses: actions/checkout@v4
         with:

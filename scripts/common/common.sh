@@ -21,11 +21,13 @@ if [[ "$(os_type)" == "windows" ]]; then
 fi
 
 # On macOS, every library for both Apple Silicon and Intel, so that the editor
-# can be built as one universal program, for the oldest macOS Qt supports. CMake
-# and clang read the variables; configure takes the flags.
+# can be built as one universal program, and for the oldest macOS it runs on,
+# CMAKE_OSX_DEPLOYMENT_TARGET of CMakeLists.txt. CMake and clang read the
+# variables; configure takes the flags.
 MACOS_ARCHITECTURES="arm64;x86_64"
-export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-13.3}"
 if [[ "$(os_type)" == "mac" ]]; then
+    export MACOSX_DEPLOYMENT_TARGET="$(sed -n 's/^ *set(CMAKE_OSX_DEPLOYMENT_TARGET "\([0-9.]*\)".*/\1/p' \
+        "$(dirname "${BASH_SOURCE[0]}")/../../CMakeLists.txt")"
     export CMAKE_OSX_ARCHITECTURES="$MACOS_ARCHITECTURES"
     ARCH_FLAGS="-arch arm64 -arch x86_64 -mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET"
 fi

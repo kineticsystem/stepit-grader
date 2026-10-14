@@ -16,8 +16,10 @@ COMMON_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PROJECT_ROOT="$(cd "${COMMON_SCRIPT_DIR}/../.." && pwd)"
 # A build of its own, apart from the development build.
 export BUILD_DIR="${PROJECT_ROOT}/build/macos-package"
-# The oldest macOS Qt 6.11 runs on; the libraries of deps/ are built for it too.
-export MACOS_DEPLOYMENT_TARGET="13.3"
+# The oldest macOS it runs on, CMAKE_OSX_DEPLOYMENT_TARGET of CMakeLists.txt,
+# which the build and the libraries of deps/ use too.
+export MACOS_DEPLOYMENT_TARGET="$(sed -n 's/^ *set(CMAKE_OSX_DEPLOYMENT_TARGET "\([0-9.]*\)".*/\1/p' \
+    "${PROJECT_ROOT}/CMakeLists.txt")"
 # Apple Silicon and Intel, in one program.
 export MACOS_ARCHITECTURES="arm64;x86_64"
 
@@ -40,7 +42,6 @@ build_project_once() {
     echo "=== Building into ${BUILD_DIR}"
     cmake -S "${PROJECT_ROOT}" -B "${BUILD_DIR}" -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_OSX_DEPLOYMENT_TARGET="${MACOS_DEPLOYMENT_TARGET}" \
         -DCMAKE_OSX_ARCHITECTURES="${MACOS_ARCHITECTURES}" \
         -DSTEPIT_GRADER_BUILD_TESTS=OFF
     cmake --build "${BUILD_DIR}" --parallel
