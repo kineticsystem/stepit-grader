@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-StepIt Grader is a C++23/Qt 6 desktop application that edits the tones and colours of one picture (TIFF, DNG, camera raw) with the usual sliders of a raw editor, an eyedropper for the white balance and an HDR compression, live, and saves the edit by itself, a second after the last change, as an XMP sidecar next to the picture. It must build on Linux, macOS and Windows (MSYS2). How it is built: [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md); keep it true with the `architect` skill, and review the design with the `reviewer` skill, which keeps [docs/Review.md](../docs/Review.md), both in `.claude/skills/`.
+StepIt Grader is a C++23/Qt 6 desktop application that edits the tones and colours of one picture (TIFF, DNG, camera raw) with the usual sliders of a raw editor, an eyedropper for the white balance and an HDR compression, live, and saves the edit by itself, a second after the last change, as an XMP sidecar next to the picture. It must build on Linux, macOS and Windows (MSYS2). How it is built: [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md); keep it true with the `architect` skill, and review the design with the `reviewer` skill, which keeps [docs/Review.md](../docs/Review.md). What those skills need to know of this project is in [Architecture and Review Documents](#architecture-and-review-documents).
 
 ## Build Commands
 
@@ -33,6 +33,17 @@ LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/<library>`, 
 - `src/cli-app`: `stepit-grader-cli`'s `main()`.
 - Dependencies go downward only: editor-app → editor-lib → widgets-lib, io-lib → core-lib, and cli-app → cli-lib → io-lib → core-lib.
 - StepIt Grader is independent software: never mention the projects that use it in its code or docs.
+
+## Architecture and Review Documents
+
+For the `architect` and `reviewer` skills: what they cannot find out alone.
+
+- `docs/ARCHITECTURE.md` follows one idea: **an edit is a set of named values, never pixels**. If a change breaks it, say so in the document and to the user.
+- Its sections, in order: Introduction, The Big Picture, The Libraries (`| Library | Owns | Links | Must never |`), The Engine (the image and the working space, `Effect` and `Pipeline`, a table of the effects with their parameter ids, threads and memory with times measured on a real picture, and Matching a Camera's Look), Reading and Saving (the readers, the XMP sidecar), The Command Line, The Editor (the widgets and their signals, the document, the renderer, the menu actions, the mediators, `main()`), The Engine in Another Program, A Slider Moves (a sequence diagram, at most four participants), Threads, The Linux AppImage, Tests, How to Extend StepIt Grader, Design Decisions and Trade-offs.
+- Includes between libraries: `grep -rhoE '#include "(core|imageio|widgets|editor|cli)/' src/<lib> | sort | uniq -c`. `core-lib`, `io-lib` and `cli-lib` include no Qt.
+- Tests: one table per folder of `src/tests`, with its count, `grep -rhE '^(TEST|TEST_F|TEST_P)\(' src/tests/<folder> | wc -l`; tests that need the raw samples are marked "(with the samples)".
+- A throwaway test goes in the folder of `src/tests` of its library, in the `add_executable()` of `src/tests/CMakeLists.txt`, and runs with `QT_QPA_PLATFORM=offscreen build/bin/stepit-grader-tests --gtest_filter='ReviewProbe.*'`.
+- Rules kept in step by hand, for the review: the effects and `makeStandardPipeline()`, the parameter ids and the names other raw editors give them, the slider ids of `core::match::standardStages()`.
 
 ## Rules
 
