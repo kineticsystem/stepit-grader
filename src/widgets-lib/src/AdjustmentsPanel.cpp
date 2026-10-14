@@ -7,7 +7,6 @@
 
 #include <QFrame>
 #include <QLabel>
-#include <QPainter>
 #include <QScrollArea>
 #include <QVBoxLayout>
 
@@ -17,26 +16,6 @@ namespace {
 constexpr int HEADING_SPACE = 12;
 /// The space between a heading and the first slider of its group, in pixels.
 constexpr int HEADING_GAP = 4;
-/// The space above and below a divider's line, in pixels.
-constexpr int DIVIDER_SPACE = 6;
-/// How strong a divider's line is against the text colour, 0 to 255: faint, a hint of a line.
-constexpr int DIVIDER_ALPHA = 40;
-
-/// A line across the panel, in the text colour made faint, so it follows the theme.
-class Divider : public QWidget
-{
-public:
-    Divider() { setFixedHeight(2 * DIVIDER_SPACE + 1); }
-
-protected:
-    void paintEvent(QPaintEvent *) override
-    {
-        QColor colour = palette().color(QPalette::WindowText);
-        colour.setAlpha(DIVIDER_ALPHA);
-        QPainter painter{this};
-        painter.fillRect(0, DIVIDER_SPACE, width(), 1, colour);
-    }
-};
 
 } // namespace
 
@@ -158,42 +137,18 @@ void AdjustmentsPanel::addHeading(const std::string &id, const QString &text)
     QFont font = heading->font();
     font.setBold(true);
     heading->setFont(font);
+    // Centred, so it reads as the name of the group below and not as one more slider's name.
+    heading->setAlignment(Qt::AlignHCenter);
     auto *box = new QWidget;
     auto *layout = new QVBoxLayout{box};
-    // The first slider of a section has the title's space above it already, and one below a
-    // divider has the divider's.
-    QLayout *column = slider->second->parentWidget()->layout();
-    const int index = column->indexOf(slider->second);
-    const bool spaced = index == 0
-                        || dynamic_cast<Divider *>(column->itemAt(index - 1)->widget()) != nullptr;
-    layout->setContentsMargins(0, spaced ? 0 : HEADING_SPACE, 0, HEADING_GAP);
+    // The first slider of a section has the title's space above it already.
+    const bool first = slider->second->parentWidget()->layout()->indexOf(slider->second) == 0;
+    layout->setContentsMargins(0, first ? 0 : HEADING_SPACE, 0, HEADING_GAP);
     layout->addWidget(heading);
     for (const auto &[title, section] : m_sections) {
         if (section->addWidgetBefore(slider->second, box)) {
-            m_headings[id] = box;
             return;
         }
     }
     delete box;
-}
-
-void AdjustmentsPanel::addDivider(const std::string &id)
-{
-    const auto slider = m_sliders.find(id);
-    if (slider == m_sliders.end()) {
-        return;
-    }
-    // Above the slider's heading, if it has one: the line sets the whole group apart.
-    const auto heading = m_headings.find(id);
-    QWidget *below = heading != m_headings.end() ? heading->second : slider->second;
-    auto *divider = new Divider;
-    for (const auto &[title, section] : m_sections) {
-        if (section->addWidgetBefore(below, divider)) {
-            if (heading != m_headings.end()) {
-                heading->second->layout()->setContentsMargins(0, 0, 0, HEADING_GAP);
-            }
-            return;
-        }
-    }
-    delete divider;
 }

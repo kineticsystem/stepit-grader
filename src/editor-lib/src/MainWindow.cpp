@@ -113,15 +113,12 @@ MainWindow::MainWindow(
         m_panel->setSectionExpanded(title, false);
     }
 
-    // The colour mixer's three groups of sliders, each under its name.
+    // The colour mixer's three groups of sliders, each under its name; and Sharpness and its
+    // Radius, one group, under theirs, apart from the texture and clarity above them.
     m_panel->addHeading(core::ColorMixerEffect::hues()[0].id, tr("Hue"));
     m_panel->addHeading(core::ColorMixerEffect::saturations()[0].id, tr("Saturation"));
     m_panel->addHeading(core::ColorMixerEffect::luminances()[0].id, tr("Luminance"));
-    // Sharpness and its Radius, one group, apart from the sliders above them; and each group of
-    // the colour mixer apart from the one before it.
-    m_panel->addDivider(core::SharpnessEffect::SHARPNESS.id);
-    m_panel->addDivider(core::ColorMixerEffect::saturations()[0].id);
-    m_panel->addDivider(core::ColorMixerEffect::luminances()[0].id);
+    m_panel->addHeading(core::SharpnessEffect::SHARPNESS.id, tr("Sharpening"));
 
     // The curve drawn above the sliders that shape it.
     auto *curveView = new CurveView;
