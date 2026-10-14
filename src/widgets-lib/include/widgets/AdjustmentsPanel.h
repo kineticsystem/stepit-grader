@@ -60,17 +60,10 @@ public:
     void addSectionWidget(const QString &title, QWidget *widget);
     /**
      * Adds a heading just above the parameter's slider, to name the group of sliders it starts,
-     * e.g. "Hue" above the hues of the colour mixer. A heading after other sliders stands apart
-     * from them.
+     * e.g. "Hue" above the hues of the colour mixer, centred. A heading after other sliders stands
+     * apart from them.
      */
     void addHeading(const std::string &id, const QString &text);
-    /**
-     * Adds a thin, faint line just above the parameter's slider, to set the group of sliders it
-     * starts apart from those above, e.g. Sharpness and its Radius below the clarity. Above the
-     * slider's heading if it has one, e.g. between the colour mixer's groups, whichever is added
-     * first; the heading then needs no space of its own above it.
-     */
-    void addDivider(const std::string &id);
 
 Q_SIGNALS:
     /// The user changed a value; `settings` has every value.
@@ -83,8 +76,6 @@ private:
     /// The sections' titles in the order shown: the map's is alphabetical.
     QStringList m_titles;
     std::map<std::string, ParameterSlider *> m_sliders;
-    /// The headings added, by the id of the slider each is above.
-    std::map<std::string, QWidget *> m_headings;
     std::vector<core::Parameter> m_parameters;
     core::Settings m_settings;
 };
