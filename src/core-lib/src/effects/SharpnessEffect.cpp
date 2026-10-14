@@ -10,18 +10,22 @@ namespace core {
 
 namespace {
 
-/// The radius of the edges sharpened, in pixels of the full image.
-constexpr double SIGMA = 1.0;
 /// Variations below about this many stops are taken for noise.
 constexpr float NOISE_STOPS = 0.02f;
 
 } // namespace
 
+bool SharpnessEffect::isIdentity(const Settings &settings) const
+{
+    return settings.value(SHARPNESS) <= 0;
+}
+
 void SharpnessEffect::apply(Image &image, const Settings &settings, const RenderContext &context) const
 {
     const float amount = static_cast<float>(settings.value(SHARPNESS) / 100.0);
     const Plane lum = luminance::logLuminance(image);
-    const Plane blurred = filters::gaussianBlur(lum, SIGMA * context.scale);
+    // The radius of the edges sharpened, in pixels of the full image.
+    const Plane blurred = filters::gaussianBlur(lum, settings.value(RADIUS) * context.scale);
     Plane stops{lum.width, lum.height};
     parallelForEach(stops.data.size(), [&](std::size_t i) {
         const float edge = lum.data[i] - blurred.data[i];
