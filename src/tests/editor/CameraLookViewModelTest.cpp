@@ -9,6 +9,7 @@
 #include "editor/viewmodel/CameraLookViewModel.h"
 
 #include <QBuffer>
+#include <QFileInfo>
 #include <QImage>
 #include <QSignalSpy>
 #include <QTest>
@@ -95,7 +96,8 @@ TEST_F(CameraLookViewModelTest, MatchesTheOpenPictureOnlyWhenItIsARawFile)
     EXPECT_EQ(viewModel.picture(), "/pictures/a.CR2");
     open("/pictures/a.tif");
     EXPECT_FALSE(viewModel.matchesOpenPicture());
-    EXPECT_EQ(viewModel.folder(), "/pictures");
+    // As the system writes it: with the drive in front on Windows.
+    EXPECT_EQ(viewModel.folder(), QFileInfo{"/pictures"}.absoluteFilePath());
 }
 
 TEST_F(CameraLookViewModelTest, OffersTheRawFilesTheReaderReadsInEitherCase)

@@ -55,13 +55,22 @@ jobs:
           version: ${{ env.QT_VERSION }}
           cache: true
 
-      - uses: actions/cache@v4
+      # deps/ is saved as soon as the libraries are built, not only when the
+      # whole job succeeds, so that a later failure does not build them again.
+      - uses: actions/cache/restore@v4
+        id: deps
         with:
           path: deps
           key: deps-${{ runner.os }}-${{ hashFiles('install-deps.sh', 'scripts/**') }}
 
       - name: Build the libraries
         run: ./install-deps.sh
+
+      - uses: actions/cache/save@v4
+        if: steps.deps.outputs.cache-hit != 'true'
+        with:
+          path: deps
+          key: ${{ steps.deps.outputs.cache-primary-key }}
 
       - name: Build
         run: |
@@ -70,7 +79,7 @@ jobs:
           cmake --build build --parallel
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --timeout 120
 
       - name: Keep the test log
         if: failure()
@@ -108,13 +117,22 @@ jobs:
           version: ${{ env.QT_VERSION }}
           cache: true
 
-      - uses: actions/cache@v4
+      # deps/ is saved as soon as the libraries are built, not only when the
+      # whole job succeeds, so that a later failure does not build them again.
+      - uses: actions/cache/restore@v4
+        id: deps
         with:
           path: deps
           key: deps-${{ runner.os }}-${{ hashFiles('install-deps.sh', 'scripts/**') }}
 
       - name: Build the libraries
         run: ./install-deps.sh
+
+      - uses: actions/cache/save@v4
+        if: steps.deps.outputs.cache-hit != 'true'
+        with:
+          path: deps
+          key: ${{ steps.deps.outputs.cache-primary-key }}
 
       - name: Build
         run: |
@@ -123,7 +141,7 @@ jobs:
           cmake --build build --parallel
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --timeout 120
 
       - name: Keep the test log
         if: failure()
@@ -183,13 +201,22 @@ jobs:
             mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-svg mingw-w64-x86_64-qt6-tools
             make curl zip
 
-      - uses: actions/cache@v4
+      # deps/ is saved as soon as the libraries are built, not only when the
+      # whole job succeeds, so that a later failure does not build them again.
+      - uses: actions/cache/restore@v4
+        id: deps
         with:
           path: deps
           key: deps-${{ runner.os }}-${{ hashFiles('install-deps.sh', 'scripts/**') }}
 
       - name: Build the libraries
         run: ./install-deps.sh
+
+      - uses: actions/cache/save@v4
+        if: steps.deps.outputs.cache-hit != 'true'
+        with:
+          path: deps
+          key: ${{ steps.deps.outputs.cache-primary-key }}
 
       # Windows has no run path: the DLLs of deps/ are found on the PATH, by the
       # tests' discovery after the build and by ctest. Set in each step, as the
@@ -203,7 +230,7 @@ jobs:
       - name: Test
         run: |
           export PATH="$(printf '%s:' "$PWD"/deps/*/bin "$PWD"/deps/*/lib)$PATH"
-          ctest --test-dir build --output-on-failure
+          ctest --test-dir build --output-on-failure --timeout 120
 
       - name: Keep the test log
         if: failure()

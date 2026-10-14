@@ -87,16 +87,20 @@ cmake_install() {
         "$@" > /dev/null
     cmake --build "$source/_build" --parallel "$JOBS" > /dev/null
     cmake --install "$source/_build" > /dev/null
+    check_architectures "$name"
 }
 
 # Builds an Autotools project into deps/<name>, as a shared library. On macOS
-# for both architectures at once, which needs no dependency tracking.
+# for both architectures at once, which needs no dependency tracking; the flags
+# go in the compilers' commands too, as libtool drops them from LDFLAGS when it
+# links C++.
 configure_install() {
     local source="$1" name="$2"
     shift 2
     local flags=()
     if [[ -n "${ARCH_FLAGS:-}" ]]; then
-        flags=(CFLAGS="$ARCH_FLAGS -O2" CXXFLAGS="$ARCH_FLAGS -O2" LDFLAGS="$ARCH_FLAGS"
+        flags=(CC="clang $ARCH_FLAGS" CXX="clang++ $ARCH_FLAGS"
+            CFLAGS="$ARCH_FLAGS -O2" CXXFLAGS="$ARCH_FLAGS -O2" LDFLAGS="$ARCH_FLAGS"
             --disable-dependency-tracking)
     fi
     (cd "$source" &&
@@ -104,4 +108,17 @@ configure_install() {
             --disable-static --quiet "${flags[@]}" "$@" > /dev/null &&
         make -j"$JOBS" --quiet > /dev/null 2>&1 &&
         make install --quiet > /dev/null)
+    check_architectures "$name"
+}
+
+# On macOS, that every library of deps/<name> has both architectures: one
+# that has a single one fails only when the universal editor links it.
+check_architectures() {
+    [[ -n "${ARCH_FLAGS:-}" ]] || return 0
+    local library
+    for library in "$DEPS_DIR/$1"/lib/*.dylib "$DEPS_DIR/$1"/lib/*.a; do
+        [[ -f "$library" && ! -L "$library" ]] || continue
+        lipo "$library" -verify_arch arm64 x86_64 ||
+            { echo "$library: not built for arm64 and x86_64: $(lipo -archs "$library")" >&2; exit 1; }
+    done
 }
