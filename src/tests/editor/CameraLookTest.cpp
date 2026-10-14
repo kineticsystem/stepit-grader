@@ -1,9 +1,9 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/CameraLookUtils.h"
 #include "../testutils/Fakes.h"
 #include "core/StandardPipeline.h"
+#include "editor/CameraLookUtils.h"
 #include "editor/Status.h"
 #include "editor/WaitingDialog.h"
 #include "imageio/RawReader.h"

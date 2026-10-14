@@ -7,7 +7,6 @@
 #include "editor/Document.h"
 #include "editor/WhiteBalanceUtils.h"
 
-
 #include <expected>
 
 WhiteBalanceViewModel::WhiteBalanceViewModel(Document *document, QObject *parent)

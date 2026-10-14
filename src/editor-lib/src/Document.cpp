@@ -53,26 +53,25 @@ void Document::open(const QString &path)
     // first, as the files are read and written in turn.
     save();
     m_openingPath = path;
-    m_opening.setFuture(
-        QtConcurrent::run(
-            &m_files,
-            [reader = m_reader, store = m_store, parameters = m_parameters, file = toPath(path)] {
-                Loaded loaded;
-                try {
-                    loaded.image = std::make_shared<const core::Image>(reader->read(file));
-                } catch (const std::exception &e) {
-                    loaded.error = QString::fromUtf8(e.what());
-                    return loaded;
-                }
-                // A damaged sidecar is no reason to keep the picture from opening: it opens with
-                // no edit, and the sidecar stays as it is until the first change.
-                try {
-                    loaded.settings = store->load(file, parameters).value_or(core::Settings{});
-                } catch (const std::exception &e) {
-                    loaded.settingsError = QString::fromUtf8(e.what());
-                }
+    m_opening.setFuture(QtConcurrent::run(
+        &m_files,
+        [reader = m_reader, store = m_store, parameters = m_parameters, file = toPath(path)] {
+            Loaded loaded;
+            try {
+                loaded.image = std::make_shared<const core::Image>(reader->read(file));
+            } catch (const std::exception &e) {
+                loaded.error = QString::fromUtf8(e.what());
                 return loaded;
-            }));
+            }
+            // A damaged sidecar is no reason to keep the picture from opening: it opens with
+            // no edit, and the sidecar stays as it is until the first change.
+            try {
+                loaded.settings = store->load(file, parameters).value_or(core::Settings{});
+            } catch (const std::exception &e) {
+                loaded.settingsError = QString::fromUtf8(e.what());
+            }
+            return loaded;
+        }));
 }
 
 void Document::finishOpening()
