@@ -199,7 +199,7 @@ jobs:
             mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja
             mingw-w64-x86_64-pkgconf mingw-w64-x86_64-zlib
             mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-svg mingw-w64-x86_64-qt6-tools
-            make curl zip
+            make curl zip diffutils
 
       # deps/ is saved as soon as the libraries are built, not only when the
       # whole job succeeds, so that a later failure does not build them again.

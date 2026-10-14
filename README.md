@@ -105,7 +105,7 @@ export Qt6_DIR=~/Qt/6.11.0/gcc_64/lib/cmake/Qt6
 
    ```bash
    pacman -S --needed mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja \
-       mingw-w64-x86_64-pkgconf mingw-w64-x86_64-zlib mingw-w64-x86_64-qt6 make curl git
+       mingw-w64-x86_64-pkgconf mingw-w64-x86_64-zlib mingw-w64-x86_64-qt6 make curl git diffutils
    ```
 
 ## Install StepIt Grader

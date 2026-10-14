@@ -93,13 +93,14 @@ cmake_install() {
 # Builds an Autotools project into deps/<name>, as a shared library. On macOS
 # for both architectures at once, which needs no dependency tracking; the flags
 # go in the compilers' commands too, as libtool drops them from LDFLAGS when it
-# links C++.
+# links C++, and the preprocessors are given without them, as clang preprocesses
+# for one architecture only.
 configure_install() {
     local source="$1" name="$2"
     shift 2
     local flags=()
     if [[ -n "${ARCH_FLAGS:-}" ]]; then
-        flags=(CC="clang $ARCH_FLAGS" CXX="clang++ $ARCH_FLAGS"
+        flags=(CC="clang $ARCH_FLAGS" CXX="clang++ $ARCH_FLAGS" CPP="clang -E" CXXCPP="clang++ -E"
             CFLAGS="$ARCH_FLAGS -O2" CXXFLAGS="$ARCH_FLAGS -O2" LDFLAGS="$ARCH_FLAGS"
             --disable-dependency-tracking)
     fi
