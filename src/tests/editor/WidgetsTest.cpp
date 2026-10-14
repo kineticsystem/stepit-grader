@@ -481,6 +481,36 @@ TEST(AdjustmentsPanelTest, ADividerSetsTheGroupBelowItApart)
     EXPECT_EQ(layout->itemAt(index + 1)->widget(), panel.slider("SharpenRadius"));
 }
 
+TEST(AdjustmentsPanelTest, ADividerGoesAboveTheHeadingOfItsGroup)
+{
+    // Whichever is added first.
+    for (const bool headingFirst : {true, false}) {
+        AdjustmentsPanel panel{SectionUtils::sectionsOf(*core::makeStandardPipeline())};
+        if (headingFirst) {
+            panel.addHeading("SaturationAdjustmentRed", "Saturation");
+            panel.addDivider("SaturationAdjustmentRed");
+        } else {
+            panel.addDivider("SaturationAdjustmentRed");
+            panel.addHeading("SaturationAdjustmentRed", "Saturation");
+        }
+        auto *slider = panel.slider("SaturationAdjustmentRed");
+        QLayout *layout = slider->parentWidget()->layout();
+        const int index = layout->indexOf(slider);
+        ASSERT_GT(index, 1) << headingFirst;
+
+        // The slider, its heading just above, and the line above the heading.
+        QWidget *heading = layout->itemAt(index - 1)->widget();
+        const auto labels = heading->findChildren<QLabel *>();
+        ASSERT_EQ(labels.size(), 1) << headingFirst;
+        EXPECT_EQ(labels.front()->text(), "Saturation");
+        QWidget *line = layout->itemAt(index - 2)->widget();
+        EXPECT_EQ(qobject_cast<ParameterSlider *>(line), nullptr) << headingFirst;
+        EXPECT_TRUE(line->findChildren<QLabel *>().isEmpty()) << headingFirst;
+        // The line's space sets the group apart: the heading needs none of its own above it.
+        EXPECT_EQ(heading->layout()->contentsMargins().top(), 0) << headingFirst;
+    }
+}
+
 TEST(AdjustmentsPanelTest, AHeadingNamesTheGroupBelowItAndStandsApart)
 {
     AdjustmentsPanel panel{SectionUtils::sectionsOf(*core::makeStandardPipeline())};

@@ -160,12 +160,17 @@ void AdjustmentsPanel::addHeading(const std::string &id, const QString &text)
     heading->setFont(font);
     auto *box = new QWidget;
     auto *layout = new QVBoxLayout{box};
-    // The first slider of a section has the title's space above it already.
-    const bool first = slider->second->parentWidget()->layout()->indexOf(slider->second) == 0;
-    layout->setContentsMargins(0, first ? 0 : HEADING_SPACE, 0, HEADING_GAP);
+    // The first slider of a section has the title's space above it already, and one below a
+    // divider has the divider's.
+    QLayout *column = slider->second->parentWidget()->layout();
+    const int index = column->indexOf(slider->second);
+    const bool spaced = index == 0
+                        || dynamic_cast<Divider *>(column->itemAt(index - 1)->widget()) != nullptr;
+    layout->setContentsMargins(0, spaced ? 0 : HEADING_SPACE, 0, HEADING_GAP);
     layout->addWidget(heading);
     for (const auto &[title, section] : m_sections) {
         if (section->addWidgetBefore(slider->second, box)) {
+            m_headings[id] = box;
             return;
         }
     }
@@ -178,9 +183,15 @@ void AdjustmentsPanel::addDivider(const std::string &id)
     if (slider == m_sliders.end()) {
         return;
     }
+    // Above the slider's heading, if it has one: the line sets the whole group apart.
+    const auto heading = m_headings.find(id);
+    QWidget *below = heading != m_headings.end() ? heading->second : slider->second;
     auto *divider = new Divider;
     for (const auto &[title, section] : m_sections) {
-        if (section->addWidgetBefore(slider->second, divider)) {
+        if (section->addWidgetBefore(below, divider)) {
+            if (heading != m_headings.end()) {
+                heading->second->layout()->setContentsMargins(0, 0, 0, HEADING_GAP);
+            }
             return;
         }
     }
