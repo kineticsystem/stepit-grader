@@ -15,9 +15,9 @@ namespace core {
 class DetailEffect : public Effect
 {
 public:
-    static inline const Parameter DETAIL{"Texture", "Detail", -100, 100, 0, 0};
+    static inline const Parameter DETAIL{"Texture", "Texture", -100, 100, 0, 0};
 
-    std::string section() const override { return "Effects"; }
+    std::string section() const override { return "Detail"; }
     std::vector<Parameter> parameters() const override { return {DETAIL}; }
     void apply(Image &image, const Settings &settings, const RenderContext &context) const override;
 };

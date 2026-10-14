@@ -171,6 +171,6 @@ TEST_F(CameraLookViewModelTest, NamesTheSectionsWhoseSlidersAMatchSets)
         EXPECT_TRUE(sections.contains(section)) << section;
     }
     // The local tools are left alone.
-    EXPECT_FALSE(sections.contains("Effects"));
+    EXPECT_FALSE(sections.contains("Detail"));
     EXPECT_FALSE(sections.contains("HDR"));
 }

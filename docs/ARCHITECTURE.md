@@ -180,10 +180,10 @@ An [`Effect`](../src/core-lib/include/core/Effect.h) is one adjustment. It owns 
 
 The [`Pipeline`](../src/core-lib/include/core/Pipeline.h) holds the effects in order and knows only the interface. `render()` copies the image and skips effects that are at their defaults. Before each effect it calls a `cancelled` callback, so a render whose settings are already out of date stops early. The list of effects and their order is defined in one place: [`makeStandardPipeline()`](../src/core-lib/src/StandardPipeline.cpp).
 
-The tools panel shows the sections in its own order, given by [`standardSectionOrder()`](../src/core-lib/src/StandardPipeline.cpp): Color, Light, Tone Curve, Color Mixer, Effects, Noise Reduction, Chromatic Aberration, HDR. The white balance comes first because it is the first thing you set. This is mostly the order in which the effects run, with two exceptions:
+The tools panel shows the sections in its own order, given by [`standardSectionOrder()`](../src/core-lib/src/StandardPipeline.cpp): Color, Light, Tone Curve, Color Mixer, Detail, Noise Reduction, Chromatic Aberration, HDR. The white balance comes first because it is the first thing you set. This is mostly the order in which the effects run, with two exceptions:
 
 - Noise reduction and chromatic aberration run before the light effects, but the panel shows them after, because they are set less often.
-- Sharpening, in Effects, runs last, on the finished picture.
+- Sharpening, in Detail, runs last, on the finished picture.
 
 The white balance also runs first, so it neutralises the colours as shot, before the other effects change them.
 
@@ -520,7 +520,7 @@ To add an action of this kind, see [How to Extend StepIt Grader](#how-to-extend-
 - **In the panel**: three widgets that belong to the window.
   - The eyedropper, 28 pixels, at the top of the Color section above the temperature and tint it sets. It is in no menu or toolbar. The window holds its action, so its key, `W`, works anywhere.
   - A `CurveView` above the Tone Curve sliders, redrawn from `ToneCurveEffect::knots()`, `curve()` and `splits()` on every settings change.
-  - The headings Hue, Saturation and Luminance in the colour mixer, and Sharpening in the effects.
+  - The headings Hue, Saturation and Luminance in the colour mixer, and Sharpening in the detail.
 - **Above**: a fixed toolbar with the most used actions: open, save, before and after, and the zoom.
 - **The menus**: File, Edit, View and Settings. The theme, under Settings, is stored in `QSettings` under `theme` and applied by `main()` before the window is created.
 - **Below**: the status bar.

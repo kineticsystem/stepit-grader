@@ -52,7 +52,7 @@ std::vector<std::string> standardSectionOrder()
         "Light",
         "Tone Curve",
         "Color Mixer",
-        "Effects",
+        "Detail",
         "Noise Reduction",
         "Chromatic Aberration",
         "HDR"};
