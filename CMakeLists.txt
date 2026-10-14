@@ -55,6 +55,10 @@ endif()
 # that builds raw-converter already shares its own.
 if(NOT TARGET rawconv)
     add_subdirectory(modules/raw-converter EXCLUDE_FROM_ALL)
+    # MinGW declares POSIX's localtime_r(), which raw-converter calls, only when asked to.
+    if(MINGW)
+        target_compile_definitions(rawconv PRIVATE _POSIX_THREAD_SAFE_FUNCTIONS)
+    endif()
 endif()
 
 add_subdirectory(src/io-lib)
