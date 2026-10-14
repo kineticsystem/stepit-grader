@@ -7,6 +7,7 @@
 
 #include <QFrame>
 #include <QLabel>
+#include <QPainter>
 #include <QScrollArea>
 #include <QVBoxLayout>
 
@@ -16,6 +17,26 @@ namespace {
 constexpr int HEADING_SPACE = 12;
 /// The space between a heading and the first slider of its group, in pixels.
 constexpr int HEADING_GAP = 4;
+/// The space above and below a divider's line, in pixels.
+constexpr int DIVIDER_SPACE = 6;
+/// How strong a divider's line is against the text colour, 0 to 255: faint, a hint of a line.
+constexpr int DIVIDER_ALPHA = 40;
+
+/// A line across the panel, in the text colour made faint, so it follows the theme.
+class Divider : public QWidget
+{
+public:
+    Divider() { setFixedHeight(2 * DIVIDER_SPACE + 1); }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QColor colour = palette().color(QPalette::WindowText);
+        colour.setAlpha(DIVIDER_ALPHA);
+        QPainter painter{this};
+        painter.fillRect(0, DIVIDER_SPACE, width(), 1, colour);
+    }
+};
 
 } // namespace
 
@@ -149,4 +170,19 @@ void AdjustmentsPanel::addHeading(const std::string &id, const QString &text)
         }
     }
     delete box;
+}
+
+void AdjustmentsPanel::addDivider(const std::string &id)
+{
+    const auto slider = m_sliders.find(id);
+    if (slider == m_sliders.end()) {
+        return;
+    }
+    auto *divider = new Divider;
+    for (const auto &[title, section] : m_sections) {
+        if (section->addWidgetBefore(slider->second, divider)) {
+            return;
+        }
+    }
+    delete divider;
 }

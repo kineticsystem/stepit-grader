@@ -47,7 +47,8 @@ constexpr const char *EDITOR_SIDECAR = R"(<x:xmpmeta xmlns:x="adobe:ns:meta/" x:
    crs:Exposure2012="+0.65"
    crs:Contrast2012="-12"
    crs:Clarity2012="+20"
-   crs:Sharpness="40">
+   crs:Sharpness="40"
+   crs:SharpenRadius="+1.5">
    <crs:ToneCurvePV2012>
     <rdf:Seq>
      <rdf:li>0, 0</rdf:li>
@@ -67,6 +68,7 @@ TEST(XmpSidecarTest, FormatsValuesAsRawEditorsDo)
     EXPECT_EQ(imageio::xmp::format(ExposureEffect::EXPOSURE, -1.25), "-1.25");
     EXPECT_EQ(imageio::xmp::format(ExposureEffect::EXPOSURE, 0), "0.00");
     EXPECT_EQ(imageio::xmp::format(core::SharpnessEffect::SHARPNESS, 40), "40");
+    EXPECT_EQ(imageio::xmp::format(core::SharpnessEffect::RADIUS, 2.5), "2.5");
 }
 
 TEST(XmpSidecarTest, ReadsWhatAnotherEditorWrites)
@@ -76,6 +78,7 @@ TEST(XmpSidecarTest, ReadsWhatAnotherEditorWrites)
     EXPECT_EQ(settings.values().at("Contrast2012"), -12);
     EXPECT_EQ(settings.values().at("Clarity2012"), 20);
     EXPECT_EQ(settings.values().at("Sharpness"), 40);
+    EXPECT_DOUBLE_EQ(settings.value(core::SharpnessEffect::RADIUS), 1.5);
     EXPECT_FALSE(settings.has("Shadows2012"));
 }
 

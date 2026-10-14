@@ -127,7 +127,7 @@ TEST(EffectsTest, ParametersHaveUniqueIdsAndDefaultsInRange)
         EXPECT_LE(parameter.minimum, parameter.defaultValue);
         EXPECT_GE(parameter.maximum, parameter.defaultValue);
     }
-    EXPECT_EQ(ids.size(), 52u);
+    EXPECT_EQ(ids.size(), 53u);
 }
 
 TEST(EffectsTest, ExposureOfOneStopDoublesTheLight)
@@ -259,6 +259,48 @@ TEST(EffectsTest, SharpnessSteepensEdges)
     EXPECT_LT(sharp.pixel(15, 4)[1], 0.1f);
     EXPECT_GT(sharp.pixel(16, 4)[1], 0.4f);
     EXPECT_NEAR(sharp.pixel(2, 4)[1], 0.1f, 1e-4f);
+}
+
+TEST(EffectsTest, OnAPreviewOnlyAWiderSharpeningRadiusShows)
+{
+    // A preview of a picture 6,536 pixels tall reduced to 2,000: 1 pixel of the picture is a third
+    // of the preview's, too fine to show.
+    const RenderContext preview{2000.0 / 6536.0};
+    const Image edge = testutils::step(32, 8, 0.1f, 0.4f);
+    Settings fine;
+    fine.setValue(SharpnessEffect::SHARPNESS.id, 150);
+    fine.setValue(SharpnessEffect::RADIUS.id, 1.0);
+    Settings wide = fine;
+    wide.setValue(SharpnessEffect::RADIUS.id, 3.0);
+
+    Image fineSharp = edge;
+    SharpnessEffect{}.apply(fineSharp, fine, preview);
+    Image wideSharp = edge;
+    SharpnessEffect{}.apply(wideSharp, wide, preview);
+
+    EXPECT_FLOAT_EQ(fineSharp.pixel(15, 4)[1], edge.pixel(15, 4)[1]);
+    EXPECT_LT(wideSharp.pixel(15, 4)[1], edge.pixel(15, 4)[1] - 0.005f);
+}
+
+TEST(EffectsTest, WithoutARadiusTheSharpeningIsOfOnePixelAsBefore)
+{
+    const Image edge = testutils::step(32, 8, 0.1f, 0.4f);
+    const Image unset = applied(SharpnessEffect{}, edge, SharpnessEffect::SHARPNESS.id, 80);
+    Settings settings;
+    settings.setValue(SharpnessEffect::SHARPNESS.id, 80);
+    settings.setValue(SharpnessEffect::RADIUS.id, 1.0);
+    Image one = edge;
+    SharpnessEffect{}.apply(one, settings, RenderContext{});
+    for (int x = 0; x < edge.width; ++x) {
+        EXPECT_EQ(one.pixel(x, 4)[1], unset.pixel(x, 4)[1]) << x;
+    }
+}
+
+TEST(EffectsTest, ARadiusWithoutSharpnessChangesNothing)
+{
+    Settings settings;
+    settings.setValue(SharpnessEffect::RADIUS.id, 2.5);
+    EXPECT_TRUE(SharpnessEffect{}.isIdentity(settings));
 }
 
 namespace {

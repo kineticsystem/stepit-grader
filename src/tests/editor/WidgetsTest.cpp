@@ -22,6 +22,7 @@
 #include <QApplication>
 #include <QDir>
 #include <QLabel>
+#include <QLayout>
 #include <QLocale>
 #include <QProxyStyle>
 #include <QScrollBar>
@@ -259,12 +260,12 @@ TEST(AdjustmentsPanelTest, SectionsFollowTheOrderGiven)
             "Blacks2012",
             "Vibrance",
             "Saturation"}));
-    // The effects gather the texture, the clarity and the sharpening, which runs last.
+    // The effects gather the texture, the clarity and the sharpening, with its radius, last.
     QStringList effects;
     for (const auto &parameter : sections[4].parameters) {
         effects << QString::fromStdString(parameter.id);
     }
-    EXPECT_EQ(effects, (QStringList{"Texture", "Clarity2012", "Sharpness"}));
+    EXPECT_EQ(effects, (QStringList{"Texture", "Clarity2012", "Sharpness", "SharpenRadius"}));
 
     // A section the order does not name follows those it names, in the order of the pipeline.
     const auto partial = SectionUtils::sectionsOf(*core::makeStandardPipeline(), {"HDR", "Light"});
@@ -458,6 +459,26 @@ TEST(AdjustmentsPanelTest, TheTitleIsTheSameBlockOpenOrClosed)
     EXPECT_TRUE(section.isExpanded());
     section.setExpanded(false);
     EXPECT_EQ(title->grab().toImage().pixelColor(inside), open);
+}
+
+TEST(AdjustmentsPanelTest, ADividerSetsTheGroupBelowItApart)
+{
+    AdjustmentsPanel panel{SectionUtils::sectionsOf(*core::makeStandardPipeline())};
+    panel.addDivider("Sharpness");
+    // A slider that does not exist gets no line, and nothing breaks.
+    panel.addDivider("NoSuchSlider");
+    auto *sharpness = panel.slider("Sharpness");
+    QLayout *layout = sharpness->parentWidget()->layout();
+    const int index = layout->indexOf(sharpness);
+    ASSERT_GT(index, 0);
+
+    // Just above, a line: neither a slider nor a heading.
+    QWidget *above = layout->itemAt(index - 1)->widget();
+    ASSERT_NE(above, nullptr);
+    EXPECT_EQ(qobject_cast<ParameterSlider *>(above), nullptr);
+    EXPECT_TRUE(above->findChildren<QLabel *>().isEmpty());
+    // Just below, its radius, nothing between them.
+    EXPECT_EQ(layout->itemAt(index + 1)->widget(), panel.slider("SharpenRadius"));
 }
 
 TEST(AdjustmentsPanelTest, AHeadingNamesTheGroupBelowItAndStandsApart)

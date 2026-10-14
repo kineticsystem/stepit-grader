@@ -64,6 +64,12 @@ public:
      * from them.
      */
     void addHeading(const std::string &id, const QString &text);
+    /**
+     * Adds a thin, faint line just above the parameter's slider, to set the group of sliders it
+     * starts apart from those above without naming it, e.g. Sharpness and its Radius below the
+     * clarity.
+     */
+    void addDivider(const std::string &id);
 
 Q_SIGNALS:
     /// The user changed a value; `settings` has every value.

@@ -37,6 +37,7 @@
 #include <QVBoxLayout>
 
 #include "core/effects/ColorMixerEffect.h"
+#include "core/effects/SharpnessEffect.h"
 #include "core/effects/ToneCurveEffect.h"
 #include "core/effects/WhiteBalanceEffect.h"
 
@@ -116,6 +117,8 @@ MainWindow::MainWindow(
     m_panel->addHeading(core::ColorMixerEffect::hues()[0].id, tr("Hue"));
     m_panel->addHeading(core::ColorMixerEffect::saturations()[0].id, tr("Saturation"));
     m_panel->addHeading(core::ColorMixerEffect::luminances()[0].id, tr("Luminance"));
+    // Sharpness and its Radius, one group, apart from the sliders above them.
+    m_panel->addDivider(core::SharpnessEffect::SHARPNESS.id);
 
     // The curve drawn above the sliders that shape it.
     auto *curveView = new CurveView;
