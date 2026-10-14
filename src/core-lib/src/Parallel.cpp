@@ -140,8 +140,11 @@ private:
 
 ThreadPool &pool()
 {
-    static ThreadPool instance;
-    return instance;
+    // Never destroyed: the system ends the threads with the process. Joining them in a static
+    // destructor, while the process exits, deadlocks on Windows, where a thread still starting
+    // waits for a lock of the C runtime that the exiting thread holds.
+    static ThreadPool *const instance = new ThreadPool;
+    return *instance;
 }
 
 } // namespace

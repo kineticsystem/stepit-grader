@@ -6,6 +6,7 @@
 #include "editor/FileUtils.h"
 #include "editor/SessionProperties.h"
 
+#include <QFileInfo>
 #include <QSettings>
 
 #include <gtest/gtest.h>
@@ -33,11 +34,13 @@ TEST(FileUtilsTest, KeepsTheFolderOfTheFileChosen)
 {
     QSettings settings{settingsFile(), QSettings::IniFormat};
     FileUtils::rememberFolder(settings, KEY, "/pictures/2026/a.tif");
-    EXPECT_EQ(FileUtils::lastFolder(settings, KEY, "/elsewhere"), "/pictures/2026");
+    // As the system writes it: with the drive in front on Windows.
+    const QString folder = QFileInfo{"/pictures/2026"}.absoluteFilePath();
+    EXPECT_EQ(FileUtils::lastFolder(settings, KEY, "/elsewhere"), folder);
 
     // A dialog cancelled keeps the folder kept before.
     FileUtils::rememberFolder(settings, KEY, "");
-    EXPECT_EQ(FileUtils::lastFolder(settings, KEY), "/pictures/2026");
+    EXPECT_EQ(FileUtils::lastFolder(settings, KEY), folder);
 }
 
 TEST(FileUtilsTest, ADialogWithoutAKeyKeepsNothing)

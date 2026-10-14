@@ -8,9 +8,9 @@
 class SaveImageViewModel;
 
 /**
- * File > Save Image…: asks for a file and its format, and has the view model save the picture there;
- * tells the user when the view model refuses the file or the save fails. The dialogs only: what is
- * saved, and where it may be, is the view model's.
+ * File > Save Image…: asks for a file and its format, and has the view model save the picture
+ * there; tells the user when the view model refuses the file or the save fails. The dialogs only:
+ * what is saved, and where it may be, is the view model's.
  */
 class SaveImageAction : public QAction
 {

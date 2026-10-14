@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.22)
 
+# The oldest macOS StepIt Grader runs on, before project(), which reads it. The
+# only place it is set: install-deps.sh and setup/mac read it from here. A
+# bigger project that adds StepIt Grader sets its own.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "26.0" CACHE STRING "The oldest macOS to run on")
+endif()
+
 project(stepit-grader
     VERSION 0.1.0
     DESCRIPTION "A photo editor for the tones and colours of a picture, with XMP sidecars"
@@ -55,6 +62,10 @@ endif()
 # that builds raw-converter already shares its own.
 if(NOT TARGET rawconv)
     add_subdirectory(modules/raw-converter EXCLUDE_FROM_ALL)
+    # MinGW declares POSIX's localtime_r(), which raw-converter calls, only when asked to.
+    if(MINGW)
+        target_compile_definitions(rawconv PRIVATE _POSIX_THREAD_SAFE_FUNCTIONS)
+    endif()
 endif()
 
 add_subdirectory(src/io-lib)

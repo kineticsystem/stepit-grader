@@ -27,7 +27,7 @@
 - [The Engine in Another Program](#the-engine-in-another-program)
 - [A Slider Moves](#a-slider-moves)
 - [Threads](#threads)
-- [The Linux AppImage](#the-linux-appimage)
+- [The Packages and the CI](#the-packages-and-the-ci)
 - [Tests](#tests)
 - [How to Extend StepIt Grader](#how-to-extend-stepit-grader)
 - [Design Decisions and Trade-offs](#design-decisions-and-trade-offs)
@@ -226,7 +226,7 @@ All effects except the white balance, the colour noise, the defringe and the col
 
 ### Threads and Memory
 
-[`parallelFor()`](../src/core-lib/include/core/Parallel.h) splits a range of work over a pool of threads, one per core, started once. Any thread can submit work. While it waits, it runs queued work itself, so the preview and the full render share the pool.
+[`parallelFor()`](../src/core-lib/include/core/Parallel.h) splits a range of work over a pool of threads, one per core, started once and never destroyed: the system ends the threads with the process, as joining them while the process exits deadlocks on Windows. Any thread can submit work. While it waits, it runs queued work itself, so the preview and the full render share the pool.
 
 Two details matter for correctness:
 
@@ -676,7 +676,11 @@ The view models run their work through [`ConcurrentUtils::run(context, work, don
 | A preview or a full pass | `QtConcurrent::run`, from `PreviewRenderer`. | `QMetaObject::invokeMethod` on the main thread, guarded by a `QPointer` to the renderer. |
 | Inside an effect, a reader or the screen conversion | `core::parallelFor`'s pool. | The caller waits for its chunks and helps run them. |
 
-## The Linux AppImage
+## The Packages and the CI
+
+StepIt Grader runs on Ubuntu 24.04 or later, Windows 11 and macOS 26 or later. Each system has a packaging script in `setup/`, which builds the project on its own, without the tests, and packages both programs with Qt and the other libraries. None is signed.
+
+### The Linux AppImage
 
 [`setup/linux/package-stepit-grader.sh`](../setup/linux/package-stepit-grader.sh) makes one AppImage holding both programs, using the steps in [`common.sh`](../setup/linux/common.sh):
 
@@ -686,6 +690,35 @@ The view models run their work through [`ConcurrentUtils::run(context, work, don
 
 The application's icon and desktop file are in [`src/editor-app/resources`](../src/editor-app/resources), installed by CMake.
 
+### The macOS DMG
+
+[`setup/mac/package-stepit-grader.sh`](../setup/mac/package-stepit-grader.sh) makes `StepItGrader.app` and its DMG, using the steps in [`common.sh`](../setup/mac/common.sh):
+
+1. Build the project into `build/macos-package`, universal (`arm64;x86_64`). The oldest macOS it runs on is `CMAKE_OSX_DEPLOYMENT_TARGET` in `CMakeLists.txt`, the only place it is set: `install-deps.sh`, which builds the libraries of `deps/` for both architectures and checks them with `lipo`, and the script read it from there.
+2. Lay out the bundle: the editor and `stepit-grader-cli` in `Contents/MacOS`, the icon `stepit-grader.icns`, an `Info.plist` and a `qt.conf`.
+3. Run `macdeployqt` on both programs, with the folders of `deps/`, to copy Qt and the libraries into `Contents/Frameworks`. Then make every library's install name `@rpath`, remove the build machine's run paths, and copy any library of a library that `macdeployqt` missed.
+4. Sign the bundle ad hoc, as macOS requires once its files have changed, and make the DMG with `hdiutil`.
+
+### The Windows Installer
+
+[`setup/win/package-stepit-grader.sh`](../setup/win/package-stepit-grader.sh), in an MSYS2 MINGW64 shell, uses the steps in [`common.sh`](../setup/win/common.sh):
+
+1. Build the project into `build/win-package`.
+2. Run `windeployqt6` for Qt, then follow the programs' DLLs with `ldd`, recursively, and copy those of `deps/` and of MinGW into `deploy-stepit-grader`, and check that none is missing.
+3. Zip the folder, and make the installer with Inno Setup from [`setup.iss`](../setup/win/setup.iss). Its `AppId` must never change: Windows knows the installed program by it, to update it.
+
+### The CI
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on every pull request, on `main` and on tags `v*`, with one job for each system and one that checks the format with clang-format:
+
+| Job | Runner | Qt | After the tests |
+|---|---|---|---|
+| Ubuntu 24.04 | `ubuntu-24.04` | `install-qt-action` | The AppImage. |
+| macOS | `macos-latest` | `install-qt-action`, universal | The DMG; then both programs must have both architectures, and the command line must start, natively and as Intel. |
+| Windows | `windows-latest`, its own MSYS2 in `C:\msys64` | MSYS2's | The installer and the ZIP; then the command line must start with Windows' own DLLs alone on the `PATH`. |
+
+`deps/` is cached under the hash of `install-deps.sh` and `scripts/`, and saved as soon as it is built, so a later failure does not build it again. `ctest` stops a test after two minutes. Each job keeps its packages as the run's artifacts. On a tag `v<version>`, the Release job checks that the tag is the version of `CMakeLists.txt` and publishes the packages as the release of that version.
+
 ## Tests
 
 All the tests are in one program, [`src/tests`](../src/tests), using GoogleTest and Qt Test. It links every library, so it also catches problems that only show when they work together. [`Main.cpp`](../src/tests/Main.cpp) creates one offscreen `QApplication`. Run the tests with `ctest --test-dir build`, or run `build/bin/stepit-grader-tests`.
@@ -693,7 +726,7 @@ All the tests are in one program, [`src/tests`](../src/tests), using GoogleTest 
 | Folder | Test cases | What they cover |
 |---|---|---|
 | [`core`](../src/tests/core) | 63 | The effects, the colour maths, the filters, the camera match and the thread pool. |
-| [`io`](../src/tests/io) | 27 | Replacing files, the readers, the TIFF writer and the XMP sidecar. |
+| [`io`](../src/tests/io) | 28 | Replacing files, the readers, the TIFF writer and the XMP sidecar. |
 | [`editor`](../src/tests/editor) | 110 | The widgets, the document, the renderer, the view models, the actions, the mediators and the utilities. |
 | [`cli`](../src/tests/cli) | 7 | The options and the grader. |
 
@@ -721,7 +754,7 @@ All the tests are in one program, [`src/tests`](../src/tests), using GoogleTest 
 - A raw file and a TIFF with the same name each get their own sidecar. A TIFF reads a sidecar named without its extension unless a raw file of the same name owns it, and saves under its own name.
 - A sidecar that is not XMP is replaced on save and kept beside it as it was.
 - The readers read a camera shot with its JPEG (with the samples), a 16-bit linear Rec. 2020 TIFF unchanged, and an untagged 8-bit TIFF as sRGB. They handle orientation, report a broken file, and are chosen by extension. A Canon CR2 and a DNG read correctly (with the samples).
-- The sidecar formats values correctly, reads another raw editor's sidecar and elements with another prefix, keeps everything else on update, round-trips on disk, handles a file that is not XML, and loads a sidecar of any name.
+- The sidecar formats values correctly, reads only whole numbers, with a point in every locale, reads another raw editor's sidecar and elements with another prefix, keeps everything else on update, round-trips on disk, handles a file that is not XML, and loads a sidecar of any name.
 - The TIFF writer writes each of the four colour spaces, read back through the embedded profile, clips white, replaces a file whole without leaving a temporary file, and reports a missing folder. The colour spaces' names round-trip.
 
 **`editor`** checks that:

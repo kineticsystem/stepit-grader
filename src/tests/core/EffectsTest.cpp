@@ -431,8 +431,8 @@ TEST(EffectsTest, WhiteBalanceBeyondTheSlidersIsClamped)
 TEST(SamplingTest, AveragesADiscAndLeavesClippedPixelsOut)
 {
     Image image = testutils::uniform(20, 20, 0.2f, 0.4f, 0.6f);
-    image.pixel(10, 10)[1] = 1.0f;  // clipped, in the middle
-    image.pixel(0, 0)[0] = 0.9f;    // outside the disc
+    image.pixel(10, 10)[1] = 1.0f; // clipped, in the middle
+    image.pixel(0, 0)[0] = 0.9f; // outside the disc
     const sampling::Sample sample = sampling::meanColour(image, 10.5, 10.5, 3.0);
     EXPECT_EQ(sample.clipped, 1);
     EXPECT_EQ(sample.used, 28);

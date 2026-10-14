@@ -11,7 +11,8 @@
   - [Check out the Git Repository](#check-out-the-git-repository)
   - [Install the Libraries](#install-the-libraries)
   - [Build the Project](#build-the-project)
-  - [Package for Linux](#package-for-linux)
+  - [Make the Packages](#make-the-packages)
+  - [Make a Release](#make-a-release)
   - [Use the Engine in Another Program](#use-the-engine-in-another-program)
 - [Running the Application](#running-the-application)
   - [Open a Picture](#open-a-picture)
@@ -66,7 +67,7 @@ You need CMake 3.22 or later, a C++23 compiler such as GCC 13, and these librari
 `./install-deps.sh` needs a C and a C++ compiler, CMake, make, curl and zlib.
 
 > [!NOTE]
-> The editor is built and tested on Ubuntu 24.04. The code is written for macOS and Windows too, but it has not been built there yet.
+> StepIt Grader runs on Ubuntu 24.04 or later, Windows 11 and macOS 26 or later, on both Apple Silicon and Intel Macs. The CI builds and tests it on all three on every pull request.
 
 ### Ubuntu 24.04
 
@@ -105,7 +106,7 @@ export Qt6_DIR=~/Qt/6.11.0/gcc_64/lib/cmake/Qt6
 
    ```bash
    pacman -S --needed mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja \
-       mingw-w64-x86_64-pkgconf mingw-w64-x86_64-zlib mingw-w64-x86_64-qt6 make curl git
+       mingw-w64-x86_64-pkgconf mingw-w64-x86_64-zlib mingw-w64-x86_64-qt6 make curl git diffutils
    ```
 
 ## Install StepIt Grader
@@ -151,22 +152,42 @@ The programs are in `build/bin`:
 
 Build in `Release`. In `Debug`, the engine is still optimised, but the rest of the program is not.
 
-### Package for Linux
+### Make the Packages
 
-You can package both programs as an AppImage: a single file that runs on Linux without installing anything.
+Each system has a script in `setup/` that builds the project on its own, without the tests, and packages both programs with Qt and the other libraries. Run `./install-deps.sh` first, and set `Qt6_DIR`. The CI runs the same scripts and keeps their packages under **Artifacts** on each run's page.
 
-```bash
-./setup/linux/package-stepit-grader.sh
-```
+| System | Script | Package, in `build/` |
+|---|---|---|
+| Ubuntu | `./setup/linux/package-stepit-grader.sh` | `linux-package/stepit-grader-<version>-x86_64.AppImage`: one file that runs without installing anything, on Linux systems at least as recent as the one that built it. |
+| macOS | `./setup/mac/package-stepit-grader.sh` | `macos-package/StepItGrader-<version>-macos.dmg`: a universal app, for Apple Silicon and Intel. The command-line tool is `StepItGrader.app/Contents/MacOS/stepit-grader-cli`. |
+| Windows, in the MSYS2 MINGW64 terminal | `./setup/win/package-stepit-grader.sh` | `win-package/StepItGrader-<version>-setup.exe`, an installer, and `win-package/StepItGrader-<version>-win64.zip`, the same files to unzip anywhere. The command-line tool is `stepit-grader-cli.exe`, beside the editor. |
 
-The script builds the project and bundles Qt and the other libraries with [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy), which `./install-deps.sh` downloads. It writes `build/linux-package/stepit-grader-<version>-x86_64.AppImage`. Run it like this:
+The AppImage uses [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy), which `./install-deps.sh` downloads. Run it like this:
 
 ```bash
 ./stepit-grader-0.1.0-x86_64.AppImage                  # the editor
 ./stepit-grader-0.1.0-x86_64.AppImage --cli --help     # the command-line tool
 ```
 
-The AppImage runs on Linux systems at least as recent as the one that built it.
+The DMG needs Xcode's command-line tools. On macOS the libraries of `./install-deps.sh` are built for both architectures. On Windows the installer needs [Inno Setup 6](https://jrsoftware.org/isinfo.php): install it, and put its folder on the `PATH`, e.g. `export PATH="$PATH:/c/Program Files (x86)/Inno Setup 6"`; the script also needs `pacman -S mingw-w64-x86_64-qt6-tools zip`.
+
+> [!NOTE]
+> The packages are not signed. The first time, macOS says the app is from an unidentified developer: right-click it and choose **Open**. Windows SmartScreen asks too: choose **More info**, then **Run anyway**.
+
+### Make a Release
+
+A tag `v<version>` on `main` makes a release, with the packages of the three systems:
+
+1. Set the version in `CMakeLists.txt`, e.g. `VERSION 0.2.0`, and merge it into `main`.
+2. Tag that commit with the same version and push the tag:
+
+   ```bash
+   git checkout main && git pull
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+
+The CI builds, tests and packages StepIt Grader on the three systems, then publishes a GitHub Release, **StepIt Grader 0.2.0**, with the AppImage, the DMG, the installer and the ZIP, and notes listing the pull requests merged since the last release. It fails if the tag is not the version of `CMakeLists.txt`. To make a release again, delete the tag (`git tag -d v0.2.0 && git push origin :refs/tags/v0.2.0`), fix what failed, and tag again.
 
 ### Use the Engine in Another Program
 
@@ -454,3 +475,4 @@ StepIt Grader is released under the MIT licence; see [`LICENSE`](LICENSE). It us
 | [zlib](https://zlib.net/) | zlib licence | Compression for libtiff. The system's copy is used. |
 | [GoogleTest](https://github.com/google/googletest) | BSD 3-Clause | The tests. |
 | [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy) | MIT | Builds the Linux AppImage. It is not included in the AppImage. |
+| [Inno Setup](https://jrsoftware.org/isinfo.php) | Inno Setup licence | Builds the Windows installer. It is not included in it. |

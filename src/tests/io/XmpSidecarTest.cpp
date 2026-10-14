@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 
 #include <fstream>
+#include <locale>
 #include <sstream>
 
 namespace fs = std::filesystem;
@@ -80,6 +81,31 @@ TEST(XmpSidecarTest, ReadsWhatAnotherEditorWrites)
     EXPECT_EQ(settings.values().at("Sharpness"), 40);
     EXPECT_DOUBLE_EQ(settings.value(core::SharpnessEffect::RADIUS), 1.5);
     EXPECT_FALSE(settings.has("Shadows2012"));
+}
+
+TEST(XmpSidecarTest, ReadsOnlyWholeNumbersInAnyLocale)
+{
+    const auto parsed = [](const std::string &exposure) {
+        const std::string document
+            = R"(<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+          <rdf:Description rdf:about="" xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+            crs:Exposure2012=")"
+              + exposure + R"("/></rdf:RDF></x:xmpmeta>)";
+        return imageio::xmp::parse(document, parameters());
+    };
+    // Where the user's locale writes a decimal comma, the sidecar's point still reads.
+    const std::locale before = std::locale::global(std::locale::classic());
+    try {
+        std::locale::global(std::locale{"de_DE.UTF-8"});
+    } catch (const std::runtime_error &) {
+        // Not installed: the classic locale is still a check.
+    }
+    EXPECT_DOUBLE_EQ(parsed("+0.65").value(ExposureEffect::EXPOSURE), 0.65);
+    EXPECT_DOUBLE_EQ(parsed("-1.5").value(ExposureEffect::EXPOSURE), -1.5);
+    for (const char *wrong : {"", "abc", "1.5x", " 1.5", "1,5"}) {
+        EXPECT_FALSE(parsed(wrong).has(ExposureEffect::EXPOSURE.id)) << '"' << wrong << '"';
+    }
+    std::locale::global(before);
 }
 
 TEST(XmpSidecarTest, ReadsSettingsWrittenAsElementsWithAnyPrefix)
