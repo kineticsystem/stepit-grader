@@ -264,12 +264,14 @@ build_project_once() {
         fi
     fi
 
-    # Configure CMake
+    # Configure CMake. The tests are listed when ctest runs, not after the
+    # build: without a run path, they cannot find the DLLs of deps/ here.
     echo "Configuring CMake with generator: ${DESIRED_GENERATOR}..."
     cmake "${PROJECT_ROOT}" \
         -G "${DESIRED_GENERATOR}" \
         -DCMAKE_BUILD_TYPE=Release \
-        -DSTEPIT_GRADER_BUILD_TESTS=ON
+        -DSTEPIT_GRADER_BUILD_TESTS=ON \
+        -DCMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST
 
     # Build
     echo "Building with ${BUILD_COMMAND}..."
