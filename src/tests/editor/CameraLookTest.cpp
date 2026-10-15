@@ -4,7 +4,7 @@
 #include "../testutils/Fakes.h"
 #include "core/StandardPipeline.h"
 #include "editor/CameraLookUtils.h"
-#include "editor/Status.h"
+#include "editor/ProgressMonitor.h"
 #include "editor/WaitingDialog.h"
 #include "imageio/RawReader.h"
 
@@ -74,27 +74,27 @@ TEST(CameraLookTest, AJpegOfAnotherShapeIsRefusedAndOfAnotherSizeScaled)
 
 TEST(WaitingDialogTest, FollowsTheStatusAndAsksToStop)
 {
-    auto controller = std::make_shared<StatusController>();
-    WaitingDialog dialog{controller, "Stop"};
+    auto monitor = std::make_shared<ProgressMonitor>();
+    WaitingDialog dialog{monitor, "Stop"};
     dialog.show();
-    controller->setStatus(Status{"Halfway", 50});
+    monitor->setStatus(Status{"Halfway", 50});
     EXPECT_EQ(dialog.message(), "Halfway");
     EXPECT_EQ(dialog.progressBar()->value(), 50);
 
-    QSignalSpy spy{controller.get(), &StatusController::stopRequested};
+    QSignalSpy spy{monitor.get(), &ProgressMonitor::stopRequested};
     QTest::mouseClick(dialog.stopButton(), Qt::LeftButton);
-    EXPECT_TRUE(controller->isStopped());
+    EXPECT_TRUE(monitor->isStopped());
     EXPECT_FALSE(dialog.stopButton()->isEnabled());
     EXPECT_EQ(spy.count(), 1);
 }
 
 TEST(WaitingDialogTest, ClosingItAsksToStopAndWaitsForTheTask)
 {
-    auto controller = std::make_shared<StatusController>();
-    WaitingDialog dialog{controller, "Stop"};
+    auto monitor = std::make_shared<ProgressMonitor>();
+    WaitingDialog dialog{monitor, "Stop"};
     dialog.show();
     dialog.close();
-    EXPECT_TRUE(controller->isStopped());
+    EXPECT_TRUE(monitor->isStopped());
     EXPECT_TRUE(dialog.isVisible());
 }
 
@@ -105,9 +105,9 @@ TEST(CameraLookTest, MatchesARawFileAndStopsWhenAsked)
     if (!std::filesystem::exists(file)) {
         GTEST_SKIP() << "No " << file << ": run modules/raw-converter/bin/fetch-samples.sh";
     }
-    StatusController status;
+    ProgressMonitor status;
     std::vector<Status> statuses;
-    QObject::connect(&status, &StatusController::status, [&](const Status &s) {
+    QObject::connect(&status, &ProgressMonitor::status, [&](const Status &s) {
         statuses.push_back(s);
         // A dozen trials are enough to see it work: stop then.
         if (s.message.contains("trial 12,")) {
@@ -130,7 +130,7 @@ TEST(CameraLookTest, MatchesARawFileAndStopsWhenAsked)
 
 TEST(CameraLookTest, AFileThatIsNotARawIsReported)
 {
-    StatusController status;
+    ProgressMonitor status;
     const auto result = CameraLookUtils::matchCameraLook(
         {"/no/such/file.CR2"},
         imageio::RawShotReader{},

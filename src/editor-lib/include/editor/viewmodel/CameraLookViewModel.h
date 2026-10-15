@@ -5,7 +5,7 @@
 
 #include "core/CameraMatch.h"
 #include "core/Pipeline.h"
-#include "editor/Status.h"
+#include "editor/ProgressMonitor.h"
 
 #include <QObject>
 #include <QString>
@@ -55,7 +55,7 @@ public:
      * it; ends with the grade found applied and finished(), or with failed(). Returns nothing, and
      * starts nothing, while a match runs or with no file.
      */
-    std::shared_ptr<StatusController> start(const QStringList &raws);
+    std::shared_ptr<ProgressMonitor> start(const QStringList &raws);
 
     /// What the last match found and applied, in a line; empty before one, or after one failed.
     QString summary() const;
@@ -75,7 +75,7 @@ private:
     std::shared_ptr<const core::Pipeline> m_pipeline;
     std::shared_ptr<const imageio::CameraShotReader> m_reader;
     /// The match running, or none.
-    std::shared_ptr<StatusController> m_status;
+    std::shared_ptr<ProgressMonitor> m_status;
     /// The grade the last match found: none while one runs, nor after one failed.
     std::optional<core::match::Result> m_result;
 };

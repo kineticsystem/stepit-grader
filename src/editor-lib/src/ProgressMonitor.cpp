@@ -1,20 +1,20 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "editor/Status.h"
+#include "editor/ProgressMonitor.h"
 
-StatusController::StatusController()
+ProgressMonitor::ProgressMonitor()
 {
     // A Status crosses threads in a queued signal: Qt must know the type.
     qRegisterMetaType<Status>("Status");
 }
 
-void StatusController::setStatus(const Status &status)
+void ProgressMonitor::setStatus(const Status &status)
 {
     Q_EMIT this->status(status);
 }
 
-void StatusController::stop()
+void ProgressMonitor::stop()
 {
     m_stopped = true;
     Q_EMIT stopRequested();

@@ -63,7 +63,7 @@ std::expected<core::match::Result, QString> matchCameraLook(
     const imageio::CameraShotReader &reader,
     const core::Pipeline &pipeline,
     const core::Settings &base,
-    StatusController &status)
+    ProgressMonitor &status)
 {
     std::vector<core::match::Sample> samples;
     for (int i = 0; i < raws.size(); ++i) {
