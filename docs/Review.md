@@ -67,7 +67,7 @@ No view model includes a widget. Among the actions, only `PickWhiteBalanceAction
 | `SettingsStore` | [`SettingsStore.h`](../src/io-lib/include/imageio/SettingsStore.h) | Good. One implementation, the XMP sidecar, and a fake. The store decides where a sidecar lives (`location()`), so the document and the command-line tool never build its name. |
 | `core::match::Options` | [`CameraMatch.h`](../src/core-lib/include/core/CameraMatch.h) | Good. Progress and stopping are plain callbacks, and `base` holds the settings the grade goes over. So the search runs, and is tested, without Qt. |
 | The view models | [`viewmodel/`](../src/editor-lib/include/editor/viewmodel) | Good. `SaveImageViewModel`, `CameraLookViewModel`, `WhiteBalanceViewModel` and `LeavePictureViewModel` are given the document, the pipeline and what they read or store with. They answer calls and emit signals, and have no widgets. Their tests drive them the way the actions do. |
-| `StatusController` | [`Status.h`](../src/editor-lib/include/editor/Status.h) | Adequate. A thread-safe flag and a queued signal. It handles one task at a time, which is all the window needs. |
+| `ProgressMonitor` | [`ProgressMonitor.h`](../src/editor-lib/include/editor/ProgressMonitor.h) | Adequate. A thread-safe flag and a queued signal. It handles one task at a time, which is all the window needs. |
 | `AdjustmentsPanel` | [`AdjustmentsPanel.h`](../src/widgets-lib/include/widgets/AdjustmentsPanel.h) | Good. `addSectionWidget()`, `addSectionHeaderWidget()` and `addHeading()` let the window add to a section without the panel knowing why. `sectionTitles()` returns the titles in display order. |
 
 ## Separation of Concerns

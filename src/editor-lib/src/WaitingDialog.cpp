@@ -19,9 +19,9 @@ constexpr int MESSAGE_CHARACTERS = 60;
 } // namespace
 
 WaitingDialog::WaitingDialog(
-    std::shared_ptr<StatusController> controller, const QString &stopText, QWidget *parent)
+    std::shared_ptr<ProgressMonitor> monitor, const QString &stopText, QWidget *parent)
     : QDialog{parent}
-    , m_controller{std::move(controller)}
+    , m_monitor{std::move(monitor)}
     , m_message{new QLabel{this}}
     , m_progress{new QProgressBar{this}}
     , m_stop{new QPushButton{stopText, this}}
@@ -42,7 +42,7 @@ WaitingDialog::WaitingDialog(
     layout->addLayout(buttons);
 
     connect(m_stop, &QPushButton::clicked, this, &WaitingDialog::stop);
-    connect(m_controller.get(), &StatusController::status, this, [this](const Status &status) {
+    connect(m_monitor.get(), &ProgressMonitor::status, this, [this](const Status &status) {
         m_message->setText(status.message);
         m_progress->setValue(status.value);
     });
@@ -56,14 +56,14 @@ QString WaitingDialog::message() const
 void WaitingDialog::stop()
 {
     m_stop->setEnabled(false);
-    m_controller->stop();
+    m_monitor->stop();
 }
 
 void WaitingDialog::closeEvent(QCloseEvent *event)
 {
     // The window's close button stops the task as the Stop button does; the window stays until
     // the task ends, which closes it.
-    if (!m_controller->isStopped()) {
+    if (!m_monitor->isStopped()) {
         stop();
     }
     event->ignore();

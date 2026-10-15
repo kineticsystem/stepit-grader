@@ -6,7 +6,7 @@
 #include "core/CameraMatch.h"
 #include "core/Image.h"
 #include "core/Pipeline.h"
-#include "editor/Status.h"
+#include "editor/ProgressMonitor.h"
 #include "imageio/CameraShotReader.h"
 
 #include <QImage>
@@ -48,6 +48,6 @@ std::expected<core::match::Result, QString> matchCameraLook(
     const imageio::CameraShotReader &reader,
     const core::Pipeline &pipeline,
     const core::Settings &base,
-    StatusController &status);
+    ProgressMonitor &status);
 
 } // namespace CameraLookUtils

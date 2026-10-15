@@ -76,7 +76,7 @@ struct CameraLookViewModelTest : ::testing::Test
         if (!status) {
             return false;
         }
-        QObject::connect(status.get(), &StatusController::status, [status](const Status &s) {
+        QObject::connect(status.get(), &ProgressMonitor::status, [status](const Status &s) {
             if (s.message.contains(QString{"trial %1,"}.arg(TRIALS_TO_SEE))) {
                 status->stop();
             }

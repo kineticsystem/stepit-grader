@@ -27,12 +27,12 @@ Q_DECLARE_METATYPE(Status)
  * thread, and the window receives it on its own thread through status(); the window asks the task
  * to stop with stop(), which the task reads with isStopped() between its steps.
  */
-class StatusController : public QObject
+class ProgressMonitor : public QObject
 {
     Q_OBJECT
 
 public:
-    StatusController();
+    ProgressMonitor();
 
     /// Thread-safe: may be called from the task's thread.
     void setStatus(const Status &status);

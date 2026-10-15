@@ -11,9 +11,9 @@ add_library(editor-lib STATIC
     include/editor/ImageExportUtils.h
     include/editor/MainWindow.h
     include/editor/PreviewRenderer.h
+    include/editor/ProgressMonitor.h
     include/editor/RecentFilesMenu.h
     include/editor/SessionProperties.h
-    include/editor/Status.h
     include/editor/ThemeMenu.h
     include/editor/WaitingDialog.h
     include/editor/actions/BeforeAfterToggleAction.h
@@ -38,8 +38,8 @@ add_library(editor-lib STATIC
     src/ImageExportUtils.cpp
     src/MainWindow.cpp
     src/PreviewRenderer.cpp
+    src/ProgressMonitor.cpp
     src/RecentFilesMenu.cpp
-    src/Status.cpp
     src/ThemeMenu.cpp
     src/ThemeUtils.cpp
     src/WaitingDialog.cpp

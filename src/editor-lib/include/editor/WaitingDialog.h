@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "editor/Status.h"
+#include "editor/ProgressMonitor.h"
 
 #include <QDialog>
 
@@ -24,7 +24,7 @@ class WaitingDialog : public QDialog
 
 public:
     WaitingDialog(
-        std::shared_ptr<StatusController> controller,
+        std::shared_ptr<ProgressMonitor> monitor,
         const QString &stopText,
         QWidget *parent = nullptr);
 
@@ -38,7 +38,7 @@ protected:
 private:
     void stop();
 
-    std::shared_ptr<StatusController> m_controller;
+    std::shared_ptr<ProgressMonitor> m_monitor;
     QLabel *m_message;
     QProgressBar *m_progress;
     QPushButton *m_stop;

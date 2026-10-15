@@ -50,12 +50,12 @@ QString CameraLookViewModel::folder() const
     return QFileInfo{m_document->path()}.absolutePath();
 }
 
-std::shared_ptr<StatusController> CameraLookViewModel::start(const QStringList &raws)
+std::shared_ptr<ProgressMonitor> CameraLookViewModel::start(const QStringList &raws)
 {
     if (isRunning() || raws.isEmpty()) {
         return nullptr;
     }
-    m_status = std::make_shared<StatusController>();
+    m_status = std::make_shared<ProgressMonitor>();
     // A grade found before is not this match's: it is not offered once this one fails.
     m_result.reset();
     // The picture's settings as the match starts: the grade found goes over them.
