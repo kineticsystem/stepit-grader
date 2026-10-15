@@ -20,9 +20,9 @@ LibRaw, Little CMS, libtiff, pugixml and GoogleTest come from `deps/<library>`, 
 
 ## Packaging
 
-StepIt Grader runs on Ubuntu 24.04 or later, Windows 11 and macOS 26 or later (Apple Silicon and Intel). Each script needs `./install-deps.sh` first and packages both programs:
+StepIt Grader runs on Ubuntu 24.04 or later, Windows 11 and macOS 26 or later (Apple Silicon and Intel). Each script needs `./install-deps.sh` first and packages both programs and the tests, which the CI runs from the package, with its libraries only:
 
-- `setup/linux/package-stepit-grader.sh`: the AppImage (`--cli` for the command line), into `build/linux-package/`, with linuxdeploy, which `install-deps.sh` downloads into `deps/linuxdeploy`.
+- `setup/linux/package-stepit-grader.sh`: the AppImage (`--cli` for the command line, `--run-tests` for the tests), into `build/linux-package/`, with linuxdeploy, which `install-deps.sh` downloads into `deps/linuxdeploy`.
 - `setup/mac/package-stepit-grader.sh`: a universal DMG into `build/macos-package/`. The oldest macOS is `CMAKE_OSX_DEPLOYMENT_TARGET` in `CMakeLists.txt`, the only place it is set.
 - `setup/win/package-stepit-grader.sh`, in MSYS2 MINGW64: an Inno Setup installer and a ZIP into `build/win-package/`.
 

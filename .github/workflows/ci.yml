@@ -14,7 +14,9 @@
 # Each system then makes its packages, with the scripts of setup/, and keeps
 # them as the run's artifacts: the AppImage on Ubuntu, a universal DMG on macOS,
 # for Apple Silicon and Intel, and an installer and a portable ZIP on Windows.
-# None is signed. On a tag v<version>, a last job publishes them as the
+# Each package holds the tests too, run from it where the build's libraries
+# cannot be found, so that a library the package misses fails the job. None is
+# signed. On a tag v<version>, a last job publishes them as the
 # release of that version.
 
 name: CI
@@ -94,6 +96,18 @@ jobs:
           export Qt6_DIR="$QT_ROOT_DIR/lib/cmake/Qt6"
           ./setup/linux/package-stepit-grader.sh
 
+      # The tests from the AppImage, on a bare Ubuntu with only what every
+      # desktop has: no Qt, no deps/.
+      - name: Test the AppImage
+        run: |
+          docker run --rm -v "$PWD/build/linux-package":/package:ro \
+            -e APPIMAGE_EXTRACT_AND_RUN=1 ubuntu:24.04 bash -c '
+              apt-get update -qq > /dev/null
+              DEBIAN_FRONTEND=noninteractive apt-get install -qq --no-install-recommends \
+                libgl1 libegl1 libopengl0 libx11-6 libx11-xcb1 libxcb1 libfontconfig1 > /dev/null
+              cp /package/*.AppImage /tmp/
+              cd /tmp && ./*.AppImage --run-tests'
+
       - uses: actions/upload-artifact@v4
         with:
           name: package-linux
@@ -164,6 +178,17 @@ jobs:
           lipo "$bundle/stepit-grader-cli" -verify_arch arm64 x86_64
           "$bundle/stepit-grader-cli" --help
           arch -x86_64 "$bundle/stepit-grader-cli" --help
+
+      # The tests from the bundle, on both architectures, with Qt and deps/
+      # moved away, so that only the bundle's libraries can be found.
+      - name: Test the bundle
+        run: |
+          mv deps deps.away
+          mv "$QT_ROOT_DIR" "$QT_ROOT_DIR.away"
+          trap 'mv deps.away deps; mv "$QT_ROOT_DIR.away" "$QT_ROOT_DIR"' EXIT
+          bundle=build/macos-package/StepItGrader.app/Contents/MacOS
+          "$bundle/stepit-grader-tests"
+          arch -x86_64 "$bundle/stepit-grader-tests"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -252,11 +277,13 @@ jobs:
           export PATH="$PATH:/c/Program Files (x86)/Inno Setup 6"
           ./setup/win/package-stepit-grader.sh
 
-      # The packaged programs start with the DLLs beside them alone.
+      # The packaged programs start, and the tests pass, with the DLLs beside
+      # them alone.
       - name: Check the package
         run: |
           export PATH="/c/Windows/System32:/c/Windows"
           ./build/win-package/deploy-stepit-grader/stepit-grader-cli.exe --help
+          ./build/win-package/deploy-stepit-grader/stepit-grader-tests.exe
 
       - uses: actions/upload-artifact@v4
         with:

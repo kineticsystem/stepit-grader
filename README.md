@@ -154,19 +154,20 @@ Build in `Release`. In `Debug`, the engine is still optimised, but the rest of t
 
 ### Make the Packages
 
-Each system has a script in `setup/` that builds the project on its own, without the tests, and packages both programs with Qt and the other libraries. Run `./install-deps.sh` first, and set `Qt6_DIR`. The CI runs the same scripts and keeps their packages under **Artifacts** on each run's page.
+Each system has a script in `setup/` that builds the project on its own and packages both programs with Qt and the other libraries. Each package also holds the tests, to run them with the package's own libraries. Run `./install-deps.sh` first, and set `Qt6_DIR`. The CI runs the same scripts and keeps their packages under **Artifacts** on each run's page.
 
 | System | Script | Package, in `build/` |
 |---|---|---|
 | Ubuntu | `./setup/linux/package-stepit-grader.sh` | `linux-package/stepit-grader-<version>-x86_64.AppImage`: one file that runs without installing anything, on Linux systems at least as recent as the one that built it. |
-| macOS | `./setup/mac/package-stepit-grader.sh` | `macos-package/StepItGrader-<version>-macos.dmg`: a universal app, for Apple Silicon and Intel. The command-line tool is `StepItGrader.app/Contents/MacOS/stepit-grader-cli`. |
-| Windows, in the MSYS2 MINGW64 terminal | `./setup/win/package-stepit-grader.sh` | `win-package/StepItGrader-<version>-setup.exe`, an installer, and `win-package/StepItGrader-<version>-win64.zip`, the same files to unzip anywhere. The command-line tool is `stepit-grader-cli.exe`, beside the editor. |
+| macOS | `./setup/mac/package-stepit-grader.sh` | `macos-package/StepItGrader-<version>-macos.dmg`: a universal app, for Apple Silicon and Intel. The command-line tool is `StepItGrader.app/Contents/MacOS/stepit-grader-cli`, and the tests are `stepit-grader-tests` beside it. |
+| Windows, in the MSYS2 MINGW64 terminal | `./setup/win/package-stepit-grader.sh` | `win-package/StepItGrader-<version>-setup.exe`, an installer, and `win-package/StepItGrader-<version>-win64.zip`, the same files to unzip anywhere. The command-line tool is `stepit-grader-cli.exe`, beside the editor, and the tests are `stepit-grader-tests.exe`. |
 
 The AppImage uses [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy), which `./install-deps.sh` downloads. Run it like this:
 
 ```bash
 ./stepit-grader-0.1.0-x86_64.AppImage                  # the editor
 ./stepit-grader-0.1.0-x86_64.AppImage --cli --help     # the command-line tool
+./stepit-grader-0.1.0-x86_64.AppImage --run-tests      # the tests, with the AppImage's libraries
 ```
 
 The DMG needs Xcode's command-line tools. On macOS the libraries of `./install-deps.sh` are built for both architectures. On Windows the installer needs [Inno Setup 6](https://jrsoftware.org/isinfo.php): install it, and put its folder on the `PATH`, e.g. `export PATH="$PATH:/c/Program Files (x86)/Inno Setup 6"`; the script also needs `pacman -S mingw-w64-x86_64-qt6-tools zip`.

@@ -28,10 +28,12 @@ get_version() {
     sed -n 's/^ *VERSION \([0-9.]*\).*/\1/p' "${PROJECT_ROOT}/CMakeLists.txt" | head -1
 }
 
-# Builds the project, without the tests, once: remove ${BUILD_DIR}/.build_complete
-# to build it again.
+# Builds the project once: remove ${BUILD_DIR}/.build_complete to build it again.
+# The tests are built too, to be shipped in the bundle and run there, with its
+# libraries.
 build_project_once() {
-    if [[ -f "${BUILD_DIR}/.build_complete" && -d "${BUILD_DIR}/bin/stepit-grader.app" ]]; then
+    if [[ -f "${BUILD_DIR}/.build_complete" && -d "${BUILD_DIR}/bin/stepit-grader.app" &&
+        -f "${BUILD_DIR}/bin/stepit-grader-tests" ]]; then
         echo "Project already built. To build it again: rm ${BUILD_DIR}/.build_complete"
         return 0
     fi
@@ -43,7 +45,7 @@ build_project_once() {
     cmake -S "${PROJECT_ROOT}" -B "${BUILD_DIR}" -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_OSX_ARCHITECTURES="${MACOS_ARCHITECTURES}" \
-        -DSTEPIT_GRADER_BUILD_TESTS=OFF
+        -DSTEPIT_GRADER_BUILD_TESTS=ON
     cmake --build "${BUILD_DIR}" --parallel
     touch "${BUILD_DIR}/.build_complete"
 }
@@ -193,6 +195,17 @@ EOF
         mkdir -p "${imageformats_dir}"
         cp "$svg_plugin" "${imageformats_dir}/"
         chmod 755 "${imageformats_dir}/libqsvg.dylib"
+    fi
+
+    # macdeployqt deploys only the Cocoa platform; the tests run offscreen.
+    local offscreen_plugin="${QT_BASE_DIR}/plugins/platforms/libqoffscreen.dylib"
+    local platforms_dir="${app_bundle}/Contents/PlugIns/platforms"
+    if [[ " ${others} " == *" stepit-grader-tests "* && -f "$offscreen_plugin" &&
+        ! -f "${platforms_dir}/libqoffscreen.dylib" ]]; then
+        echo "Copying the offscreen platform plugin, for the tests..."
+        mkdir -p "${platforms_dir}"
+        cp "$offscreen_plugin" "${platforms_dir}/"
+        chmod 755 "${platforms_dir}/libqoffscreen.dylib"
     fi
 
     # Our libraries, not any of the same name that macdeployqt took from Qt.
