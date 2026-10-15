@@ -183,6 +183,8 @@ jobs:
       # moved away, so that only the bundle's libraries can be found.
       - name: Test the bundle
         run: |
+          # install-qt-action points Qt to its plugins: the bundle must use its own.
+          unset QT_PLUGIN_PATH QML2_IMPORT_PATH
           mv deps deps.away
           mv "$QT_ROOT_DIR" "$QT_ROOT_DIR.away"
           trap 'mv deps.away deps; mv "$QT_ROOT_DIR.away" "$QT_ROOT_DIR"' EXIT
