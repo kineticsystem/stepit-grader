@@ -19,7 +19,8 @@ get_version() {
     sed -n 's/^ *VERSION \([0-9.]*\).*/\1/p' "${PROJECT_ROOT}/CMakeLists.txt" | head -1
 }
 
-# Builds the project, without the tests, and installs it into ${BUILD_DIR}/AppDir.
+# Builds the project and installs it into ${BUILD_DIR}/AppDir. The tests are
+# built too, to be shipped in the AppImage and run there, with its libraries.
 build_project() {
     if [[ -z "${Qt6_DIR:-}" ]]; then
         error "Qt6_DIR is not set, e.g. export Qt6_DIR=~/Qt/6.11.0/gcc_64/lib/cmake/Qt6"
@@ -29,7 +30,7 @@ build_project() {
     cmake -S "${PROJECT_ROOT}" -B "${BUILD_DIR}" -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
-        -DSTEPIT_GRADER_BUILD_TESTS=OFF > /dev/null
+        -DSTEPIT_GRADER_BUILD_TESTS=ON > /dev/null
     cmake --build "${BUILD_DIR}" --parallel
     rm -rf "${BUILD_DIR}/AppDir"
     DESTDIR="${BUILD_DIR}/AppDir" cmake --install "${BUILD_DIR}" > /dev/null
@@ -55,7 +56,8 @@ setup_linuxdeploy() {
 # Makes the AppDir of an application, with linuxdeploy: its programs, Qt, and
 # every library they need, from deps/ or from the system.
 #   $1  the application, the name of its program, desktop file and icon
-#   $2  the other programs to include, space separated
+#   $2  the other programs to include, space separated: installed ones, or
+#       ones of the build only, as the tests are
 deploy_appdir() {
     local app="$1" others="${2:-}"
     local appdir="${BUILD_DIR}/AppDir_${app}"
@@ -65,7 +67,11 @@ deploy_appdir() {
     cp "${installed}/bin/${app}" "${appdir}/usr/bin/"
     local other executables=()
     for other in ${others}; do
-        cp "${installed}/bin/${other}" "${appdir}/usr/bin/"
+        if [[ -f "${installed}/bin/${other}" ]]; then
+            cp "${installed}/bin/${other}" "${appdir}/usr/bin/"
+        else
+            cp "${BUILD_DIR}/bin/${other}" "${appdir}/usr/bin/"
+        fi
         executables+=(--executable "${appdir}/usr/bin/${other}")
     done
 

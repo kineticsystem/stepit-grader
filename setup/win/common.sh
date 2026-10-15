@@ -221,7 +221,7 @@ scan_required_dlls() {
 
 build_project_once() {
     # Check if already built
-    if [ -f "${BUILD_DIR}/.build_complete" ]; then
+    if [ -f "${BUILD_DIR}/.build_complete" ] && [ -f "${BUILD_DIR}/bin/stepit-grader-tests.exe" ]; then
         echo "Project already built. Skipping build step."
         echo "To force rebuild, run: rm ${BUILD_DIR}/.build_complete"
         return 0
@@ -264,12 +264,14 @@ build_project_once() {
         fi
     fi
 
-    # Configure CMake
+    # Configure CMake. The tests are listed when ctest runs, not after the
+    # build: without a run path, they cannot find the DLLs of deps/ here.
     echo "Configuring CMake with generator: ${DESIRED_GENERATOR}..."
     cmake "${PROJECT_ROOT}" \
         -G "${DESIRED_GENERATOR}" \
         -DCMAKE_BUILD_TYPE=Release \
-        -DSTEPIT_GRADER_BUILD_TESTS=OFF
+        -DSTEPIT_GRADER_BUILD_TESTS=ON \
+        -DCMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST
 
     # Build
     echo "Building with ${BUILD_COMMAND}..."
@@ -349,6 +351,12 @@ collect_dependencies() {
     echo "Running windeployqt to collect Qt dependencies..."
     cd "${deploy_dir}"
     windeployqt6 --release --no-translations "${app_name}.exe" 2>/dev/null || windeployqt --release --no-translations "${app_name}.exe"
+    # The Qt modules of the extra programs too, e.g. Qt Test for the tests.
+    for extra in ${extra_files}; do
+        if [[ "${extra}" == *.exe && -f "${extra}" ]]; then
+            windeployqt6 --release --no-translations "${extra}" >/dev/null 2>&1 || true
+        fi
+    done
     cd "${BUILD_DIR}"
 
     # Copy required DLLs (REQUIRED_DLLS and REQUIRED_DLL_PATHS must be defined by scan_required_dlls)

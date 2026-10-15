@@ -29,6 +29,8 @@ using testutils::FakeStore;
 constexpr std::chrono::milliseconds SAVE_DELAY{200};
 /// Long enough for a save to have happened had one been due.
 constexpr int SETTLE_MS = 3 * SAVE_DELAY.count();
+/// Long enough for the fake reader to have read a picture on the file thread.
+constexpr std::chrono::milliseconds READ_TIME{200};
 
 core::Settings contrast(double value)
 {
@@ -171,11 +173,24 @@ TEST_F(DocumentTest, OpensTheImageWithItsSavedSettings)
     EXPECT_EQ(changed.count(), 1);
 }
 
+TEST_F(DocumentTest, IsOpeningUntilThePictureIsTakenIn)
+{
+    document.open("/pictures/a.tif");
+    // The read ends on the file thread, but no event runs here to take the picture in.
+    std::this_thread::sleep_for(READ_TIME);
+    EXPECT_TRUE(document.isOpening());
+    EXPECT_FALSE(document.isOpen());
+
+    ASSERT_TRUE(QTest::qWaitFor([&] { return document.isOpen(); }, 5000));
+    EXPECT_FALSE(document.isOpening());
+}
+
 TEST_F(DocumentTest, ReportsAnImageThatCannotBeRead)
 {
     QSignalSpy failed{&document, &Document::openFailed};
     openAndWait("/pictures/a.jpg");
     EXPECT_FALSE(document.isOpen());
+    EXPECT_FALSE(document.isOpening());
     ASSERT_EQ(failed.count(), 1);
     EXPECT_TRUE(failed.first().at(0).toString().contains("a.jpg"));
 }

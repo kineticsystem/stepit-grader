@@ -678,15 +678,15 @@ The view models run their work through [`ConcurrentUtils::run(context, work, don
 
 ## The Packages and the CI
 
-StepIt Grader runs on Ubuntu 24.04 or later, Windows 11 and macOS 26 or later. Each system has a packaging script in `setup/`, which builds the project on its own, without the tests, and packages both programs with Qt and the other libraries. None is signed.
+StepIt Grader runs on Ubuntu 24.04 or later, Windows 11 and macOS 26 or later. Each system has a packaging script in `setup/`, which builds the project on its own and packages both programs with Qt and the other libraries. Each package also holds the test program. The tests run from the package, with its libraries only. So they find a library that the package misses, or one that clashes with the system's. None is signed.
 
 ### The Linux AppImage
 
 [`setup/linux/package-stepit-grader.sh`](../setup/linux/package-stepit-grader.sh) makes one AppImage holding both programs, using the steps in [`common.sh`](../setup/linux/common.sh):
 
-1. Build the project into `build/linux-package`, without the tests, and install it into an `AppDir`.
+1. Build the project into `build/linux-package` and install it into an `AppDir`. The tests are not installed: the script takes them from the build.
 2. Bundle the programs, Qt and every library they need with linuxdeploy and its Qt plugin, which `install-deps.sh` downloads into `deps/linuxdeploy`. Qt's GTK3 theme is added for the desktop's fonts and dialogs, and the offscreen display platform for running headless.
-3. Replace linuxdeploy's `AppRun` with [`AppRun-stepit-grader.sh`](../setup/linux/AppRun-stepit-grader.sh), which starts the editor, or the command-line tool with `--cli`. Then make the AppImage.
+3. Replace linuxdeploy's `AppRun` with [`AppRun-stepit-grader.sh`](../setup/linux/AppRun-stepit-grader.sh), which starts the editor, the command-line tool with `--cli`, or the tests with `--run-tests`. Then make the AppImage.
 
 The application's icon and desktop file are in [`src/editor-app/resources`](../src/editor-app/resources), installed by CMake.
 
@@ -695,8 +695,8 @@ The application's icon and desktop file are in [`src/editor-app/resources`](../s
 [`setup/mac/package-stepit-grader.sh`](../setup/mac/package-stepit-grader.sh) makes `StepItGrader.app` and its DMG, using the steps in [`common.sh`](../setup/mac/common.sh):
 
 1. Build the project into `build/macos-package`, universal (`arm64;x86_64`). The oldest macOS it runs on is `CMAKE_OSX_DEPLOYMENT_TARGET` in `CMakeLists.txt`, the only place it is set: `install-deps.sh`, which builds the libraries of `deps/` for both architectures and checks them with `lipo`, and the script read it from there.
-2. Lay out the bundle: the editor and `stepit-grader-cli` in `Contents/MacOS`, the icon `stepit-grader.icns`, an `Info.plist` and a `qt.conf`.
-3. Run `macdeployqt` on both programs, with the folders of `deps/`, to copy Qt and the libraries into `Contents/Frameworks`. Then make every library's install name `@rpath`, remove the build machine's run paths, and copy any library of a library that `macdeployqt` missed.
+2. Lay out the bundle: the editor, `stepit-grader-cli` and `stepit-grader-tests` in `Contents/MacOS`, the icon `stepit-grader.icns`, an `Info.plist` and a `qt.conf`.
+3. Run `macdeployqt` on the programs, with the folders of `deps/`, to copy Qt and the libraries into `Contents/Frameworks`. Add the offscreen platform plugin, which the tests use. Then make every library's install name `@rpath`, remove the build machine's run paths, and copy any library of a library that `macdeployqt` missed.
 4. Sign the bundle ad hoc, as macOS requires once its files have changed, and make the DMG with `hdiutil`.
 
 ### The Windows Installer
@@ -704,7 +704,7 @@ The application's icon and desktop file are in [`src/editor-app/resources`](../s
 [`setup/win/package-stepit-grader.sh`](../setup/win/package-stepit-grader.sh), in an MSYS2 MINGW64 shell, uses the steps in [`common.sh`](../setup/win/common.sh):
 
 1. Build the project into `build/win-package`.
-2. Run `windeployqt6` for Qt, then follow the programs' DLLs with `ldd`, recursively, and copy those of `deps/` and of MinGW into `deploy-stepit-grader`, and check that none is missing.
+2. Run `windeployqt6` for Qt, on every program, then follow the programs' DLLs with `ldd`, recursively, and copy those of `deps/` and of MinGW into `deploy-stepit-grader`, and check that none is missing. Add the offscreen platform plugin, which the tests use.
 3. Zip the folder, and make the installer with Inno Setup from [`setup.iss`](../setup/win/setup.iss). Its `AppId` must never change: Windows knows the installed program by it, to update it.
 
 ### The CI
@@ -713,9 +713,9 @@ The application's icon and desktop file are in [`src/editor-app/resources`](../s
 
 | Job | Runner | Qt | After the tests |
 |---|---|---|---|
-| Ubuntu 24.04 | `ubuntu-24.04` | `install-qt-action` | The AppImage. |
-| macOS | `macos-latest` | `install-qt-action`, universal | The DMG; then both programs must have both architectures, and the command line must start, natively and as Intel. |
-| Windows | `windows-latest`, its own MSYS2 in `C:\msys64` | MSYS2's | The installer and the ZIP; then the command line must start with Windows' own DLLs alone on the `PATH`. |
+| Ubuntu 24.04 | `ubuntu-24.04` | `install-qt-action` | The AppImage; then its tests must pass in a bare `ubuntu:24.04` container, with only the libraries every desktop has (OpenGL, X11, fontconfig). |
+| macOS | `macos-latest` | `install-qt-action`, universal | The DMG; then both programs must have both architectures, and the command line must start, natively and as Intel. Then the bundle's tests must pass on both architectures, with Qt and `deps/` moved away. |
+| Windows | `windows-latest`, its own MSYS2 in `C:\msys64` | MSYS2's | The installer and the ZIP; then the command line must start, and the tests must pass, with Windows' own DLLs alone on the `PATH`. |
 
 `deps/` is cached under the hash of `install-deps.sh` and `scripts/`, and saved as soon as it is built, so a later failure does not build it again. `ctest` stops a test after two minutes. Each job keeps its packages as the run's artifacts. On a tag `v<version>`, the Release job checks that the tag is the version of `CMakeLists.txt` and publishes the packages as the release of that version.
 

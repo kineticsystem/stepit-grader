@@ -46,9 +46,10 @@ Document::~Document()
 
 void Document::open(const QString &path)
 {
-    if (m_opening.isRunning()) {
+    if (m_isOpening) {
         return;
     }
+    m_isOpening = true;
     // The settings waiting to be saved belong to the picture open, not to the next one: written
     // first, as the files are read and written in turn.
     save();
@@ -76,6 +77,7 @@ void Document::open(const QString &path)
 
 void Document::finishOpening()
 {
+    m_isOpening = false;
     Loaded loaded = m_opening.result();
     if (!loaded.image) {
         Q_EMIT openFailed(loaded.error);

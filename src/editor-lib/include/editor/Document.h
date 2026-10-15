@@ -57,7 +57,7 @@ public:
     void open(const QString &path);
 
     bool isOpen() const { return m_image != nullptr; }
-    bool isOpening() const { return m_opening.isRunning(); }
+    bool isOpening() const { return m_isOpening; }
     QString path() const { return m_path; }
     QString settingsPath() const;
     std::shared_ptr<const core::Image> image() const { return m_image; }
@@ -144,6 +144,9 @@ private:
     QThreadPool m_files;
     QFutureWatcher<Loaded> m_opening;
     QString m_openingPath;
+    /// From open() until finishOpening() takes the picture in, on this thread: the read itself
+    /// ends earlier, on the file thread, and a second picture must wait until then.
+    bool m_isOpening = false;
 
     QString m_path;
     std::shared_ptr<const core::Image> m_image;
