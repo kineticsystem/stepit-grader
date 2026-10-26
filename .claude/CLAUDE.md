@@ -49,7 +49,12 @@ For the `architect` and `reviewer` skills: what they cannot find out alone.
 - Includes between libraries: `grep -rhoE '#include "(core|imageio|widgets|editor|cli)/' src/<lib> | sort | uniq -c`. `core-lib`, `io-lib` and `cli-lib` include no Qt.
 - Tests: one table per folder of `src/tests`, with its count, `grep -rhE '^(TEST|TEST_F|TEST_P)\(' src/tests/<folder> | wc -l`; tests that need the raw samples are marked "(with the samples)".
 - A throwaway test goes in the folder of `src/tests` of its library, in the `add_executable()` of `src/tests/CMakeLists.txt`, and runs with `QT_QPA_PLATFORM=offscreen build/bin/stepit-grader-tests --gtest_filter='ReviewProbe.*'`.
+- **Diagrams** follow the `beautiful-mermaid-diagrams` skill, not the blue style of `write-docs`: colours by role, compact, readable in light and dark mode. Each is shown as an image: its source is `docs/diagrams/<name>.mmd`, rendered by `bin/render-diagrams.sh` into an SVG beside it (it needs Node.js and Chrome); commit both. `bin/check-diagrams.sh`, run by the Ubuntu job of the CI, fails when an SVG is older than its source.
 - Rules kept in step by hand, for the review: the effects and `makeStandardPipeline()`, the parameter ids and the names other raw editors give them, the slider ids of `core::match::standardStages()`.
+
+## Pull Request Notes
+
+Each pull request has a notes file in [docs/pr/](../docs/pr/README.md): what we discussed, what we chose, and why. One file per pull request, written while the branch is open. Keep them simple: short sentences, one idea per paragraph, and a diagram when it explains faster than words.
 
 ## Rules
 
