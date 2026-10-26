@@ -42,89 +42,8 @@ The design follows one idea: **an edit is a set of named values, never pixels**.
 
 The code has six static libraries and two programs: the editor and the command-line tool. Both programs share the engine and the file handling. Each library depends only on the libraries below it. Only the widgets library and the editor library use Qt.
 
-```mermaid
----
-config:
-  theme: base
-  themeCSS: ".edgeLabel p { padding: 4px 10px; }"
-  flowchart:
-    padding: 20
-    nodeSpacing: 40
-    rankSpacing: 50
-  class:
-    padding: 16
-  sequence:
-    boxMargin: 12
-    boxTextMargin: 8
-    noteMargin: 28
-    messageMargin: 40
-    actorMargin: 60
-    labelBoxWidth: 56
-    labelBoxHeight: 28
-  themeVariables:
-    primaryColor: "#3b6fb6"
-    primaryTextColor: "#ffffff"
-    primaryBorderColor: "#2c5590"
-    lineColor: "#8b949e"
-    textColor: "#4d86d6"
-    actorBkg: "#3b6fb6"
-    actorBorder: "#2c5590"
-    actorTextColor: "#ffffff"
-    actorLineColor: "#8b949e"
-    signalColor: "#8b949e"
-    signalTextColor: "#4d86d6"
-    noteBkgColor: "#3b6fb6"
-    noteTextColor: "#ffffff"
-    noteBorderColor: "#2c5590"
-    secondaryColor: "#3b6fb6"
-    tertiaryColor: "#3b6fb6"
-    clusterBkg: "transparent"
-    clusterBorder: "#8b949e"
-    titleColor: "#4d86d6"
-    edgeLabelBackground: "#3b6fb6"
-    classText: "#ffffff"
-    labelBoxBkgColor: "#3b6fb6"
-    labelBoxBorderColor: "#2c5590"
-    labelTextColor: "#ffffff"
-    loopTextColor: "#4d86d6"
-    mainBkg: "#3b6fb6"
-    nodeBorder: "#2c5590"
-    nodeTextColor: "#ffffff"
-    secondaryBorderColor: "#2c5590"
-    secondaryTextColor: "#ffffff"
-    tertiaryBorderColor: "#2c5590"
-    tertiaryTextColor: "#ffffff"
-    errorBkgColor: "#3b6fb6"
-    errorTextColor: "#ffffff"
----
-flowchart TB
-    App["stepit-grader<br/>the editor's main()"]
-    Cli["stepit-grader-cli<br/>the command line's main()"]
-    Editor["editor-lib<br/>Document, view models, actions,<br/>PreviewRenderer, MainWindow"]
-    Widgets["widgets-lib<br/>AdjustmentsPanel, sliders, ImageView"]
-    CliLib["cli-lib<br/>Options, Grader"]
-    IO["io-lib<br/>readers, TIFF writer, XMP sidecar"]
-    Core["core-lib<br/>Image, Effect, Pipeline, the effects"]
-    Raw["raw-converter<br/>submodule"]
-    Qt["Qt 6<br/>Widgets, Concurrent, Svg"]
-    Libs["libtiff, Little CMS, pugixml"]
-    LibRaw["LibRaw"]
-    App --> Editor
-    Cli --> CliLib
-    Editor --> Widgets
-    Editor --> IO
-    Editor --> Qt
-    CliLib --> IO
-    Widgets --> Qt
-    IO --> Raw
-    IO --> Libs
-    Raw --> LibRaw
-    Widgets --> Core
-    IO --> Core
-    CliLib --> Core
-
-    classDef default fill:#3b6fb6,stroke:#2c5590,color:#ffffff
-```
+<!-- The source is diagrams/libraries.mmd: change it, then run bin/render-diagrams.sh. -->
+<p align="center"><img src="diagrams/libraries.svg" alt="The programs and the libraries: stepit-grader on editor-lib, which uses widgets-lib, io-lib and Qt 6; stepit-grader-cli on cli-lib, which uses io-lib and core-lib; widgets-lib on Qt 6 and core-lib; io-lib on core-lib, raw-converter, which uses LibRaw, and libtiff, Little CMS and pugixml." width="891"></p>
 
 | Program | What it is |
 |---|---|
@@ -395,74 +314,8 @@ The editor's code has three layers. This way a rule can be tested without a wind
 
 A model or a view model never calls a view, and never knows one. A test drives a view model the way its action would, with fake readers and stores for the document, and checks its signals.
 
-```mermaid
----
-config:
-  theme: base
-  themeCSS: ".edgeLabel p { padding: 4px 10px; }"
-  flowchart:
-    padding: 20
-    nodeSpacing: 40
-    rankSpacing: 50
-  class:
-    padding: 16
-  sequence:
-    boxMargin: 12
-    boxTextMargin: 8
-    noteMargin: 28
-    messageMargin: 40
-    actorMargin: 60
-    labelBoxWidth: 56
-    labelBoxHeight: 28
-  themeVariables:
-    primaryColor: "#3b6fb6"
-    primaryTextColor: "#ffffff"
-    primaryBorderColor: "#2c5590"
-    lineColor: "#8b949e"
-    textColor: "#4d86d6"
-    actorBkg: "#3b6fb6"
-    actorBorder: "#2c5590"
-    actorTextColor: "#ffffff"
-    actorLineColor: "#8b949e"
-    signalColor: "#8b949e"
-    signalTextColor: "#4d86d6"
-    noteBkgColor: "#3b6fb6"
-    noteTextColor: "#ffffff"
-    noteBorderColor: "#2c5590"
-    secondaryColor: "#3b6fb6"
-    tertiaryColor: "#3b6fb6"
-    clusterBkg: "transparent"
-    clusterBorder: "#8b949e"
-    titleColor: "#4d86d6"
-    edgeLabelBackground: "#3b6fb6"
-    classText: "#ffffff"
-    labelBoxBkgColor: "#3b6fb6"
-    labelBoxBorderColor: "#2c5590"
-    labelTextColor: "#ffffff"
-    loopTextColor: "#4d86d6"
-    mainBkg: "#3b6fb6"
-    nodeBorder: "#2c5590"
-    nodeTextColor: "#ffffff"
-    secondaryBorderColor: "#2c5590"
-    secondaryTextColor: "#ffffff"
-    tertiaryBorderColor: "#2c5590"
-    tertiaryTextColor: "#ffffff"
-    errorBkgColor: "#3b6fb6"
-    errorTextColor: "#ffffff"
----
-flowchart TB
-    Main["main()<br/>makes them all"]
-    Window["MainWindow<br/>lays out and connects"]
-    Action["an action, e.g. SaveImageAction<br/>dialogs only"]
-    ViewModel["a view model, e.g. SaveImageViewModel<br/>the rules, the work in the background"]
-    Document["Document<br/>the model every view shares"]
-    Main -- gives the view models --> Window
-    Window -- makes, given its view model --> Action
-    Action -- calls --> ViewModel
-    ViewModel -- calls --> Document
-    ViewModel -. signals .-> Action
-    Document -. signals .-> Window
-```
+<!-- The source is diagrams/view-models.mmd: change it, then run bin/render-diagrams.sh. -->
+<p align="center"><img src="diagrams/view-models.svg" alt="main() gives the view models to MainWindow, which makes each action with its view model; the action calls the view model, which calls the Document; the view model signals the action, and the Document signals the window." width="313"></p>
 
 [`main()`](../src/editor-app/src/main.cpp) creates the view models, like it creates the document, and gives them to `MainWindow`. The window creates each action with its view model, adds it to a menu, and enables it once a picture is open. The window also listens to view-model signals that the status bar displays.
 
@@ -588,74 +441,8 @@ The program converts its pictures to the working space (linear Rec. 2020, in flo
 
 ## A Slider Moves
 
-```mermaid
----
-config:
-  theme: base
-  themeCSS: ".edgeLabel p { padding: 4px 10px; }"
-  flowchart:
-    padding: 20
-    nodeSpacing: 40
-    rankSpacing: 50
-  class:
-    padding: 16
-  sequence:
-    boxMargin: 12
-    boxTextMargin: 8
-    noteMargin: 28
-    messageMargin: 40
-    actorMargin: 60
-    labelBoxWidth: 56
-    labelBoxHeight: 28
-  themeVariables:
-    primaryColor: "#3b6fb6"
-    primaryTextColor: "#ffffff"
-    primaryBorderColor: "#2c5590"
-    lineColor: "#8b949e"
-    textColor: "#4d86d6"
-    actorBkg: "#3b6fb6"
-    actorBorder: "#2c5590"
-    actorTextColor: "#ffffff"
-    actorLineColor: "#8b949e"
-    signalColor: "#8b949e"
-    signalTextColor: "#4d86d6"
-    noteBkgColor: "#3b6fb6"
-    noteTextColor: "#ffffff"
-    noteBorderColor: "#2c5590"
-    secondaryColor: "#3b6fb6"
-    tertiaryColor: "#3b6fb6"
-    clusterBkg: "transparent"
-    clusterBorder: "#8b949e"
-    titleColor: "#4d86d6"
-    edgeLabelBackground: "#3b6fb6"
-    classText: "#ffffff"
-    labelBoxBkgColor: "#3b6fb6"
-    labelBoxBorderColor: "#2c5590"
-    labelTextColor: "#ffffff"
-    loopTextColor: "#4d86d6"
-    mainBkg: "#3b6fb6"
-    nodeBorder: "#2c5590"
-    nodeTextColor: "#ffffff"
-    secondaryBorderColor: "#2c5590"
-    secondaryTextColor: "#ffffff"
-    tertiaryBorderColor: "#2c5590"
-    tertiaryTextColor: "#ffffff"
-    errorBkgColor: "#3b6fb6"
-    errorTextColor: "#ffffff"
----
-sequenceDiagram
-    participant Panel as AdjustmentsPanel
-    participant Doc as Document
-    participant Renderer as PreviewRenderer
-    participant View as ImageView
-    Panel->>Doc: settingsChanged(settings)
-    Doc->>Renderer: settingsChanged(settings)
-    Note over Renderer: preview pass, on a worker
-    Renderer->>View: rendered(preview, fullSize, false)
-    Note over Renderer: 0.3 s without a change
-    Note over Renderer: full pass, on a worker
-    Renderer->>View: rendered(full, fullSize, true)
-```
+<!-- The source is diagrams/slider-moves.mmd: change it, then run bin/render-diagrams.sh. -->
+<p align="center"><img src="diagrams/slider-moves.svg" alt="AdjustmentsPanel sends settingsChanged to the Document, which passes it to PreviewRenderer; the renderer makes a preview pass on a worker and sends it to ImageView, then, after 0.3 s without a change, a full pass, which it sends too." width="792"></p>
 
 A dragged slider sends a change for every step. Each change starts a preview if none is running, or replaces the one waiting. It stops the running preview, at most once until a picture is shown. The full pass starts only once the slider stops.
 
